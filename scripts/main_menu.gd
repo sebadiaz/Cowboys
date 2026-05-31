@@ -33,6 +33,12 @@ func _ready() -> void:
 	play.pressed.connect(_on_play)
 	box.add_child(play)
 
+	var visual := Button.new()
+	visual.text = "Voir le décor banque (test)"
+	visual.custom_minimum_size = Vector2(460, 46)
+	visual.pressed.connect(_on_visual_test)
+	box.add_child(visual)
+
 	box.add_child(_spacer(10))
 
 	box.add_child(_label(
@@ -52,6 +58,10 @@ func _ready() -> void:
 
 func _on_play() -> void:
 	GameManager.start_mission()
+
+
+func _on_visual_test() -> void:
+	get_tree().change_scene_to_file("res://scenes/levels/BankVisualTest.tscn")
 
 
 func _label(text: String, font_size: int, color: Color) -> Label:

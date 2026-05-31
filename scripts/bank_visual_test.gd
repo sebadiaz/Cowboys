@@ -120,3 +120,22 @@ func _build_title() -> void:
 	lbl.add_theme_constant_override("outline_size", 4)
 	lbl.position = Vector2(16, 12)
 	layer.add_child(lbl)
+
+	# Bouton retour (clic tactile / souris) pour ne pas rester bloqué sur web.
+	var back := Button.new()
+	back.text = "← Menu"
+	back.add_theme_font_size_override("font_size", 20)
+	back.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	back.position = Vector2(-150, 12)
+	back.custom_minimum_size = Vector2(130, 44)
+	back.pressed.connect(_back_to_menu)
+	layer.add_child(back)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("pause"):
+		_back_to_menu()
+
+
+func _back_to_menu() -> void:
+	GameManager.goto_main_menu()
