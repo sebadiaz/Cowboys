@@ -33,28 +33,34 @@ jobs:
 
       - name: Install Godot ${{ env.GODOT_VERSION }} + export templates
         run: |
-          set -e
+          set -euo pipefail
           BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
-          wget -q "${BASE}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-          wget -q "${BASE}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
-          unzip -q "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          wget -qO godot.zip "${BASE}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          wget -qO templates.tpz "${BASE}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q godot.zip
           chmod +x "Godot_v${GODOT_VERSION}-stable_linux.x86_64"
           sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
           mkdir -p "${HOME}/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
-          unzip -q "Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q templates.tpz
           mv templates/* "${HOME}/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+          godot --version
 
-      - name: Import des ressources
-        # Premier lancement headless pour importer les assets (icône, etc.).
-        run: godot --headless --path . --import || true
+      - name: Import des ressources (passe éditeur headless)
+        run: |
+          # Génère le cache d'import (.godot/). Tolérant : on continue même si
+          # Godot renvoie un code non nul ou s'arrête via le timeout.
+          timeout 120 godot --headless --editor --path . --quit-after 400 2>&1 | tail -n 40 || true
 
       - name: Export du build Web
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p build/web
-          godot --headless --path . --export-release "Web" build/web/index.html
-          # Évite le traitement Jekyll des fichiers Godot sur Pages.
+          godot --headless --path . --export-release "Web" build/web/index.html 2>&1 | tail -n 80
+          # Vérifie que l'export a bien produit les fichiers attendus.
+          test -f build/web/index.html
+          test -f build/web/index.wasm
           touch build/web/.nojekyll
+          echo "--- Contenu de build/web ---"
           ls -lh build/web
 
       - name: Upload de l'artefact Pages
@@ -70,6 +76,13 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Activer/configurer Pages
+        # enablement: true active GitHub Pages (source = Actions) sans réglage
+        # manuel dans les Settings, si le plan du dépôt le permet.
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Déployer sur Pages
         id: deployment
         uses: actions/deploy-pages@v4
