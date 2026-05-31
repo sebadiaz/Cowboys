@@ -48,11 +48,11 @@ func _input(event: InputEvent) -> void:
 		elif event.index == _touch_index:
 			_reset_joystick()
 	elif event is InputEventScreenDrag and _active and event.index == _touch_index:
-		var offset := event.position - _base
+		var offset: Vector2 = event.position - _base
 		if offset.length() > JOY_RADIUS:
 			offset = offset.normalized() * JOY_RADIUS
 		_knob = _base + offset
-		var v := offset / JOY_RADIUS
+		var v: Vector2 = offset / JOY_RADIUS
 		if v.length() < DEADZONE:
 			v = Vector2.ZERO
 		InputManager.set_touch_move(v)

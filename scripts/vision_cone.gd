@@ -54,7 +54,7 @@ func _draw() -> void:
 	var pts := PackedVector2Array()
 	pts.append(Vector2.ZERO)
 	for i in range(steps + 1):
-		var a := lerp(-half, half, float(i) / float(steps))
+		var a: float = lerpf(-half, half, float(i) / float(steps))
 		pts.append(Vector2.RIGHT.rotated(a) * view_distance)
 	draw_colored_polygon(pts, _fill)
 	# Contour des deux bords du cône.

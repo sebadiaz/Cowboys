@@ -106,14 +106,17 @@ func _build_pause_menu() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP  # bloque les clics derrière le menu
 	_pause_root.add_child(dim)
 
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pause_root.add_child(center)
+
 	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.position = Vector2(-110, -90)
-	box.custom_minimum_size = Vector2(220, 0)
+	box.custom_minimum_size = Vector2(260, 0)
 	box.add_theme_constant_override("separation", 16)
-	_pause_root.add_child(box)
+	center.add_child(box)
 
 	var title := _make_label("PAUSE", 36)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -121,15 +124,19 @@ func _build_pause_menu() -> void:
 
 	var resume := Button.new()
 	resume.text = "Reprendre"
-	resume.custom_minimum_size = Vector2(220, 48)
+	resume.custom_minimum_size = Vector2(260, 48)
 	resume.pressed.connect(_toggle_pause)
 	box.add_child(resume)
 
 	var menu := Button.new()
 	menu.text = "Menu principal"
-	menu.custom_minimum_size = Vector2(220, 48)
-	menu.pressed.connect(func() -> void: GameManager.goto_main_menu())
+	menu.custom_minimum_size = Vector2(260, 48)
+	menu.pressed.connect(_on_quit_to_menu)
 	box.add_child(menu)
+
+
+func _on_quit_to_menu() -> void:
+	GameManager.goto_main_menu()
 
 
 func _build_mobile_controls() -> void:

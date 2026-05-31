@@ -47,7 +47,7 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2.ZERO
 		return
 
-	var sees_player := _cone != null and _cone.can_see(player.global_position)
+	var sees_player: bool = _cone != null and _cone.can_see(player.global_position)
 
 	# Mise à jour de la détection.
 	if sees_player:
@@ -58,7 +58,7 @@ func _physics_process(delta: float) -> void:
 		_detect = max(0.0, _detect - DETECT_FALL * delta)
 
 	# Alerte globale forcée par la jauge d'alarme.
-	var global_alert := alarm != null and "global_alert" in alarm and alarm.global_alert
+	var global_alert: bool = alarm != null and "global_alert" in alarm and alarm.global_alert
 
 	# Transitions d'état.
 	if global_alert or _detect >= ALERT_THRESHOLD:
