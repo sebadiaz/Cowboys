@@ -1,0 +1,11 @@
+# Godot 4 — dossier de cache/import généré
+.godot/
+
+# Exports / builds
+/build/
+/export/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db

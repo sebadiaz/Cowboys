@@ -1,0 +1,44 @@
+extends Node
+## GameManager (autoload)
+## État global et transitions de scènes. Transporte le résultat de la mission
+## jusqu'à l'écran de résultat.
+
+const SCENE_MAIN_MENU := "res://scenes/MainMenu.tscn"
+const SCENE_MISSION := "res://scenes/MissionRoot.tscn"
+const SCENE_RESULT := "res://scenes/ResultScreen.tscn"
+
+## Résultat de la dernière mission jouée, lu par ResultScreen.
+var last_result := {
+	"success": false,
+	"loot_value": 0,
+	"loot_bags": 0,
+	"money_earned": 0,
+}
+
+
+func goto_main_menu() -> void:
+	_change_scene(SCENE_MAIN_MENU)
+
+
+func start_mission() -> void:
+	_change_scene(SCENE_MISSION)
+
+
+## Appelé par mission_manager à la fin d'une mission.
+func finish_mission(success: bool, loot_value: int, loot_bags: int) -> void:
+	var money_earned := loot_value if success else 0
+	last_result = {
+		"success": success,
+		"loot_value": loot_value,
+		"loot_bags": loot_bags,
+		"money_earned": money_earned,
+	}
+	if success:
+		SaveManager.register_success(money_earned)
+	_change_scene(SCENE_RESULT)
+
+
+func _change_scene(path: String) -> void:
+	# On s'assure que le jeu n'est pas en pause lors d'un changement de scène.
+	get_tree().paused = false
+	get_tree().change_scene_to_file(path)

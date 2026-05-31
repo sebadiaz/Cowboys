@@ -1,0 +1,11 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" rx="16" fill="#d9bd87"/>
+  <!-- chapeau de cowboy -->
+  <ellipse cx="64" cy="86" rx="44" ry="12" fill="#5a3a1c"/>
+  <path d="M40 80 Q44 44 64 44 Q84 44 88 80 Z" fill="#73491f"/>
+  <rect x="40" y="74" width="48" height="8" rx="4" fill="#4a2f16"/>
+  <!-- pièce $ -->
+  <circle cx="64" cy="34" r="16" fill="#f2cd24" stroke="#9c7a08" stroke-width="3"/>
+  <text x="64" y="41" font-family="Arial, sans-serif" font-size="20" font-weight="bold"
+        text-anchor="middle" fill="#6b5300">$</text>
+</svg>
