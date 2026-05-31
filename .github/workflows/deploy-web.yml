@@ -1,7 +1,10 @@
 name: Build & Deploy Web (jouable sur mobile)
 
-# Construit l'export HTML5/WebAssembly du jeu avec Godot 4 puis le publie sur
-# GitHub Pages. Une fois terminé, ouvre l'URL Pages depuis ton téléphone.
+# Construit l'export HTML5/WebAssembly du jeu avec Godot 4, puis publie le
+# résultat sur la branche "gh-pages". GitHub Pages sert ensuite cette branche.
+# Méthode volontairement sans environnement Pages ni action tierce : on pousse
+# le build avec le token intégré, ce qui fonctionne depuis n'importe quelle
+# branche (pas de restriction de "deployment branch").
 
 on:
   push:
@@ -11,21 +14,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# Un seul déploiement Pages à la fois.
 concurrency:
-  group: "pages"
+  group: "web-deploy"
   cancel-in-progress: false
 
 env:
   GODOT_VERSION: "4.3"
 
 jobs:
-  build:
-    name: Export Web
+  build-deploy:
+    name: Export Web + publication gh-pages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -47,8 +47,6 @@ jobs:
 
       - name: Import des ressources (passe éditeur headless)
         run: |
-          # Génère le cache d'import (.godot/). Tolérant : on continue même si
-          # Godot renvoie un code non nul ou s'arrête via le timeout.
           timeout 120 godot --headless --editor --path . --quit-after 400 2>&1 | tail -n 40 || true
 
       - name: Export du build Web
@@ -56,33 +54,23 @@ jobs:
           set -euo pipefail
           mkdir -p build/web
           godot --headless --path . --export-release "Web" build/web/index.html 2>&1 | tail -n 80
-          # Vérifie que l'export a bien produit les fichiers attendus.
           test -f build/web/index.html
           test -f build/web/index.wasm
-          touch build/web/.nojekyll
           echo "--- Contenu de build/web ---"
           ls -lh build/web
 
-      - name: Upload de l'artefact Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-
-  deploy:
-    name: Déploiement GitHub Pages
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Activer/configurer Pages
-        # enablement: true active GitHub Pages (source = Actions) sans réglage
-        # manuel dans les Settings, si le plan du dépôt le permet.
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: Déployer sur Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publier sur la branche gh-pages
+        run: |
+          set -euo pipefail
+          cd build/web
+          touch .nojekyll            # sert les fichiers tels quels (pas de Jekyll)
+          git init -q
+          git checkout -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy web build ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+          echo "Build publié sur la branche gh-pages."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

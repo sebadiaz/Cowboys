@@ -72,17 +72,22 @@ Un workflow GitHub Actions (`.github/workflows/deploy-web.yml`) **construit l'ex
 Web et le publie sur GitHub Pages** à chaque push. Tu obtiens une URL publique à
 ouvrir directement dans le navigateur de ton téléphone.
 
-**Étape unique à faire une fois** sur GitHub :
-`Settings → Pages → Build and deployment → Source = **GitHub Actions**`.
+**Étape unique à faire une fois** sur GitHub (après le 1er run réussi du
+workflow, qui crée la branche `gh-pages`) :
+`Settings → Pages → Build and deployment → Source = **Deploy from a branch** →
+Branch = **gh-pages** / **/(root)** → Save`.
 
 Ensuite, à chaque push (ou via `Actions → Build & Deploy Web → Run workflow`), le
-jeu est redéployé. L'URL est du type :
+build est régénéré et poussé sur `gh-pages`, et Pages se met à jour. L'URL est :
 
 ```
 https://sebadiaz.github.io/cowboys/
 ```
 
-(visible aussi dans l'onglet **Actions**, sur le job *Déploiement GitHub Pages*).
+> Pourquoi cette méthode : le workflow **pousse le build sur la branche
+> `gh-pages`** avec le token intégré, au lieu de passer par l'« environnement
+> github-pages ». Ça évite les *règles de protection d'environnement* qui
+> bloquent les déploiements depuis une branche non-défaut.
 
 > Détails techniques : l'export désactive le *thread support* Godot
 > (`variant/thread_support=false`) pour fonctionner sur GitHub Pages, qui n'envoie
