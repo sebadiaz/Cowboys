@@ -8,8 +8,9 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [ ] Effets : poussière, flash d'alarme, particules sur le coffre.
 
 ## Assets & intégration (suite)
-- [ ] Remplacer les planches **placeholder** par le vrai art (mêmes chemins/grille).
-- [ ] **Découpage précis des sprites** (régions exactes au pixel, marges propres).
+- [x] Intégrer les vraies planches PNG (1254²) + props en régions d'atlas.
+- [ ] **Cadrage précis des régions** au pixel (les `region_rect` sont à l'œil).
+- [ ] Exploiter `western_exterior_sheet.png` (scène d'extérieur / rue).
 - [ ] Créer un **vrai TileSet Godot** (`assets/tilesets/`) pour sol et murs.
 - [ ] **Collisions plus précises** sur les props (formes ajustées au visuel).
 - [ ] **Séparation définitive** props décoratifs / objets gameplay.

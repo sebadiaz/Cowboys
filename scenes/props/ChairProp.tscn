@@ -1,7 +1,7 @@
 [gd_scene load_steps=2 format=3]
-[ext_resource type="Texture2D" path="res://assets/source_sheets/bank_props_sheet.png" id="1"]
+[ext_resource type="Texture2D" path="res://assets/source_sheets/bank_interior_sheet.png" id="1"]
 [node name="ChairProp" type="Node2D"]
 [node name="Sprite2D" type="Sprite2D" parent="."]
 texture = ExtResource("1")
 region_enabled = true
-region_rect = Rect2(0, 128, 128, 128)
+region_rect = Rect2(520, 385, 180, 235)

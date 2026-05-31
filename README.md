@@ -105,18 +105,18 @@ https://sebadiaz.github.io/cowboys/
 Les décors sont fournis sous forme de **planches PNG** (atlas) découpées par
 **régions d'atlas** sur des `Sprite2D` — pas de fichiers individuels par objet.
 
-**Où placer les PNG :** `assets/source_sheets/`
-- `bank_interior_sheet.png` — sol, tapis, mur, comptoir
-- `bank_props_sheet.png` — coffre, porte de coffre, sac, bureau, chaise, baril, caisse
-- `western_exterior_sheet.png` — sable, façade, mur extérieur, porte
+**Où placer les PNG :** `assets/source_sheets/` (planches 1254 × 1254)
+- `bank_props_sheet.png` — **bâtiment** : sols, murs, comptoirs « BANK », tapis, portes
+- `bank_interior_sheet.png` — **objets** : porte de coffre, coffre, bureau, chaise, barils, caisses, sacs `$`
+- `western_exterior_sheet.png` — **extérieurs** : sable, barrières, cactus, chariot, façades
 
-> ⚠️ Les planches livrées sont des **placeholders** (formes simples) pour valider
-> le pipeline. Remplace-les par ton vrai art **au même chemin, même grille 128 px**.
+> Le contenu ne suit pas le nom du fichier (planches « croisées ») — voir le
+> tableau dans [`assets/ASSET_INTEGRATION.md`](assets/ASSET_INTEGRATION.md).
 
 **Comment c'est intégré :** chaque objet a une scène réutilisable dans
 `scenes/props/` (ex. `SafeProp.tscn`, `BankCounter.tscn`, `BarrelProp.tscn`…) :
-`Node2D` + `Sprite2D` (texture + `region_rect`) + `CollisionShape2D` pour les
-objets bloquants. La carte complète des régions est dans
+`Node2D` + `Sprite2D` (texture + `region_rect` d'atlas) + `CollisionShape2D` pour
+les objets bloquants. La carte complète des régions est dans
 [`assets/ASSET_INTEGRATION.md`](assets/ASSET_INTEGRATION.md).
 
 **Lancer la scène de démo `BankVisualTest` :**
@@ -126,8 +126,7 @@ objets bloquants. La carte complète des régions est dans
    coffre, butin, bureau, barils, caisses, tapis, sortie).
 
 **Limites actuelles :**
-- Planches placeholders (à remplacer par le vrai art).
-- Régions d'atlas approximatives (rectangles 128 px), pas encore de TileSet.
+- Régions d'atlas **approximatives** (cadrage à l'œil), pas encore de TileSet.
 - La mission jouable (`MissionRoot.tscn`) garde son **rendu isométrique
   procédural** (non converti aux sprites) afin de ne pas casser le gameplay
   validé ; `BankVisualTest` sert de vitrine d'intégration. Voir `TODO.md`.
