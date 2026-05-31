@@ -1,9 +1,10 @@
 extends Node2D
 ## iso_renderer.gd
-## Rendu isométrique centralisé. Les entités (joueur, gardes, butin, coffre,
-## sortie) restent en physique cartésienne et sont rendues INVISIBLES ; ce noeud
-## lit leur position/état et dessine toute la scène en isométrique, avec tri de
-## profondeur (objets "debout" du plus lointain au plus proche).
+## Rendu isométrique centralisé de la mission. Les entités restent en physique
+## cartésienne (invisibles) ; ce noeud lit leur position/état et dessine la scène
+## en isométrique, avec tri de profondeur. Le décor (sol, coffre, butin, props)
+## utilise les TEXTURES des planches d'assets ; les personnages et les cônes de
+## vision restent dessinés en formes (pas d'art de personnage dans les planches).
 
 var floor_rect: Rect2
 var walls: Array[Dictionary] = []     # { "rect": Rect2, "outer": bool }
@@ -13,19 +14,41 @@ var loot: Array = []
 var safe: Node = null
 var exit_zone: Node = null
 
-const FLOOR_COL := Color(0.80, 0.69, 0.49)
-const FLOOR_EDGE := Color(0.6, 0.5, 0.34)
+# Planches d'assets.
+const SHEET_BUILD := preload("res://assets/source_sheets/bank_props_sheet.png")     # sol, murs
+const SHEET_OBJ := preload("res://assets/source_sheets/bank_interior_sheet.png")    # objets
+const TEX := 1254.0
+
+# Régions (cf. assets/ASSET_INTEGRATION.md).
+const R_FLOOR := Rect2(25, 25, 300, 280)
+const R_SAFE := Rect2(425, 50, 235, 295)
+const R_LOOT := Rect2(845, 855, 175, 205)
+const R_VAULT := Rect2(50, 40, 340, 300)
+const R_BARREL := Rect2(60, 635, 160, 210)
+const R_CRATE := Rect2(60, 855, 180, 200)
+const R_DESK := Rect2(685, 60, 290, 275)
+
 const WALL_TOP := Color(0.52, 0.38, 0.24)
 const WALL_SIDE := Color(0.36, 0.26, 0.16)
 const OUTER_TOP := Color(0.44, 0.30, 0.20)
 const OUTER_SIDE := Color(0.30, 0.20, 0.12)
 
+# Décor purement visuel (sans collision), placé contre les murs.
+var _decor: Array[Dictionary] = []
 
-## Appelé par mission_manager après le spawn des entités.
+
 func setup() -> void:
-	# Centre le niveau dans la fenêtre.
 	var vp := get_viewport_rect().size
 	position = vp * 0.5 - Iso.project(floor_rect.get_center()) + Vector2(0, -20)
+	# Props décoratifs adossés au mur du fond (n'entravent pas le jeu).
+	_decor = [
+		{"tex": SHEET_OBJ, "region": R_VAULT, "pos": Vector2(590, 40), "h": 122.0},
+		{"tex": SHEET_OBJ, "region": R_BARREL, "pos": Vector2(120, 62), "h": 74.0},
+		{"tex": SHEET_OBJ, "region": R_BARREL, "pos": Vector2(1040, 62), "h": 74.0},
+		{"tex": SHEET_OBJ, "region": R_CRATE, "pos": Vector2(360, 60), "h": 70.0},
+		{"tex": SHEET_OBJ, "region": R_CRATE, "pos": Vector2(820, 60), "h": 70.0},
+		{"tex": SHEET_OBJ, "region": R_DESK, "pos": Vector2(210, 80), "h": 84.0},
+	]
 	queue_redraw()
 
 
@@ -38,7 +61,6 @@ func _draw() -> void:
 	if is_instance_valid(exit_zone):
 		_draw_exit()
 	_draw_cones()
-	# Ombres au sol (sous les objets debout).
 	if is_instance_valid(player):
 		_shadow(player.global_position, 14.0)
 	for g in guards:
@@ -53,6 +75,8 @@ func _draw() -> void:
 	for w in walls:
 		var c: Vector2 = w["rect"].get_center()
 		items.append({"d": Iso.depth(c), "kind": "wall", "data": w})
+	for d in _decor:
+		items.append({"d": Iso.depth(d["pos"]), "kind": "decor", "data": d})
 	if is_instance_valid(safe):
 		items.append({"d": Iso.depth(safe.global_position), "kind": "safe"})
 	for b in loot:
@@ -68,25 +92,46 @@ func _draw() -> void:
 	for it in items:
 		match it["kind"]:
 			"wall": _draw_wall(it["data"]["rect"], it["data"]["outer"])
+			"decor": _draw_decor(it["data"])
 			"safe": _draw_safe()
 			"loot": _draw_loot(it["node"])
 			"guard": _draw_guard(it["node"])
 			"player": _draw_player()
 
 
-# --- Sol & sortie ---
+# --- Sol texturé (dalles iso) ---
 
 func _draw_floor() -> void:
-	var poly := _rect_diamond(floor_rect)
-	draw_colored_polygon(poly, FLOOR_COL)
-	draw_polyline(_closed(poly), FLOOR_EDGE, 2.0)
-	# Quelques lattes de plancher (lignes iso) pour le relief.
-	var step := 120.0
-	var x := floor_rect.position.x
-	while x <= floor_rect.end.x:
-		draw_line(Iso.project(Vector2(x, floor_rect.position.y)),
-				Iso.project(Vector2(x, floor_rect.end.y)), FLOOR_EDGE * Color(1, 1, 1, 0.4), 1.0)
-		x += step
+	var cell := 110.0
+	var y := floor_rect.position.y
+	while y < floor_rect.end.y - 1.0:
+		var x := floor_rect.position.x
+		while x < floor_rect.end.x - 1.0:
+			var w: float = min(cell, floor_rect.end.x - x)
+			var h: float = min(cell, floor_rect.end.y - y)
+			_floor_tile(x, y, w, h)
+			x += cell
+		y += cell
+	# Léger contour du sol.
+	draw_polyline(_closed(_rect_diamond(floor_rect)), Color(0.5, 0.4, 0.28), 2.0)
+
+
+func _floor_tile(x: float, y: float, w: float, h: float) -> void:
+	var pts := PackedVector2Array([
+		Iso.project(Vector2(x, y)),
+		Iso.project(Vector2(x + w, y)),
+		Iso.project(Vector2(x + w, y + h)),
+		Iso.project(Vector2(x, y + h)),
+	])
+	var p := R_FLOOR.position
+	var s := R_FLOOR.size
+	var uvs := PackedVector2Array([
+		p / TEX,
+		Vector2(p.x + s.x, p.y) / TEX,
+		Vector2(p.x + s.x, p.y + s.y) / TEX,
+		Vector2(p.x, p.y + s.y) / TEX,
+	])
+	draw_colored_polygon(pts, Color.WHITE, uvs, SHEET_BUILD)
 
 
 func _draw_exit() -> void:
@@ -97,7 +142,7 @@ func _draw_exit() -> void:
 	_text_centered("SORTIE", Iso.project(exit_zone.global_position), 16, Color(0.95, 1, 0.9))
 
 
-# --- Cônes de vision (décalque au sol) ---
+# --- Cônes de vision ---
 
 func _draw_cones() -> void:
 	for g in guards:
@@ -126,37 +171,39 @@ func _draw_cones() -> void:
 		draw_colored_polygon(pts, fill)
 
 
-# --- Murs / coffre (boîtes iso) ---
+# --- Murs (boîtes iso) & décor texturé ---
 
 func _draw_wall(r: Rect2, outer: bool) -> void:
 	_draw_box(r, Iso.WALL_HEIGHT, OUTER_TOP if outer else WALL_TOP, OUTER_SIDE if outer else WALL_SIDE)
 
 
-func _draw_safe() -> void:
-	var r := Rect2(safe.global_position - Vector2(26, 20), Vector2(52, 40))
-	var open: bool = safe._is_open
-	var top_col := Color(0.5, 0.44, 0.28) if open else Color(0.42, 0.42, 0.46)
-	var side_col := Color(0.34, 0.30, 0.18) if open else Color(0.26, 0.26, 0.30)
-	_draw_box(r, 30.0, top_col, side_col)
-	# Cadran sur le dessus.
-	var top_center := Iso.project(safe.global_position) + Vector2(0, -30.0)
-	draw_circle(top_center, 6.0, Color(0.75, 0.75, 0.2) if open else Color(0.8, 0.8, 0.85))
+func _draw_decor(d: Dictionary) -> void:
+	_billboard(d["tex"], d["region"], d["pos"], d["h"])
 
-	# Barre de progression / invite, au-dessus du coffre.
-	var head := Iso.project(safe.global_position) + Vector2(0, -56.0)
-	if open:
+
+# --- Coffre & butin texturés ---
+
+func _draw_safe() -> void:
+	_billboard(SHEET_OBJ, R_SAFE, safe.global_position, 80.0)
+	# Barre de progression / état, au-dessus.
+	var head := Iso.project(safe.global_position) + Vector2(0, -86.0)
+	if safe._is_open:
 		_text_centered("OUVERT", head, 14, Color(0.95, 0.9, 0.4))
 	else:
 		var prog: float = safe._progress
 		if safe._player_in_range or prog > 0.0:
-			var w := 56.0
+			var w := 60.0
 			draw_rect(Rect2(head + Vector2(-w * 0.5, -4), Vector2(w, 8)), Color(0, 0, 0, 0.65))
 			draw_rect(Rect2(head + Vector2(-w * 0.5, -4), Vector2(w * prog, 8)), Color(0.95, 0.8, 0.2))
 			if prog <= 0.01:
 				_text_centered("Maintiens E", head + Vector2(0, -10), 13, Color(1, 1, 1))
 
 
-# --- Acteurs debout ---
+func _draw_loot(node: Node) -> void:
+	_billboard(SHEET_OBJ, R_LOOT, node.global_position, 52.0)
+
+
+# --- Acteurs (formes) ---
 
 func _draw_player() -> void:
 	_draw_actor(player.global_position, 14.0, Color(0.45, 0.27, 0.13),
@@ -168,54 +215,43 @@ func _draw_guard(g: Node) -> void:
 	_draw_actor(g.global_position, 14.0, body, Color(0.12, 0.20, 0.45), g.get_facing())
 
 
-func _draw_loot(node: Node) -> void:
-	var base := Iso.project(node.global_position)
-	var lift := Vector2(0, -16.0)
-	draw_circle(base + lift, 12.0, Color(0.95, 0.80, 0.15))
-	draw_circle(base + lift + Vector2(0, -7.0), 6.0, Color(0.80, 0.66, 0.10))
-	_text_centered("$", base + lift + Vector2(0, 5), 18, Color(0.25, 0.18, 0.0))
-
-
 func _draw_actor(world_pos: Vector2, radius: float, body_col: Color, hat_col: Color, facing: Vector2) -> void:
 	var base := Iso.project(world_pos)
 	var center := base + Vector2(0, -radius * Iso.ACTOR_LIFT)
-	# Direction de regard projetée à l'écran (pour incliner le chapeau).
 	var face_screen := (Iso.project(world_pos + facing) - base)
 	if face_screen.length() > 0.001:
 		face_screen = face_screen.normalized()
 	draw_circle(center, radius, body_col)
 	draw_circle(center + Vector2(0, -radius * 0.55), radius * 0.95, hat_col)
 	draw_circle(center + Vector2(0, -radius * 0.55), radius * 0.55, hat_col.lightened(0.15))
-	# Repère d'orientation.
 	draw_circle(center + face_screen * (radius * 0.7), 3.0, Color(0.95, 0.85, 0.55))
 
 
-# --- Primitives iso ---
+# --- Primitives ---
+
+## Dessine une texture (région d'atlas) comme un panneau debout posé au sol.
+func _billboard(tex: Texture2D, region: Rect2, world_pos: Vector2, target_h: float) -> void:
+	var p := Iso.project(world_pos)
+	var aspect := region.size.x / region.size.y
+	var h := target_h
+	var w := h * aspect
+	var dest := Rect2(p.x - w * 0.5, p.y - h, w, h)
+	draw_texture_rect_region(tex, dest, region)
+
 
 func _draw_box(r: Rect2, h: float, top_col: Color, side_col: Color) -> void:
-	var c0 := r.position
-	var c1 := Vector2(r.end.x, r.position.y)
-	var c2 := r.end
-	var c3 := Vector2(r.position.x, r.end.y)
-	var b0 := Iso.project(c0)
-	var b1 := Iso.project(c1)
-	var b2 := Iso.project(c2)
-	var b3 := Iso.project(c3)
+	var b0 := Iso.project(r.position)
+	var b1 := Iso.project(Vector2(r.end.x, r.position.y))
+	var b2 := Iso.project(r.end)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
 	var lift := Vector2(0, -h)
-	var t0 := b0 + lift
-	var t1 := b1 + lift
-	var t2 := b2 + lift
-	var t3 := b3 + lift
-	# Faces avant (les deux arêtes qui se rejoignent au coin le plus proche c2).
-	draw_colored_polygon(PackedVector2Array([b1, b2, t2, t1]), side_col)
-	draw_colored_polygon(PackedVector2Array([b2, b3, t3, t2]), side_col.darkened(0.08))
-	# Dessus.
-	draw_colored_polygon(PackedVector2Array([t0, t1, t2, t3]), top_col)
-	draw_polyline(PackedVector2Array([t0, t1, t2, t3, t0]), top_col.darkened(0.25), 1.0)
+	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + lift, b1 + lift]), side_col)
+	draw_colored_polygon(PackedVector2Array([b2, b3, b3 + lift, b2 + lift]), side_col.darkened(0.08))
+	draw_colored_polygon(PackedVector2Array([b0 + lift, b1 + lift, b2 + lift, b3 + lift]), top_col)
+	draw_polyline(PackedVector2Array([b0 + lift, b1 + lift, b2 + lift, b3 + lift, b0 + lift]), top_col.darkened(0.25), 1.0)
 
 
 func _shadow(world_pos: Vector2, radius: float) -> void:
-	# Ellipse iso au sol.
 	var c := Iso.project(world_pos)
 	var pts := PackedVector2Array()
 	for i in range(16):
