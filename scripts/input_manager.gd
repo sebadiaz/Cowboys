@@ -61,5 +61,11 @@ func is_fire_pressed() -> bool:
 	return Input.is_action_pressed("fire") or _touch_fire_held
 
 
+## Vrai quand on vise avec le pointeur (clic souris), pas via le bouton tactile
+## TIR : dans ce cas, le tir s'oriente vers la position de la souris.
+func is_aiming_with_pointer() -> bool:
+	return Input.is_action_pressed("fire") and not _touch_fire_held
+
+
 func set_touch_fire_held(held: bool) -> void:
 	_touch_fire_held = held

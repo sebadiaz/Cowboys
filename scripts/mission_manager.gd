@@ -94,6 +94,9 @@ func _build_iso_renderer() -> void:
 	_renderer.bullets = _bullets
 	add_child(_renderer)
 	_renderer.setup()
+	# Le joueur vise vers le clic : il a besoin du renderer pour convertir
+	# la position écran/souris en point monde cartésien.
+	player.iso_renderer = _renderer
 
 
 # --- Données de mission ---

@@ -16,6 +16,13 @@ static func project(p: Vector2) -> Vector2:
 	return Vector2((p.x - p.y) * S, (p.x + p.y) * S * H)
 
 
+## Inverse de project() : position écran (relative) -> monde cartésien.
+static func unproject(s: Vector2) -> Vector2:
+	var a := s.x / S            # = x - y
+	var b := s.y / (S * H)      # = x + y
+	return Vector2((a + b) * 0.5, (b - a) * 0.5)
+
+
 ## Profondeur de tri : plus c'est grand, plus c'est "devant" (dessiné en dernier).
 static func depth(p: Vector2) -> float:
 	return p.x + p.y
