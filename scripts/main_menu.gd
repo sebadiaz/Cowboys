@@ -42,10 +42,10 @@ func _ready() -> void:
 	box.add_child(_spacer(10))
 
 	box.add_child(_label(
-		"Clavier : WASD/ZQSD bouger · E interagir · Échap pause", 16,
+		"Clavier : WASD/ZQSD bouger · Espace/clic TIRER · E interagir · Échap pause", 15,
 		Color(0.3, 0.2, 0.12)))
 	box.add_child(_label(
-		"Mobile : joystick (gauche) + bouton E (droite)", 16,
+		"Mobile : joystick (gauche) + boutons TIR et E (droite)", 16,
 		Color(0.3, 0.2, 0.12)))
 
 	box.add_child(_spacer(16))

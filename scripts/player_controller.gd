@@ -5,17 +5,24 @@ extends CharacterBody2D
 
 signal loot_changed(loot_bags: int, loot_value: int)
 signal caught()
+signal health_changed(hp: int)
 
 const SPEED := 220.0
 const BODY_RADIUS := 14.0
+const MAX_HP := 3
+const FIRE_RATE := 0.32   # secondes entre deux tirs
+const MUZZLE := 16.0      # distance du canon
 
 var loot_bags: int = 0
 var loot_value: int = 0
 var is_caught: bool = false
 var facing := Vector2.DOWN
+var hp: int = MAX_HP
+var bullet_system: Node = null
+var _fire_cd: float = 0.0
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if is_caught:
 		velocity = Vector2.ZERO
 		return
@@ -28,6 +35,24 @@ func _physics_process(_delta: float) -> void:
 	if dir.length() > 0.05:
 		facing = dir.normalized()
 	move_and_slide()
+	_handle_fire(delta)
+
+
+func _handle_fire(delta: float) -> void:
+	_fire_cd = max(0.0, _fire_cd - delta)
+	if _fire_cd <= 0.0 and bullet_system != null and InputManager.is_fire_pressed():
+		bullet_system.spawn(global_position + facing * MUZZLE, facing, true)
+		_fire_cd = FIRE_RATE
+
+
+## Encaisse un tir de garde. À 0 PV, le joueur tombe (échec).
+func take_damage(amount: int = 1) -> void:
+	if is_caught:
+		return
+	hp = max(0, hp - amount)
+	health_changed.emit(hp)
+	if hp <= 0:
+		get_caught()
 
 
 ## Ajoute un sac de butin (appelé par LootBag via mission_manager).

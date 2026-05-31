@@ -42,6 +42,7 @@ var _walls: Array[Dictionary] = []
 var _floor_rect: Rect2
 var _loot_nodes: Array = []
 var _renderer: Node2D
+var _bullets: Node
 
 var _mission_over := false
 var _safe_open := false
@@ -60,9 +61,24 @@ func _ready() -> void:
 	_spawn_safe()
 	_spawn_exit()
 	_spawn_guards()
+	_build_bullets()
 	_build_iso_renderer()
 	_connect_hud()
 	_update_objective()
+
+
+func _build_bullets() -> void:
+	_bullets = preload("res://scripts/bullet_system.gd").new()
+	_bullets.name = "BulletSystem"
+	_bullets.player = player
+	_bullets.guards = _guards
+	add_child(_bullets)
+	_bullets.guard_killed.connect(_on_guard_killed)
+	_bullets.player_hit.connect(_on_player_hit)
+	player.bullet_system = _bullets
+	player.health_changed.connect(_on_player_health)
+	for g in _guards:
+		g.bullet_system = _bullets
 
 
 func _build_iso_renderer() -> void:
@@ -75,6 +91,7 @@ func _build_iso_renderer() -> void:
 	_renderer.loot = _loot_nodes
 	_renderer.safe = _safe
 	_renderer.exit_zone = _exit
+	_renderer.bullets = _bullets
 	add_child(_renderer)
 	_renderer.setup()
 
@@ -216,6 +233,8 @@ func _connect_hud() -> void:
 		hud.set_alarm(0.0)
 	if hud.has_method("set_state"):
 		hud.set_state(false)
+	if hud.has_method("set_health"):
+		hud.set_health(player.hp, player.MAX_HP)
 
 
 # --- Boucle ---
@@ -280,6 +299,29 @@ func _on_exit_entered() -> void:
 			_exit.rearm()
 
 
+func _on_guard_killed(g: Node) -> void:
+	if not is_instance_valid(g):
+		return
+	if g.has_method("stop"):
+		g.stop()
+	_guards.erase(g)
+	g.queue_free()
+	if hud.has_method("show_toast"):
+		hud.show_toast("Garde abattu !")
+
+
+func _on_player_hit() -> void:
+	if player != null:
+		player.take_damage(1)
+
+
+func _on_player_health(current_hp: int) -> void:
+	if hud.has_method("set_health"):
+		hud.set_health(current_hp, player.MAX_HP)
+	if current_hp > 0 and hud.has_method("show_toast"):
+		hud.show_toast("Touché ! PV: %d" % current_hp)
+
+
 func _on_player_caught() -> void:
 	if _mission_over:
 		return
@@ -303,6 +345,8 @@ func _update_objective() -> void:
 
 func _end_mission(success: bool) -> void:
 	_mission_over = true
+	if _bullets != null and _bullets.has_method("stop"):
+		_bullets.stop()
 	for g in _guards:
 		if is_instance_valid(g) and g.has_method("stop"):
 			g.stop()

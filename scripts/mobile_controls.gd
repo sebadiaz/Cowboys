@@ -15,6 +15,7 @@ var _base := Vector2.ZERO
 var _knob := Vector2.ZERO
 
 var _interact_btn: Button
+var _fire_btn: Button
 
 
 func _ready() -> void:
@@ -29,6 +30,17 @@ func _ready() -> void:
 	_interact_btn.button_down.connect(func() -> void: InputManager.set_touch_interact_held(true))
 	_interact_btn.button_up.connect(func() -> void: InputManager.set_touch_interact_held(false))
 	add_child(_interact_btn)
+
+	_fire_btn = Button.new()
+	_fire_btn.text = "TIR"
+	_fire_btn.add_theme_font_size_override("font_size", 26)
+	_fire_btn.custom_minimum_size = Vector2(130, 130)
+	_fire_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_fire_btn.position = Vector2(-160, -300)
+	_fire_btn.modulate = Color(1, 0.85, 0.8, 0.9)
+	_fire_btn.button_down.connect(func() -> void: InputManager.set_touch_fire_held(true))
+	_fire_btn.button_up.connect(func() -> void: InputManager.set_touch_fire_held(false))
+	add_child(_fire_btn)
 
 
 func _in_joystick_zone(pos: Vector2) -> bool:

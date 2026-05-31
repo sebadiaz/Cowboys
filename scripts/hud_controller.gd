@@ -11,6 +11,7 @@ var _money_label: Label
 var _state_label: Label
 var _alarm_bar: ProgressBar
 var _toast_label: Label
+var _health_label: Label
 var _pause_root: Control
 
 var _money: int = 0
@@ -45,6 +46,10 @@ func _build_ui() -> void:
 	_loot_label = _make_label("Butin: 0 sac (0 $)", 16)
 	_loot_label.position = Vector2(16, 36)
 	add_child(_loot_label)
+
+	_health_label = _make_label("PV: 3/3", 16)
+	_health_label.position = Vector2(250, 36)
+	add_child(_health_label)
 
 	_money_label = _make_label("Argent: 0 $", 18)
 	_money_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -182,6 +187,14 @@ func set_state(alert: bool) -> void:
 	else:
 		_state_label.text = "DISCRET"
 		_state_label.add_theme_color_override("font_color", Color(0.5, 1.0, 0.5))
+
+
+func set_health(current_hp: int, max_hp: int) -> void:
+	if not _health_label:
+		return
+	_health_label.text = "PV: %d/%d" % [current_hp, max_hp]
+	_health_label.add_theme_color_override("font_color",
+		Color(1.0, 0.4, 0.4) if current_hp <= 1 else Color(1, 1, 1))
 
 
 func show_toast(text: String) -> void:

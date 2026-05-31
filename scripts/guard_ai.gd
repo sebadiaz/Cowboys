@@ -25,7 +25,11 @@ const ALARM_GAIN := 32.0       # contribution à la jauge globale / seconde
 var patrol_points: PackedVector2Array = PackedVector2Array()
 var player: Node2D = null
 var alarm: Node = null
+var bullet_system: Node = null
 var active: bool = true
+
+const GUARD_FIRE_RATE := 1.1   # secondes entre deux tirs de garde
+var _fire_cd: float = 0.0
 
 var _state: int = State.PATROL
 var _detect: float = 0.0
@@ -75,6 +79,13 @@ func _physics_process(delta: float) -> void:
 			_do_suspect(delta)
 		State.ALERT:
 			_do_alert(delta)
+
+	# Riposte : en alerte, le garde tire sur le joueur s'il le voit.
+	_fire_cd = max(0.0, _fire_cd - delta)
+	if _state == State.ALERT and sees_player and bullet_system != null and _fire_cd <= 0.0:
+		var aim := player.global_position - global_position
+		bullet_system.spawn(global_position + aim.normalized() * 18.0, aim, false)
+		_fire_cd = GUARD_FIRE_RATE
 
 	move_and_slide()
 	_aim_cone(delta)

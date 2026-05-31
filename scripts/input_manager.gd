@@ -10,6 +10,8 @@ var _touch_move := Vector2.ZERO
 var _touch_interact_pressed := false
 ## Bouton interaction tactile maintenu (pour remplir la barre du coffre).
 var _touch_interact_held := false
+## Bouton de tir tactile maintenu.
+var _touch_fire_held := false
 
 
 ## Direction de déplacement normalisée-bornée (clavier + tactile fusionnés).
@@ -52,3 +54,12 @@ func set_touch_interact_held(held: bool) -> void:
 	_touch_interact_held = held
 	if held:
 		_touch_interact_pressed = true
+
+
+## Tir maintenu (Espace / clic / bouton tactile TIR).
+func is_fire_pressed() -> bool:
+	return Input.is_action_pressed("fire") or _touch_fire_held
+
+
+func set_touch_fire_held(held: bool) -> void:
+	_touch_fire_held = held

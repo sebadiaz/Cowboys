@@ -13,6 +13,7 @@ var guards: Array = []
 var loot: Array = []
 var safe: Node = null
 var exit_zone: Node = null
+var bullets: Node = null
 
 # Planches d'assets.
 const SHEET_BUILD := preload("res://assets/source_sheets/bank_props_sheet.png")     # sol, murs, comptoir
@@ -120,6 +121,18 @@ func _draw() -> void:
 			"loot": _draw_loot(it["node"])
 			"guard": _draw_guard(it["node"])
 			"player": _draw_player()
+
+	_draw_bullets()
+
+
+func _draw_bullets() -> void:
+	if bullets == null:
+		return
+	for b in bullets.bullets:
+		var p: Vector2 = Iso.project(b["pos"]) + Vector2(0, -16.0)
+		var col := Color(1.0, 0.9, 0.3) if b["friendly"] else Color(1.0, 0.4, 0.2)
+		draw_circle(p, 4.5, Color(0, 0, 0, 0.3))
+		draw_circle(p, 3.5, col)
 
 
 # --- Sol texturé (dalles iso) ---

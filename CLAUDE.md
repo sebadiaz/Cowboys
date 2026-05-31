@@ -8,9 +8,9 @@
 
 **Dust & Dollars** est un petit jeu d'arcade **2D en vue isométrique** au thème
 **western cartoon**. Le joueur incarne un cowboy qui **braque une banque fictive** :
-il évite les gardes, récupère du butin, ouvre un coffre, gère une alarme, puis
-file vers la sortie. Missions **courtes et compactes**, jouables **dans un
-navigateur** (desktop et mobile).
+il **dégaine son pistolet**, abat ou évite les gardes, récupère du butin, ouvre un
+coffre, gère une alarme, puis file vers la sortie. Missions **courtes et
+compactes**, jouables **dans un navigateur** (desktop et mobile).
 
 ## 2. Contraintes dures (NE PAS violer)
 
@@ -30,29 +30,35 @@ navigateur** (desktop et mobile).
 ## 3. Gameplay du MVP
 
 Le joueur contrôle un cowboy dans une banque vue de dessus. Boucle :
-1. Entrer, **éviter les gardes** et leurs **cônes de vision**.
-2. **Récupérer du butin** (3 sacs `$`).
-3. **Ouvrir le coffre** (barre de progression en restant à proximité).
-4. **Gérer l'alarme** (jauge 0→100 ; détection progressive).
-5. **Atteindre la zone de sortie**.
+1. Entrer, **éviter ou abattre les gardes** (cônes de vision).
+2. **Tirer au pistolet** : abattre les gardes ; les gardes en alerte ripostent.
+3. **Récupérer du butin** (3 sacs `$`).
+4. **Ouvrir le coffre** (barre de progression en restant à proximité).
+5. **Gérer l'alarme** (jauge 0→100 ; détection progressive).
+6. **Atteindre la zone de sortie**.
 
 Règles :
 - **Succès** : sortir avec **au moins un butin**.
-- **Échec** : un garde **en alerte** touche le joueur.
+- **Combat** : le joueur tire dans sa direction ; une balle abat un garde. Les
+  gardes **en alerte** tirent sur le joueur.
+- **Points de vie** : le joueur a **3 PV** ; à **0 PV** (balles / contact garde
+  en alerte) → échec.
 - Détection **progressive** : un garde voit le joueur → la jauge d'alarme monte.
-- Alarme à **100** → tous les gardes passent en **alerte** (chasse).
+- Alarme à **100** → tous les gardes passent en **alerte** (chasse + tir).
 - **Écran de résultat** après chaque fin de mission.
 
 ## 4. Contrôles
 
-- Clavier : **WASD / ZQSD** (8 directions), **E** interagir, **Échap** pause.
-- Mobile browser : **joystick virtuel** (gauche) + **bouton interaction** (droite).
+- Clavier : **WASD / ZQSD** (8 directions), **Espace / clic** tirer, **E**
+  interagir, **Échap** pause.
+- Mobile browser : **joystick virtuel** (gauche) + boutons **TIR** et **E** (droite).
+- Le tir part dans la **direction regardée** (dernière direction de déplacement).
 - Abstraction via l'autoload `InputManager` (clavier + tactile fusionnés).
 
 ## 5. HUD
 
 Affiche en permanence : **objectif courant**, **butin ramassé**, **argent gagné**,
-**jauge d'alarme**, **état discret / alerte**.
+**jauge d'alarme**, **points de vie**, **état discret / alerte**.
 
 ## 6. Sauvegarde
 
