@@ -1,0 +1,75 @@
+name: Build & Deploy Web (jouable sur mobile)
+
+# Construit l'export HTML5/WebAssembly du jeu avec Godot 4 puis le publie sur
+# GitHub Pages. Une fois terminé, ouvre l'URL Pages depuis ton téléphone.
+
+on:
+  push:
+    branches:
+      - claude/dust-dollars-godot-EyJtt
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un seul déploiement Pages à la fois.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: "4.3"
+
+jobs:
+  build:
+    name: Export Web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} + export templates
+        run: |
+          set -e
+          BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          wget -q "${BASE}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          wget -q "${BASE}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          chmod +x "Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          mkdir -p "${HOME}/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          unzip -q "Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mv templates/* "${HOME}/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+
+      - name: Import des ressources
+        # Premier lancement headless pour importer les assets (icône, etc.).
+        run: godot --headless --path . --import || true
+
+      - name: Export du build Web
+        run: |
+          set -e
+          mkdir -p build/web
+          godot --headless --path . --export-release "Web" build/web/index.html
+          # Évite le traitement Jekyll des fichiers Godot sur Pages.
+          touch build/web/.nojekyll
+          ls -lh build/web
+
+      - name: Upload de l'artefact Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    name: Déploiement GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Déployer sur Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

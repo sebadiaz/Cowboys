@@ -66,6 +66,34 @@ sauvegardée dans `user://save.json` (`total_money`, `missions_completed`).
    # puis ouvrir http://localhost:8080/index.html
    ```
 
+## 📱 Tester depuis ton téléphone (déploiement automatique)
+
+Un workflow GitHub Actions (`.github/workflows/deploy-web.yml`) **construit l'export
+Web et le publie sur GitHub Pages** à chaque push. Tu obtiens une URL publique à
+ouvrir directement dans le navigateur de ton téléphone.
+
+**Étape unique à faire une fois** sur GitHub :
+`Settings → Pages → Build and deployment → Source = **GitHub Actions**`.
+
+Ensuite, à chaque push (ou via `Actions → Build & Deploy Web → Run workflow`), le
+jeu est redéployé. L'URL est du type :
+
+```
+https://sebadiaz.github.io/cowboys/
+```
+
+(visible aussi dans l'onglet **Actions**, sur le job *Déploiement GitHub Pages*).
+
+> Détails techniques : l'export désactive le *thread support* Godot
+> (`variant/thread_support=false`) pour fonctionner sur GitHub Pages, qui n'envoie
+> pas les en-têtes COOP/COEP requis par SharedArrayBuffer. Le renderer **GL
+> Compatibility** (WebGL2) assure la compatibilité mobile. Contrôles tactiles
+> intégrés (joystick + bouton E).
+>
+> Si le job *deploy* est bloqué par une protection d'environnement, autorise la
+> branche dans `Settings → Environments → github-pages`, ou définis cette branche
+> comme branche par défaut.
+
 ## Structure du projet
 
 ```
