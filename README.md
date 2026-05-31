@@ -1,8 +1,9 @@
 # Dust & Dollars 🤠💰
 
-Prototype jouable d'un petit jeu d'arcade **2D vue de dessus**, thème **western
-cartoon** : braque une banque fictive, évite les gardes, ouvre le coffre,
-ramasse le butin et file vers la sortie. **Jouable au navigateur** (desktop et
+Prototype jouable d'un petit jeu d'arcade **2D en vue isométrique**, thème
+**western cartoon** : braque une banque fictive, évite les gardes, ouvre le
+coffre, ramasse le butin et file vers la sortie. (Rendu isométrique 2D : la
+simulation reste cartésienne, seul l'affichage est projeté — aucune 3D.) **Jouable au navigateur** (desktop et
 mobile), développé avec **Godot 4** en **GDScript** uniquement.
 
 > Le concept complet et les contraintes sont figés dans [`CLAUDE.md`](CLAUDE.md).

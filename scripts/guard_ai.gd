@@ -131,6 +131,24 @@ func is_engaged() -> bool:
 	return _state != State.PATROL
 
 
+# --- Accès pour le rendu isométrique ---
+
+func get_facing() -> Vector2:
+	return _facing
+
+func get_alert_ratio() -> float:
+	return _detect / ALERT_THRESHOLD
+
+func is_alert() -> bool:
+	return _state == State.ALERT
+
+func get_view_distance() -> float:
+	return _cone.view_distance if _cone != null else 0.0
+
+func get_view_half_angle() -> float:
+	return deg_to_rad(_cone.view_angle_deg) if _cone != null else 0.0
+
+
 func stop() -> void:
 	active = false
 	velocity = Vector2.ZERO

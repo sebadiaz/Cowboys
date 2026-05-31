@@ -6,7 +6,7 @@
 
 ## 1. Pitch
 
-**Dust & Dollars** est un petit jeu d'arcade **2D vue de dessus** au thème
+**Dust & Dollars** est un petit jeu d'arcade **2D en vue isométrique** au thème
 **western cartoon**. Le joueur incarne un cowboy qui **braque une banque fictive** :
 il évite les gardes, récupère du butin, ouvre un coffre, gère une alarme, puis
 file vers la sortie. Missions **courtes et compactes**, jouables **dans un
@@ -16,8 +16,12 @@ navigateur** (desktop et mobile).
 
 - Moteur : **Godot 4**, langage **GDScript uniquement** (pas de C#).
 - **Pas** de plugin natif obligatoire, **pas** de dépendance native.
-- **Pas** de 3D, **pas** d'open-world, **pas** de side-scroller.
-- Vue **strictement de dessus (top-down)**.
+- **Pas** de 3D (vraie 3D interdite), **pas** d'open-world, **pas** de side-scroller.
+- Vue **isométrique 2D** : la simulation (déplacements, collisions, détection)
+  reste en coordonnées **cartésiennes top-down** ; seul le **rendu** est projeté
+  en isométrique (projection 2:1) avec **tri de profondeur**. Personnages dessinés
+  **debout**, sol/murs en losange. Aucune 3D réelle.
+- Contrôles clavier **alignés écran** (l'input est pivoté de 45° vers le monde).
 - **Web-first** : export HTML5 / WebAssembly / WebGL, projet léger.
 - Renderer **GL Compatibility** (meilleure compat WebGL / mobile).
 - UI lisible sur **desktop et mobile browser**.

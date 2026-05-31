@@ -19,11 +19,14 @@ func _physics_process(_delta: float) -> void:
 	if is_caught:
 		velocity = Vector2.ZERO
 		return
-	var dir := InputManager.get_move_vector()
+	var input := InputManager.get_move_vector()
+	# Contrôles alignés écran : on pivote l'entrée vers l'espace monde isométrique.
+	var dir := Iso.screen_to_world(input)
+	if dir.length() > 1.0:
+		dir = dir.normalized()
 	velocity = dir * SPEED
 	if dir.length() > 0.05:
 		facing = dir.normalized()
-		queue_redraw()
 	move_and_slide()
 
 

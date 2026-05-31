@@ -10,8 +10,6 @@ const SafeScene := preload("res://scenes/Safe.tscn")
 const LootBagScene := preload("res://scenes/LootBag.tscn")
 const ExitZoneScene := preload("res://scenes/ExitZone.tscn")
 
-const WALL_COLOR := Color(0.40, 0.27, 0.18)
-const FLOOR_COLOR := Color(0.78, 0.66, 0.46)
 const CONFIG_PATH := "res://data/mission_01.json"
 
 # Configuration par défaut si le fichier de données est absent ou invalide.
@@ -40,6 +38,10 @@ var alarm: Node
 var _guards: Array = []
 var _exit: Area2D
 var _safe: Area2D
+var _walls: Array[Dictionary] = []
+var _floor_rect: Rect2
+var _loot_nodes: Array = []
+var _renderer: Node2D
 
 var _mission_over := false
 var _safe_open := false
@@ -58,8 +60,23 @@ func _ready() -> void:
 	_spawn_safe()
 	_spawn_exit()
 	_spawn_guards()
+	_build_iso_renderer()
 	_connect_hud()
 	_update_objective()
+
+
+func _build_iso_renderer() -> void:
+	_renderer = preload("res://scripts/iso_renderer.gd").new()
+	_renderer.name = "IsoRenderer"
+	_renderer.floor_rect = _floor_rect
+	_renderer.walls = _walls
+	_renderer.player = player
+	_renderer.guards = _guards
+	_renderer.loot = _loot_nodes
+	_renderer.safe = _safe
+	_renderer.exit_zone = _exit
+	add_child(_renderer)
+	_renderer.setup()
 
 
 # --- Données de mission ---
@@ -100,28 +117,24 @@ func _build_alarm() -> void:
 
 
 func _build_floor() -> void:
-	var floor_poly := Polygon2D.new()
-	floor_poly.color = FLOOR_COLOR
-	floor_poly.polygon = PackedVector2Array([
-		Vector2(20, 20), Vector2(1160, 20), Vector2(1160, 620), Vector2(20, 620)
-	])
-	world.add_child(floor_poly)
-	world.move_child(floor_poly, 0)
+	# Le sol est dessiné par l'IsoRenderer ; on mémorise juste son emprise.
+	_floor_rect = Rect2(20, 20, 1140, 600)
 
 
 func _build_walls() -> void:
 	# Murs extérieurs (épaisseur 20).
-	_add_wall(Rect2(0, 0, 1180, 20))
-	_add_wall(Rect2(0, 620, 1180, 20))
-	_add_wall(Rect2(0, 0, 20, 640))
-	_add_wall(Rect2(1160, 0, 20, 640))
+	_add_wall(Rect2(0, 0, 1180, 20), true)
+	_add_wall(Rect2(0, 620, 1180, 20), true)
+	_add_wall(Rect2(0, 0, 20, 640), true)
+	_add_wall(Rect2(1160, 0, 20, 640), true)
 	# Comptoirs intérieurs.
-	_add_wall(Rect2(340, 120, 50, 240), Color(0.5, 0.36, 0.22))
-	_add_wall(Rect2(620, 280, 50, 240), Color(0.5, 0.36, 0.22))
-	_add_wall(Rect2(800, 160, 240, 50), Color(0.5, 0.36, 0.22))
+	_add_wall(Rect2(340, 120, 50, 240))
+	_add_wall(Rect2(620, 280, 50, 240))
+	_add_wall(Rect2(800, 160, 240, 50))
 
 
-func _add_wall(rect: Rect2, color := WALL_COLOR) -> void:
+## Crée la collision cartésienne du mur ; le visuel iso est géré par le renderer.
+func _add_wall(rect: Rect2, outer := false) -> void:
 	var body := StaticBody2D.new()
 	body.collision_layer = 1
 	body.collision_mask = 0
@@ -131,12 +144,8 @@ func _add_wall(rect: Rect2, color := WALL_COLOR) -> void:
 	shape.size = rect.size
 	cs.shape = shape
 	body.add_child(cs)
-	var poly := Polygon2D.new()
-	poly.color = color
-	var h := rect.size * 0.5
-	poly.polygon = PackedVector2Array([-h, Vector2(h.x, -h.y), h, Vector2(-h.x, h.y)])
-	body.add_child(poly)
 	world.add_child(body)
+	_walls.append({"rect": rect, "outer": outer})
 
 
 # --- Entités ---
@@ -144,6 +153,7 @@ func _add_wall(rect: Rect2, color := WALL_COLOR) -> void:
 func _spawn_player() -> void:
 	player = PlayerScene.instantiate()
 	player.global_position = _to_vec(_cfg.get("player_start", [110, 540]))
+	player.visible = false  # rendu par l'IsoRenderer
 	world.add_child(player)
 	player.caught.connect(_on_player_caught)
 	player.loot_changed.connect(_on_loot_changed)
@@ -154,8 +164,10 @@ func _spawn_loot() -> void:
 		var bag := LootBagScene.instantiate()
 		bag.global_position = _to_vec(entry.get("pos", [0, 0]))
 		bag.value = int(entry.get("value", 150))
+		bag.visible = false
 		world.add_child(bag)
 		bag.collected.connect(_on_loot_collected)
+		_loot_nodes.append(bag)
 
 
 func _spawn_safe() -> void:
@@ -164,6 +176,7 @@ func _spawn_safe() -> void:
 	_safe.global_position = _to_vec(s.get("pos", [1040, 540]))
 	_safe.value = int(s.get("value", 500))
 	_safe.open_time = float(s.get("open_time", 2.5))
+	_safe.visible = false
 	world.add_child(_safe)
 	_safe.opened.connect(_on_safe_opened)
 
@@ -171,6 +184,7 @@ func _spawn_safe() -> void:
 func _spawn_exit() -> void:
 	_exit = ExitZoneScene.instantiate()
 	_exit.global_position = _to_vec(_cfg.get("exit", [1060, 100]))
+	_exit.visible = false
 	world.add_child(_exit)
 	_exit.player_entered.connect(_on_exit_entered)
 
@@ -187,6 +201,7 @@ func _spawn_guards() -> void:
 		g.global_position = route[0]
 		g.player = player
 		g.alarm = alarm
+		g.visible = false
 		world.add_child(g)
 		g.player_caught.connect(_on_player_caught)
 		_guards.append(g)
