@@ -7,6 +7,16 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [ ] Animations de marche 8 directions, feedback de capture.
 - [ ] Effets : poussière, flash d'alarme, particules sur le coffre.
 
+## Assets & intégration (suite)
+- [ ] Remplacer les planches **placeholder** par le vrai art (mêmes chemins/grille).
+- [ ] **Découpage précis des sprites** (régions exactes au pixel, marges propres).
+- [ ] Créer un **vrai TileSet Godot** (`assets/tilesets/`) pour sol et murs.
+- [ ] **Collisions plus précises** sur les props (formes ajustées au visuel).
+- [ ] **Séparation définitive** props décoratifs / objets gameplay.
+- [ ] **Migrer le rendu de `MissionRoot`** vers les sprites des planches
+      (dessiner les régions d'atlas dans `iso_renderer.gd` au lieu des formes).
+- [ ] **Occlusion des cônes de vision par les murs** (découpe visuelle du cône).
+
 ## Gameplay & IA
 - [ ] **Occlusion des cônes de vision par les murs** (découpe visuelle du cône).
 - [ ] Mode **tactique ralenti** (bullet-time pour planifier).

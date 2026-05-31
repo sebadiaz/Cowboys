@@ -100,6 +100,38 @@ https://sebadiaz.github.io/cowboys/
 > branche dans `Settings → Environments → github-pages`, ou définis cette branche
 > comme branche par défaut.
 
+## Assets graphiques
+
+Les décors sont fournis sous forme de **planches PNG** (atlas) découpées par
+**régions d'atlas** sur des `Sprite2D` — pas de fichiers individuels par objet.
+
+**Où placer les PNG :** `assets/source_sheets/`
+- `bank_interior_sheet.png` — sol, tapis, mur, comptoir
+- `bank_props_sheet.png` — coffre, porte de coffre, sac, bureau, chaise, baril, caisse
+- `western_exterior_sheet.png` — sable, façade, mur extérieur, porte
+
+> ⚠️ Les planches livrées sont des **placeholders** (formes simples) pour valider
+> le pipeline. Remplace-les par ton vrai art **au même chemin, même grille 128 px**.
+
+**Comment c'est intégré :** chaque objet a une scène réutilisable dans
+`scenes/props/` (ex. `SafeProp.tscn`, `BankCounter.tscn`, `BarrelProp.tscn`…) :
+`Node2D` + `Sprite2D` (texture + `region_rect`) + `CollisionShape2D` pour les
+objets bloquants. La carte complète des régions est dans
+[`assets/ASSET_INTEGRATION.md`](assets/ASSET_INTEGRATION.md).
+
+**Lancer la scène de démo `BankVisualTest` :**
+1. Ouvre `scenes/levels/BankVisualTest.tscn` dans Godot.
+2. Appuie sur **F6** (Run Current Scene).
+3. Tu vois une banque western 2D/2.5D composée des décors (sol, murs, comptoirs,
+   coffre, butin, bureau, barils, caisses, tapis, sortie).
+
+**Limites actuelles :**
+- Planches placeholders (à remplacer par le vrai art).
+- Régions d'atlas approximatives (rectangles 128 px), pas encore de TileSet.
+- La mission jouable (`MissionRoot.tscn`) garde son **rendu isométrique
+  procédural** (non converti aux sprites) afin de ne pas casser le gameplay
+  validé ; `BankVisualTest` sert de vitrine d'intégration. Voir `TODO.md`.
+
 ## Structure du projet
 
 ```
