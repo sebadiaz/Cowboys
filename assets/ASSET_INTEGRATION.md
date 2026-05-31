@@ -96,7 +96,37 @@ instancie le prop visuel en enfant) sans toucher à son script ni ses signaux.
 > `scenes/levels/BankVisualTest.tscn` démontre l'intégration des décors. La
 > migration du rendu de mission vers les sprites est listée dans `TODO.md`.
 
-## 6. Affiner / remplacer plus tard
+## 6. Fond transparent (color-key)
+
+Les planches livrées étaient en **RGB sans alpha**, avec un **fond gris clair/blanc
+opaque** (qui apparaissait en rectangles blancs derrière les objets). Elles ont été
+converties en **RGBA** avec le fond rendu **transparent** (pixels clairs et peu
+saturés → alpha 0). Si tu réuploades des planches, refais l'opération, ou exporte
+directement avec un fond transparent.
+
+## 7. Personnages (planche optionnelle)
+
+Le joueur et les gardes sont dessinés en **formes** par défaut (les planches ne
+contiennent pas de personnage). Pour les texturer, dépose une planche :
+
+`assets/source_sheets/characters_sheet.png`
+
+Régions par défaut (modifiables dans `iso_renderer.gd`) :
+- Joueur : `Rect2(0, 0, 128, 128)`
+- Garde : `Rect2(128, 0, 128, 128)`
+
+Si le fichier est présent, `iso_renderer.gd` l'utilise automatiquement (sinon
+formes). Pense aussi à color-key son fond.
+
+## 8. Où l'art est utilisé
+
+- **Mission jouable** (`MissionRoot.tscn`) : `iso_renderer.gd` dessine le sol
+  (dalles texturées), le coffre, les sacs, le comptoir « BANK », la porte de
+  coffre et des props (barils/caisses/bureau) via les régions d'atlas. Murs en
+  boîtes iso à dessus bois. Personnages/cônes en formes.
+- **Vitrine** (`scenes/levels/BankVisualTest.tscn`) : compose les scènes props.
+
+## 9. Affiner / remplacer plus tard
 
 1. **Cadrage précis** : ouvre une planche dans l'éditeur Godot, sélectionne le
    `Sprite2D` d'un prop, et ajuste `region_rect` au pixel (outil de région).

@@ -2,9 +2,9 @@ extends Node2D
 ## iso_renderer.gd
 ## Rendu isométrique centralisé de la mission. Les entités restent en physique
 ## cartésienne (invisibles) ; ce noeud lit leur position/état et dessine la scène
-## en isométrique, avec tri de profondeur. Le décor (sol, coffre, butin, props)
-## utilise les TEXTURES des planches d'assets ; les personnages et les cônes de
-## vision restent dessinés en formes (pas d'art de personnage dans les planches).
+## en isométrique avec tri de profondeur. Le décor utilise les TEXTURES des
+## planches (régions d'atlas). Les personnages utilisent une planche optionnelle
+## (characters_sheet.png) si présente, sinon un rendu en formes.
 
 var floor_rect: Rect2
 var walls: Array[Dictionary] = []     # { "rect": Rect2, "outer": bool }
@@ -15,41 +15,61 @@ var safe: Node = null
 var exit_zone: Node = null
 
 # Planches d'assets.
-const SHEET_BUILD := preload("res://assets/source_sheets/bank_props_sheet.png")     # sol, murs
+const SHEET_BUILD := preload("res://assets/source_sheets/bank_props_sheet.png")     # sol, murs, comptoir
 const SHEET_OBJ := preload("res://assets/source_sheets/bank_interior_sheet.png")    # objets
 const TEX := 1254.0
+# Planche de personnages OPTIONNELLE (déposer ce fichier pour l'activer).
+const CHAR_SHEET_PATH := "res://assets/source_sheets/characters_sheet.png"
 
 # Régions (cf. assets/ASSET_INTEGRATION.md).
-const R_FLOOR := Rect2(25, 25, 300, 280)
+const R_FLOOR := Rect2(58, 58, 236, 214)   # recadré à l'intérieur de la dalle (sans bordure)
+const R_WALL := Rect2(395, 350, 215, 175)
+const R_COUNTER := Rect2(25, 770, 620, 190)
 const R_SAFE := Rect2(425, 50, 235, 295)
 const R_LOOT := Rect2(845, 855, 175, 205)
 const R_VAULT := Rect2(50, 40, 340, 300)
 const R_BARREL := Rect2(60, 635, 160, 210)
 const R_CRATE := Rect2(60, 855, 180, 200)
 const R_DESK := Rect2(685, 60, 290, 275)
+# Personnages (planche optionnelle, grille 128 px par défaut).
+const R_PLAYER := Rect2(0, 0, 128, 128)
+const R_GUARD := Rect2(128, 0, 128, 128)
 
-const WALL_TOP := Color(0.52, 0.38, 0.24)
-const WALL_SIDE := Color(0.36, 0.26, 0.16)
-const OUTER_TOP := Color(0.44, 0.30, 0.20)
-const OUTER_SIDE := Color(0.30, 0.20, 0.12)
-
-# Décor purement visuel (sans collision), placé contre les murs.
-var _decor: Array[Dictionary] = []
+var _char_tex: Texture2D = null
+var _billboards: Array[Dictionary] = []   # décor + comptoirs texturés
+var _box_walls: Array[Dictionary] = []    # murs dessinés en boîtes 3D
 
 
 func setup() -> void:
 	var vp := get_viewport_rect().size
 	position = vp * 0.5 - Iso.project(floor_rect.get_center()) + Vector2(0, -20)
-	# Props décoratifs adossés au mur du fond (n'entravent pas le jeu).
-	_decor = [
-		{"tex": SHEET_OBJ, "region": R_VAULT, "pos": Vector2(590, 40), "h": 122.0},
-		{"tex": SHEET_OBJ, "region": R_BARREL, "pos": Vector2(120, 62), "h": 74.0},
-		{"tex": SHEET_OBJ, "region": R_BARREL, "pos": Vector2(1040, 62), "h": 74.0},
-		{"tex": SHEET_OBJ, "region": R_CRATE, "pos": Vector2(360, 60), "h": 70.0},
-		{"tex": SHEET_OBJ, "region": R_CRATE, "pos": Vector2(820, 60), "h": 70.0},
-		{"tex": SHEET_OBJ, "region": R_DESK, "pos": Vector2(210, 80), "h": 84.0},
-	]
+	if ResourceLoader.exists(CHAR_SHEET_PATH):
+		_char_tex = load(CHAR_SHEET_PATH)
+	_build_billboards()
 	queue_redraw()
+
+
+func _build_billboards() -> void:
+	_billboards.clear()
+	_box_walls.clear()
+	# Murs : boîtes 3D, sauf le long obstacle intérieur horizontal -> comptoir.
+	for w in walls:
+		var r: Rect2 = w["rect"]
+		var outer: bool = w["outer"]
+		if not outer and r.size.x >= 150.0 and r.size.x >= r.size.y:
+			_add_bb(SHEET_BUILD, R_COUNTER, r.get_center(), 78.0)
+		else:
+			_box_walls.append(w)
+	# Props décoratifs adossés au mur du fond (sans collision).
+	_add_bb(SHEET_OBJ, R_VAULT, Vector2(590, 44), 120.0)
+	_add_bb(SHEET_OBJ, R_BARREL, Vector2(120, 64), 74.0)
+	_add_bb(SHEET_OBJ, R_BARREL, Vector2(1040, 64), 74.0)
+	_add_bb(SHEET_OBJ, R_CRATE, Vector2(300, 62), 70.0)
+	_add_bb(SHEET_OBJ, R_DESK, Vector2(210, 90), 84.0)
+
+
+func _add_bb(tex: Texture2D, region: Rect2, pos: Vector2, h: float) -> void:
+	_billboards.append({"tex": tex, "region": region, "pos": pos, "h": h})
 
 
 func _process(_delta: float) -> void:
@@ -70,13 +90,12 @@ func _draw() -> void:
 		if is_instance_valid(b):
 			_shadow(b.global_position, 11.0)
 
-	# Objets "debout" triés par profondeur (lointain -> proche).
+	# Tout ce qui est "debout", trié par profondeur (lointain -> proche).
 	var items: Array[Dictionary] = []
-	for w in walls:
-		var c: Vector2 = w["rect"].get_center()
-		items.append({"d": Iso.depth(c), "kind": "wall", "data": w})
-	for d in _decor:
-		items.append({"d": Iso.depth(d["pos"]), "kind": "decor", "data": d})
+	for w in _box_walls:
+		items.append({"d": Iso.depth(w["rect"].get_center()), "kind": "wall", "data": w})
+	for bb in _billboards:
+		items.append({"d": Iso.depth(bb["pos"]), "kind": "bb", "data": bb})
 	if is_instance_valid(safe):
 		items.append({"d": Iso.depth(safe.global_position), "kind": "safe"})
 	for b in loot:
@@ -91,8 +110,12 @@ func _draw() -> void:
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
 		match it["kind"]:
-			"wall": _draw_wall(it["data"]["rect"], it["data"]["outer"])
-			"decor": _draw_decor(it["data"])
+			"wall":
+				var wd: Dictionary = it["data"]
+				_draw_box(wd["rect"], Iso.WALL_HEIGHT, wd["outer"])
+			"bb":
+				var d: Dictionary = it["data"]
+				_billboard(d["tex"], d["region"], d["pos"], d["h"])
 			"safe": _draw_safe()
 			"loot": _draw_loot(it["node"])
 			"guard": _draw_guard(it["node"])
@@ -102,7 +125,7 @@ func _draw() -> void:
 # --- Sol texturé (dalles iso) ---
 
 func _draw_floor() -> void:
-	var cell := 110.0
+	var cell := 132.0
 	var y := floor_rect.position.y
 	while y < floor_rect.end.y - 1.0:
 		var x := floor_rect.position.x
@@ -112,8 +135,7 @@ func _draw_floor() -> void:
 			_floor_tile(x, y, w, h)
 			x += cell
 		y += cell
-	# Léger contour du sol.
-	draw_polyline(_closed(_rect_diamond(floor_rect)), Color(0.5, 0.4, 0.28), 2.0)
+	draw_polyline(_closed(_rect_diamond(floor_rect)), Color(0.45, 0.34, 0.22), 2.0)
 
 
 func _floor_tile(x: float, y: float, w: float, h: float) -> void:
@@ -171,21 +193,10 @@ func _draw_cones() -> void:
 		draw_colored_polygon(pts, fill)
 
 
-# --- Murs (boîtes iso) & décor texturé ---
-
-func _draw_wall(r: Rect2, outer: bool) -> void:
-	_draw_box(r, Iso.WALL_HEIGHT, OUTER_TOP if outer else WALL_TOP, OUTER_SIDE if outer else WALL_SIDE)
-
-
-func _draw_decor(d: Dictionary) -> void:
-	_billboard(d["tex"], d["region"], d["pos"], d["h"])
-
-
 # --- Coffre & butin texturés ---
 
 func _draw_safe() -> void:
 	_billboard(SHEET_OBJ, R_SAFE, safe.global_position, 80.0)
-	# Barre de progression / état, au-dessus.
 	var head := Iso.project(safe.global_position) + Vector2(0, -86.0)
 	if safe._is_open:
 		_text_centered("OUVERT", head, 14, Color(0.95, 0.9, 0.4))
@@ -203,14 +214,20 @@ func _draw_loot(node: Node) -> void:
 	_billboard(SHEET_OBJ, R_LOOT, node.global_position, 52.0)
 
 
-# --- Acteurs (formes) ---
+# --- Acteurs (planche personnages si présente, sinon formes) ---
 
 func _draw_player() -> void:
-	_draw_actor(player.global_position, 14.0, Color(0.45, 0.27, 0.13),
-			Color(0.30, 0.18, 0.08), player.facing)
+	if _char_tex != null:
+		_billboard(_char_tex, R_PLAYER, player.global_position, 56.0)
+	else:
+		_draw_actor(player.global_position, 14.0, Color(0.45, 0.27, 0.13),
+				Color(0.30, 0.18, 0.08), player.facing)
 
 
 func _draw_guard(g: Node) -> void:
+	if _char_tex != null:
+		_billboard(_char_tex, R_GUARD, g.global_position, 56.0, g.is_alert())
+		return
 	var body := Color(0.30, 0.45, 0.85) if g.is_alert() else Color(0.20, 0.35, 0.70)
 	_draw_actor(g.global_position, 14.0, body, Color(0.12, 0.20, 0.45), g.get_facing())
 
@@ -229,17 +246,9 @@ func _draw_actor(world_pos: Vector2, radius: float, body_col: Color, hat_col: Co
 
 # --- Primitives ---
 
-## Dessine une texture (région d'atlas) comme un panneau debout posé au sol.
-func _billboard(tex: Texture2D, region: Rect2, world_pos: Vector2, target_h: float) -> void:
-	var p := Iso.project(world_pos)
-	var aspect := region.size.x / region.size.y
-	var h := target_h
-	var w := h * aspect
-	var dest := Rect2(p.x - w * 0.5, p.y - h, w, h)
-	draw_texture_rect_region(tex, dest, region)
-
-
-func _draw_box(r: Rect2, h: float, top_col: Color, side_col: Color) -> void:
+## Mur en boîte 3D iso : faces latérales colorées + dessus texturé bois.
+func _draw_box(r: Rect2, h: float, outer: bool) -> void:
+	var side_col := Color(0.30, 0.20, 0.12) if outer else Color(0.36, 0.26, 0.16)
 	var b0 := Iso.project(r.position)
 	var b1 := Iso.project(Vector2(r.end.x, r.position.y))
 	var b2 := Iso.project(r.end)
@@ -247,8 +256,27 @@ func _draw_box(r: Rect2, h: float, top_col: Color, side_col: Color) -> void:
 	var lift := Vector2(0, -h)
 	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + lift, b1 + lift]), side_col)
 	draw_colored_polygon(PackedVector2Array([b2, b3, b3 + lift, b2 + lift]), side_col.darkened(0.08))
-	draw_colored_polygon(PackedVector2Array([b0 + lift, b1 + lift, b2 + lift, b3 + lift]), top_col)
-	draw_polyline(PackedVector2Array([b0 + lift, b1 + lift, b2 + lift, b3 + lift, b0 + lift]), top_col.darkened(0.25), 1.0)
+	var top := PackedVector2Array([b0 + lift, b1 + lift, b2 + lift, b3 + lift])
+	var p := R_FLOOR.position
+	var s := R_FLOOR.size
+	var uvs := PackedVector2Array([
+		p / TEX, Vector2(p.x + s.x, p.y) / TEX,
+		Vector2(p.x + s.x, p.y + s.y) / TEX, Vector2(p.x, p.y + s.y) / TEX,
+	])
+	var top_mod := Color(0.82, 0.70, 0.50) if outer else Color(0.95, 0.85, 0.70)
+	draw_colored_polygon(top, top_mod, uvs, SHEET_BUILD)
+	draw_polyline(_closed(top), side_col.darkened(0.2), 1.0)
+
+
+## Texture (région d'atlas) dessinée comme un panneau debout posé au sol.
+func _billboard(tex: Texture2D, region: Rect2, world_pos: Vector2, target_h: float, alert := false) -> void:
+	var p := Iso.project(world_pos)
+	var aspect := region.size.x / region.size.y
+	var h := target_h
+	var w := h * aspect
+	var dest := Rect2(p.x - w * 0.5, p.y - h, w, h)
+	var mod := Color(1, 0.85, 0.85) if alert else Color.WHITE
+	draw_texture_rect_region(tex, dest, region, mod)
 
 
 func _shadow(world_pos: Vector2, radius: float) -> void:
