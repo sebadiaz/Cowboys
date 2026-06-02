@@ -53,20 +53,29 @@ func setup() -> void:
 func _build_billboards() -> void:
 	_billboards.clear()
 	_box_walls.clear()
-	# Murs : boîtes 3D, sauf le long obstacle intérieur horizontal -> comptoir.
+	# Tous les murs/cloisons sont dessinés en boîtes 3D (hauteur selon type).
 	for w in walls:
 		var r: Rect2 = w["rect"]
-		var outer: bool = w["outer"]
-		if not outer and r.size.x >= 150.0 and r.size.x >= r.size.y:
-			_add_bb(SHEET_BUILD, R_COUNTER, r.get_center(), 78.0)
-		else:
-			_box_walls.append(w)
-	# Props décoratifs adossés au mur du fond (sans collision).
-	_add_bb(SHEET_OBJ, R_VAULT, Vector2(590, 44), 120.0)
-	_add_bb(SHEET_OBJ, R_BARREL, Vector2(120, 64), 74.0)
-	_add_bb(SHEET_OBJ, R_BARREL, Vector2(1040, 64), 74.0)
-	_add_bb(SHEET_OBJ, R_CRATE, Vector2(300, 62), 70.0)
-	_add_bb(SHEET_OBJ, R_DESK, Vector2(210, 90), 84.0)
+		# Les cloisons intérieures basses (comptoir guichet à y~354) restent des
+		# murs bas pour laisser voir par-dessus ; le reste = pleine hauteur.
+		var low: bool = (not w["outer"]) and r.position.y > 340 and r.position.y < 380 and r.size.x > r.size.y
+		_box_walls.append({"rect": r, "outer": w["outer"], "low": low})
+
+	# Comptoir des guichets : meubles "BANK" posés le long de la cloison basse.
+	_add_bb(SHEET_BUILD, R_COUNTER, Vector2(360, 343), 70.0)
+	_add_bb(SHEET_BUILD, R_COUNTER, Vector2(745, 343), 70.0)
+
+	# Salle des coffres : porte blindée dans l'ouverture du mur (x=820, y~290).
+	_add_bb(SHEET_OBJ, R_VAULT, Vector2(832, 300), 116.0)
+
+	# Bureau du directeur (alcôve haut-gauche) : bureau.
+	_add_bb(SHEET_OBJ, R_DESK, Vector2(100, 160), 84.0)
+
+	# Décor du hall public (bas) : tonneaux et caisses contre les murs.
+	_add_bb(SHEET_OBJ, R_BARREL, Vector2(70, 560), 70.0)
+	_add_bb(SHEET_OBJ, R_CRATE, Vector2(300, 595), 62.0)
+	# Salle des coffres : caisse de lingots à côté du coffre (coffre = 1015,170).
+	_add_bb(SHEET_OBJ, R_CRATE, Vector2(900, 250), 60.0)
 
 
 func _add_bb(tex: Texture2D, region: Rect2, pos: Vector2, h: float) -> void:
@@ -113,7 +122,8 @@ func _draw() -> void:
 		match it["kind"]:
 			"wall":
 				var wd: Dictionary = it["data"]
-				_draw_box(wd["rect"], Iso.WALL_HEIGHT, wd["outer"])
+				var wh: float = 16.0 if wd.get("low", false) else Iso.WALL_HEIGHT
+				_draw_box(wd["rect"], wh, wd["outer"])
 			"bb":
 				var d: Dictionary = it["data"]
 				_billboard(d["tex"], d["region"], d["pos"], d["h"])

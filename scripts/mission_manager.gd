@@ -13,18 +13,20 @@ const ExitZoneScene := preload("res://scenes/ExitZone.tscn")
 const CONFIG_PATH := "res://data/mission_01.json"
 
 # Configuration par défaut si le fichier de données est absent ou invalide.
+# Plan de banque réaliste : hall public (bas), comptoir des guichets (milieu,
+# avec passage), salle des coffres fermée (haut-droite), bureau (haut-gauche).
 const DEFAULT_CFG := {
-	"player_start": [110, 540],
-	"exit": [1060, 100],
-	"safe": {"pos": [1040, 540], "value": 500, "open_time": 2.5},
+	"player_start": [590, 575],          # entrée (hall public, en bas)
+	"exit": [110, 560],                  # porte d'entrée (front, bas-gauche)
+	"safe": {"pos": [1015, 170], "value": 500, "open_time": 2.5},  # dans le coffre-fort
 	"loot": [
-		{"pos": [470, 470], "value": 150},
-		{"pos": [900, 470], "value": 150},
-		{"pos": [520, 150], "value": 200},
+		{"pos": [935, 175], "value": 250},   # dans la salle des coffres
+		{"pos": [650, 300], "value": 150},   # derrière le comptoir
+		{"pos": [350, 520], "value": 150},   # dans le hall
 	],
 	"guards": [
-		{"route": [[500, 150], [500, 540], [250, 540], [250, 150]]},
-		{"route": [[760, 300], [760, 540], [980, 540], [980, 300]]},
+		{"route": [[480, 320], [1000, 320], [1000, 300], [480, 300]]},  # zone personnel
+		{"route": [[250, 500], [820, 500], [820, 470], [250, 470]]},    # hall public
 	],
 }
 
@@ -143,15 +145,28 @@ func _build_floor() -> void:
 
 
 func _build_walls() -> void:
-	# Murs extérieurs (épaisseur 20).
-	_add_wall(Rect2(0, 0, 1180, 20), true)
-	_add_wall(Rect2(0, 620, 1180, 20), true)
-	_add_wall(Rect2(0, 0, 20, 640), true)
-	_add_wall(Rect2(1160, 0, 20, 640), true)
-	# Comptoirs intérieurs.
-	_add_wall(Rect2(340, 120, 50, 240))
-	_add_wall(Rect2(620, 280, 50, 240))
-	_add_wall(Rect2(800, 160, 240, 50))
+	# Murs extérieurs (épaisseur 20). Porte d'entrée = trou dans le mur gauche.
+	_add_wall(Rect2(0, 0, 1180, 20), true)            # haut
+	_add_wall(Rect2(0, 620, 1180, 20), true)          # bas
+	_add_wall(Rect2(1160, 0, 20, 640), true)          # droite
+	_add_wall(Rect2(0, 0, 20, 500), true)             # gauche (au-dessus de la porte)
+	_add_wall(Rect2(0, 600, 20, 40), true)            # gauche (sous la porte)
+
+	# --- Salle des coffres (vault) fermée, haut-droite, avec une ouverture ---
+	# Cloison verticale gauche du coffre (x=820), trou d'entrée vers y=250..330.
+	_add_wall(Rect2(820, 20, 24, 230))                # haut du mur vertical
+	_add_wall(Rect2(820, 330, 24, 60))                # bas du mur vertical
+	# Cloison horizontale basse du coffre (y=370), de x=820 à droite.
+	_add_wall(Rect2(844, 366, 316, 24))
+
+	# --- Comptoir des guichets : sépare hall (bas) du personnel (haut) ---
+	# Cloison basse du comptoir à y=360, avec un passage (gap) vers x=560..660.
+	_add_wall(Rect2(180, 354, 360, 22))               # tronçon gauche
+	_add_wall(Rect2(680, 354, 140, 22))               # tronçon droit (jusqu'au vault)
+
+	# --- Bureau du directeur (haut-gauche), petite alcôve ---
+	_add_wall(Rect2(180, 110, 22, 150))               # cloison verticale du bureau
+	_add_wall(Rect2(20, 240, 182, 22))                # cloison horizontale du bureau
 
 
 ## Crée la collision cartésienne du mur ; le visuel iso est géré par le renderer.
