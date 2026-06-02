@@ -38,14 +38,18 @@ mobile), développé avec **Godot 4** en **GDScript** uniquement.
 
 ## Boucle de jeu
 
+0. **Ville** : on arrive dans le village western, on rejoint la **banque** à
+   pied (dirige-toi vers la porte « BANQUE ») → le braquage démarre.
 1. Récupère du butin (3 sacs **$**).
 2. Ouvre le **coffre** (reste à côté, maintiens **E** → barre de progression).
 3. Surveille la **jauge d'alarme** : les gardes qui te voient la font monter.
-   À **100**, alerte générale → tous les gardes te poursuivent.
-4. Atteins la **zone de sortie verte**.
+   À **100**, alerte générale → tous les gardes te poursuivent et **tirent**.
+4. Combat au **six-coups** : vise au **clic**, **6 balles** puis **rechargement**
+   (R / bouton RECH). Une balle abat un garde ; les gardes en alerte ripostent.
+5. Atteins la **zone de sortie verte**.
 
 - ✅ **Réussite** : sortir avec **au moins un butin**.
-- ❌ **Échec** : un garde **en alerte** te touche.
+- ❌ **Échec** : tomber à **0 PV** (balles / contact d'un garde en alerte).
 
 À la fin : **écran de résultat** (butin, argent gagné, totaux). La progression est
 sauvegardée dans `user://save.json` (`total_money`, `missions_completed`).

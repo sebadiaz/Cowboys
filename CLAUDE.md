@@ -49,11 +49,21 @@ Règles :
 
 ## 4. Contrôles
 
-- Clavier : **WASD / ZQSD** (8 directions), **Espace / clic** tirer, **E**
-  interagir, **Échap** pause.
-- Mobile browser : **joystick virtuel** (gauche) + boutons **TIR** et **E** (droite).
-- Le tir part dans la **direction regardée** (dernière direction de déplacement).
+- Clavier : **WASD / ZQSD** (8 directions), **Espace / clic** tirer, **R**
+  recharger, **E** interagir, **Échap** pause.
+- Mobile browser : **joystick virtuel** (gauche) + boutons **TIR**, **RECH** et
+  **E** (droite).
+- Le tir s'oriente vers le **point cliqué** (souris) ; repli sur la direction
+  regardée pour le bouton tactile TIR.
+- **Six-coups** : barillet de **6 balles**, **rechargement lent** (~1,6 s) — auto
+  quand vide, ou manuel (R / RECH).
 - Abstraction via l'autoload `InputManager` (clavier + tactile fusionnés).
+
+## 4 bis. Flux de jeu
+
+Menu → **Ville (extérieur western)** : on arrive en ville et on rejoint la
+**banque** à pied (porte) → la **mission de braquage** démarre → écran de
+résultat. Scène `Town.tscn` (décor depuis `western_exterior_sheet.png`).
 
 ## 5. HUD
 

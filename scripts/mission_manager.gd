@@ -77,6 +77,7 @@ func _build_bullets() -> void:
 	_bullets.player_hit.connect(_on_player_hit)
 	player.bullet_system = _bullets
 	player.health_changed.connect(_on_player_health)
+	player.ammo_changed.connect(_on_player_ammo)
 	for g in _guards:
 		g.bullet_system = _bullets
 
@@ -238,6 +239,8 @@ func _connect_hud() -> void:
 		hud.set_state(false)
 	if hud.has_method("set_health"):
 		hud.set_health(player.hp, player.MAX_HP)
+	if hud.has_method("set_ammo"):
+		hud.set_ammo(player.ammo, player.CYLINDER, false)
 
 
 # --- Boucle ---
@@ -323,6 +326,11 @@ func _on_player_health(current_hp: int) -> void:
 		hud.set_health(current_hp, player.MAX_HP)
 	if current_hp > 0 and hud.has_method("show_toast"):
 		hud.show_toast("Touché ! PV: %d" % current_hp)
+
+
+func _on_player_ammo(in_cylinder: int, capacity: int, reloading: bool) -> void:
+	if hud.has_method("set_ammo"):
+		hud.set_ammo(in_cylinder, capacity, reloading)
 
 
 func _on_player_caught() -> void:

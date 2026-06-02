@@ -57,7 +57,7 @@ func _ready() -> void:
 
 
 func _on_play() -> void:
-	GameManager.start_mission()
+	GameManager.start_town()
 
 
 func _on_visual_test() -> void:

@@ -12,6 +12,8 @@ var _touch_interact_pressed := false
 var _touch_interact_held := false
 ## Bouton de tir tactile maintenu.
 var _touch_fire_held := false
+## Bouton de rechargement tactile (impulsion).
+var _touch_reload_pressed := false
 
 
 ## Direction de déplacement normalisée-bornée (clavier + tactile fusionnés).
@@ -69,3 +71,17 @@ func is_aiming_with_pointer() -> bool:
 
 func set_touch_fire_held(held: bool) -> void:
 	_touch_fire_held = held
+
+
+## Rechargement demandé (touche R / bouton tactile recharger).
+func is_reload_pressed() -> bool:
+	if Input.is_action_pressed("reload"):
+		return true
+	if _touch_reload_pressed:
+		_touch_reload_pressed = false
+		return true
+	return false
+
+
+func trigger_touch_reload() -> void:
+	_touch_reload_pressed = true

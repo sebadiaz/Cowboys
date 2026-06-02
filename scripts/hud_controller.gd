@@ -12,6 +12,7 @@ var _state_label: Label
 var _alarm_bar: ProgressBar
 var _toast_label: Label
 var _health_label: Label
+var _ammo_label: Label
 var _pause_root: Control
 
 var _money: int = 0
@@ -50,6 +51,10 @@ func _build_ui() -> void:
 	_health_label = _make_label("PV: 3/3", 16)
 	_health_label.position = Vector2(250, 36)
 	add_child(_health_label)
+
+	_ammo_label = _make_label("Balles: 6/6", 16)
+	_ammo_label.position = Vector2(380, 36)
+	add_child(_ammo_label)
 
 	_money_label = _make_label("Argent: 0 $", 18)
 	_money_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -195,6 +200,18 @@ func set_health(current_hp: int, max_hp: int) -> void:
 	_health_label.text = "PV: %d/%d" % [current_hp, max_hp]
 	_health_label.add_theme_color_override("font_color",
 		Color(1.0, 0.4, 0.4) if current_hp <= 1 else Color(1, 1, 1))
+
+
+func set_ammo(in_cylinder: int, capacity: int, reloading: bool) -> void:
+	if not _ammo_label:
+		return
+	if reloading:
+		_ammo_label.text = "Rechargement…"
+		_ammo_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.3))
+	else:
+		_ammo_label.text = "Balles: %d/%d" % [in_cylinder, capacity]
+		_ammo_label.add_theme_color_override("font_color",
+			Color(1.0, 0.5, 0.4) if in_cylinder == 0 else Color(1, 1, 1))
 
 
 func show_toast(text: String) -> void:

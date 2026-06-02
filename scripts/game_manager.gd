@@ -4,6 +4,7 @@ extends Node
 ## jusqu'à l'écran de résultat.
 
 const SCENE_MAIN_MENU := "res://scenes/MainMenu.tscn"
+const SCENE_TOWN := "res://scenes/levels/Town.tscn"
 const SCENE_MISSION := "res://scenes/MissionRoot.tscn"
 const SCENE_RESULT := "res://scenes/ResultScreen.tscn"
 
@@ -18,6 +19,11 @@ var last_result := {
 
 func goto_main_menu() -> void:
 	_change_scene(SCENE_MAIN_MENU)
+
+
+## Le bouton "Jouer" amène d'abord en ville (on rejoint la banque à pied).
+func start_town() -> void:
+	_change_scene(SCENE_TOWN)
 
 
 func start_mission() -> void:

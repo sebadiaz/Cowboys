@@ -6,12 +6,15 @@ extends CharacterBody2D
 signal loot_changed(loot_bags: int, loot_value: int)
 signal caught()
 signal health_changed(hp: int)
+signal ammo_changed(in_cylinder: int, capacity: int, reloading: bool)
 
 const SPEED := 220.0
 const BODY_RADIUS := 14.0
 const MAX_HP := 3
-const FIRE_RATE := 0.32   # secondes entre deux tirs
-const MUZZLE := 16.0      # distance du canon
+const FIRE_RATE := 0.32      # secondes entre deux tirs
+const MUZZLE := 16.0         # distance du canon
+const CYLINDER := 6          # six-coups
+const RELOAD_TIME := 1.6     # rechargement (lent, sensible)
 
 var loot_bags: int = 0
 var loot_value: int = 0
@@ -20,7 +23,9 @@ var facing := Vector2.DOWN
 var hp: int = MAX_HP
 var bullet_system: Node = null
 var iso_renderer: Node2D = null   # pour convertir la position du clic en point monde
+var ammo: int = CYLINDER
 var _fire_cd: float = 0.0
+var _reload_t: float = 0.0    # > 0 = rechargement en cours
 
 
 func _physics_process(delta: float) -> void:
@@ -41,11 +46,39 @@ func _physics_process(delta: float) -> void:
 
 func _handle_fire(delta: float) -> void:
 	_fire_cd = max(0.0, _fire_cd - delta)
+
+	# Rechargement en cours (le six-coups prend du temps à recharger).
+	if _reload_t > 0.0:
+		_reload_t = max(0.0, _reload_t - delta)
+		if _reload_t <= 0.0:
+			ammo = CYLINDER
+			ammo_changed.emit(ammo, CYLINDER, false)
+		return
+
+	# Rechargement manuel (touche R / bouton tactile).
+	if InputManager.is_reload_pressed() and ammo < CYLINDER:
+		_start_reload()
+		return
+
 	if _fire_cd <= 0.0 and bullet_system != null and InputManager.is_fire_pressed():
+		if ammo <= 0:
+			_start_reload()   # barillet vide -> rechargement auto
+			return
 		var dir := _aim_direction()
 		facing = dir
 		bullet_system.spawn(global_position + dir * MUZZLE, dir, true)
+		ammo -= 1
+		ammo_changed.emit(ammo, CYLINDER, false)
 		_fire_cd = FIRE_RATE
+
+
+func _start_reload() -> void:
+	_reload_t = RELOAD_TIME
+	ammo_changed.emit(ammo, CYLINDER, true)
+
+
+func get_reload_ratio() -> float:
+	return 1.0 - (_reload_t / RELOAD_TIME) if _reload_t > 0.0 else 1.0
 
 
 ## Direction de tir : vers le point pointé (souris/clic) si dispo, sinon vers la

@@ -9,6 +9,9 @@ const JOY_RADIUS := 95.0
 const DEADZONE := 0.14
 const KNOB_RADIUS := 38.0
 
+## Boutons de combat (TIR / RECH / E). Désactivés en ville (déplacement seul).
+@export var combat_buttons := true
+
 var _active := false
 var _touch_index := -1
 var _base := Vector2.ZERO
@@ -16,10 +19,13 @@ var _knob := Vector2.ZERO
 
 var _interact_btn: Button
 var _fire_btn: Button
+var _reload_btn: Button
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not combat_buttons:
+		return  # en ville : joystick seul (pas de tir/recharge/interaction)
 	_interact_btn = Button.new()
 	_interact_btn.text = "E"
 	_interact_btn.add_theme_font_size_override("font_size", 28)
@@ -41,6 +47,16 @@ func _ready() -> void:
 	_fire_btn.button_down.connect(func() -> void: InputManager.set_touch_fire_held(true))
 	_fire_btn.button_up.connect(func() -> void: InputManager.set_touch_fire_held(false))
 	add_child(_fire_btn)
+
+	_reload_btn = Button.new()
+	_reload_btn.text = "RECH"
+	_reload_btn.add_theme_font_size_override("font_size", 20)
+	_reload_btn.custom_minimum_size = Vector2(96, 70)
+	_reload_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_reload_btn.position = Vector2(-160, -380)
+	_reload_btn.modulate = Color(1, 0.95, 0.7, 0.9)
+	_reload_btn.pressed.connect(func() -> void: InputManager.trigger_touch_reload())
+	add_child(_reload_btn)
 
 
 func _in_joystick_zone(pos: Vector2) -> bool:
