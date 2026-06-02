@@ -39,8 +39,8 @@ Le joueur contrôle un cowboy dans une banque vue de dessus. Boucle :
 
 Règles :
 - **Succès** : sortir avec **au moins un butin**.
-- **Combat** : le joueur tire dans sa direction ; une balle abat un garde. Les
-  gardes **en alerte** tirent sur le joueur.
+- **Combat** : le joueur tire **à l'arrêt uniquement** (pas de tir en
+  mouvement) ; une balle abat un garde. Les gardes **en alerte** tirent sur lui.
 - **Points de vie** : le joueur a **3 PV** ; à **0 PV** (balles / contact garde
   en alerte) → échec.
 - Détection **progressive** : un garde voit le joueur → la jauge d'alarme monte.

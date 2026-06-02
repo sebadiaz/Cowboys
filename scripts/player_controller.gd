@@ -24,6 +24,7 @@ var hp: int = MAX_HP
 var bullet_system: Node = null
 var iso_renderer: Node2D = null   # pour convertir la position du clic en point monde
 var ammo: int = CYLINDER
+var is_moving: bool = false   # le tir n'est possible qu'à l'arrêt
 var _fire_cd: float = 0.0
 var _reload_t: float = 0.0    # > 0 = rechargement en cours
 
@@ -38,7 +39,8 @@ func _physics_process(delta: float) -> void:
 	if dir.length() > 1.0:
 		dir = dir.normalized()
 	velocity = dir * SPEED
-	if dir.length() > 0.05:
+	is_moving = dir.length() > 0.05
+	if is_moving:
 		facing = dir.normalized()
 	move_and_slide()
 	_handle_fire(delta)
@@ -58,6 +60,10 @@ func _handle_fire(delta: float) -> void:
 	# Rechargement manuel (touche R / bouton tactile).
 	if InputManager.is_reload_pressed() and ammo < CYLINDER:
 		_start_reload()
+		return
+
+	# Pas de tir en mouvement : il faut s'arrêter pour dégainer et viser.
+	if is_moving:
 		return
 
 	if _fire_cd <= 0.0 and bullet_system != null and InputManager.is_fire_pressed():
