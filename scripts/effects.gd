@@ -5,9 +5,8 @@ extends Node2D
 ## screen-shake (via la position du renderer) et flash plein écran (dégâts/alarme).
 ## Reçoit les positions MONDE et les projette en iso, comme le renderer.
 
-var iso_offset := Vector2.ZERO        # = renderer.position (pour projeter pareil)
+var iso_offset := Vector2.ZERO        # décalage de projection (0 quand le noeud est zoomé)
 var shake_amount: float = 0.0
-var flash_color := Color(0, 0, 0, 0)
 
 # Particule : {pos(screen), vel, life, max_life, size, color, kind}
 var _parts: Array[Dictionary] = []
@@ -32,9 +31,8 @@ func _process(delta: float) -> void:
 		p["pos"] += p["vel"] * delta
 		alive.append(p)
 	_parts = alive
-	# Décroissance du shake et du flash.
+	# Décroissance du shake.
 	shake_amount = max(0.0, shake_amount - delta * 40.0)
-	flash_color.a = max(0.0, flash_color.a - delta * 2.2)
 	queue_redraw()
 
 
@@ -87,10 +85,6 @@ func add_shake(amount: float) -> void:
 	shake_amount = min(14.0, shake_amount + amount)
 
 
-func full_flash(color: Color) -> void:
-	flash_color = color
-
-
 ## Décalage de tremblement à appliquer au renderer (lu par mission_manager).
 func get_shake_offset() -> Vector2:
 	if shake_amount <= 0.01:
@@ -126,7 +120,3 @@ func _draw() -> void:
 			draw_rect(Rect2(p["pos"] - Vector2(1.5, 1.5), Vector2(3, 3)), c)
 		else:
 			draw_circle(p["pos"], p["size"] * (0.6 + 0.4 * t), c)
-	# Flash plein écran (dégâts / alarme).
-	if flash_color.a > 0.001:
-		var vp := get_viewport_rect().size
-		draw_rect(Rect2(-iso_offset, vp), flash_color)

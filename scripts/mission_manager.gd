@@ -87,11 +87,24 @@ func _build_bullets() -> void:
 		g.bullet_system = _bullets
 
 
+## Re-fit du niveau et resynchronisation des effets quand l'écran change de taille.
+func _on_viewport_resized() -> void:
+	if not is_instance_valid(_renderer) or not _renderer.has_method("refit"):
+		return
+	_renderer_home = _renderer.refit()
+	if is_instance_valid(_fx):
+		_fx.scale = _renderer.scale
+		_fx.position = _renderer_home
+
+
 func _build_effects() -> void:
 	_fx = preload("res://scripts/effects.gd").new()
 	_fx.name = "Effects"
-	_fx.iso_offset = _renderer_home
-	_fx.position = Vector2.ZERO   # dessine en espace écran fixe (pas de shake)
+	# Les effets partagent le MÊME zoom/position que le renderer pour rester
+	# alignés sur les entités (le shake ne décale que le renderer).
+	_fx.iso_offset = Vector2.ZERO
+	_fx.scale = _renderer.scale
+	_fx.position = _renderer_home
 	add_child(_fx)
 	_renderer.fx = _fx
 	# Branche les effets sur les évènements de combat.
@@ -101,7 +114,8 @@ func _build_effects() -> void:
 		_fx.muzzle_flash(pos, dir)
 		_fx.add_shake(3.0))
 	player.damaged.connect(func():
-		_fx.full_flash(Color(0.8, 0.0, 0.0, 0.45))
+		if hud.has_method("flash"):
+			hud.flash(Color(0.8, 0.0, 0.0, 0.45))
 		_fx.add_shake(7.0))
 
 
@@ -119,6 +133,8 @@ func _build_iso_renderer() -> void:
 	add_child(_renderer)
 	_renderer.setup()
 	_renderer_home = _renderer.position
+	# Re-ajuste le zoom si la fenêtre/écran change de taille (navigateur, mobile).
+	get_viewport().size_changed.connect(_on_viewport_resized)
 	# Le joueur vise vers le clic : il a besoin du renderer pour convertir
 	# la position écran/souris en point monde cartésien.
 	player.iso_renderer = _renderer
@@ -330,8 +346,9 @@ func _on_alarm_changed(value: float) -> void:
 func _on_global_alert() -> void:
 	if hud.has_method("show_toast"):
 		hud.show_toast("ALERTE GÉNÉRALE !")
+	if hud.has_method("flash"):
+		hud.flash(Color(0.9, 0.1, 0.1, 0.5))
 	if _fx != null:
-		_fx.full_flash(Color(0.9, 0.1, 0.1, 0.5))
 		_fx.add_shake(8.0)
 
 

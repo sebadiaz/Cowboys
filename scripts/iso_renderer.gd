@@ -49,12 +49,59 @@ func add_corpse(world_pos: Vector2, facing: Vector2) -> void:
 
 
 func setup() -> void:
-	var vp := get_viewport_rect().size
-	position = vp * 0.5 - Iso.project(floor_rect.get_center()) + Vector2(0, -20)
 	if ResourceLoader.exists(CHAR_SHEET_PATH):
 		_char_tex = load(CHAR_SHEET_PATH)
 	_build_billboards()
+	_fit_to_viewport()
 	queue_redraw()
+
+
+## Re-ajuste le zoom (appelé sur redimensionnement de la fenêtre). Retourne la
+## position de repos pour que l'appelant resynchronise le shake/les effets.
+func refit() -> Vector2:
+	_fit_to_viewport()
+	queue_redraw()
+	return position
+
+
+## Zoome et centre le niveau pour qu'il remplisse l'écran (toutes résolutions).
+## On calcule la boîte englobante du niveau PROJETÉ (sol + sommets des murs +
+## marge pour la hauteur des personnages), puis on choisit l'échelle qui le fait
+## tenir avec une petite marge.
+func _fit_to_viewport() -> void:
+	var vp := get_viewport_rect().size
+	var bounds := _level_screen_bounds()
+	var margin := 48.0
+	var avail := vp - Vector2(margin, margin) * 2.0
+	var s := minf(avail.x / bounds.size.x, avail.y / bounds.size.y)
+	s = clampf(s, 0.4, 3.0)
+	scale = Vector2(s, s)
+	# Centre la boîte englobante (en coords locales) au centre de l'écran.
+	position = vp * 0.5 - bounds.get_center() * s
+
+
+## Boîte englobante du niveau en coordonnées LOCALES (Iso.project, avant scale).
+func _level_screen_bounds() -> Rect2:
+	var pts: Array[Vector2] = []
+	# Coins du sol.
+	pts.append(Iso.project(floor_rect.position))
+	pts.append(Iso.project(Vector2(floor_rect.end.x, floor_rect.position.y)))
+	pts.append(Iso.project(floor_rect.end))
+	pts.append(Iso.project(Vector2(floor_rect.position.x, floor_rect.end.y)))
+	# Sommets des murs (hauteur vers le haut de l'écran).
+	for w in walls:
+		var r: Rect2 = w["rect"]
+		var h: float = 16.0 if w.get("low", false) else Iso.WALL_HEIGHT
+		for c in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+			pts.append(Iso.project(c) + Vector2(0, -h))
+	var mn := pts[0]
+	var mx := pts[0]
+	for p in pts:
+		mn = mn.min(p)
+		mx = mx.max(p)
+	# Marge verticale en haut pour la tête/chapeau des personnages (~40 px).
+	mn.y -= 40.0
+	return Rect2(mn, mx - mn)
 
 
 func _build_billboards() -> void:
@@ -155,19 +202,22 @@ func _draw() -> void:
 
 ## Pénombre western : assombrit les bords, halo clair autour du joueur.
 func _draw_vignette() -> void:
-	var vp := get_viewport_rect().size
-	var origin := -position   # coin haut-gauche de l'écran en coords locales
+	var s: float = scale.x if scale.x > 0.001 else 1.0
+	# Conversion écran -> coords locales (le noeud est zoomé).
+	var vp := get_viewport_rect().size / s
+	var origin := -position / s   # coin haut-gauche de l'écran en coords locales
+	var band := 24.0 / s
 	# Cadres semi-transparents concentriques pour assombrir les bords.
 	var bands := 4
 	for i in range(bands):
-		var inset := float(i) * 24.0
+		var inset := float(i) * band
 		var a := 0.06 * (bands - i) / bands
 		var col := Color(0.05, 0.03, 0.02, a)
 		# Quatre bandes (haut/bas/gauche/droite) pour ne pas réassombrir le centre.
-		draw_rect(Rect2(origin.x, origin.y + inset, vp.x, 24), col)
-		draw_rect(Rect2(origin.x, origin.y + vp.y - inset - 24, vp.x, 24), col)
-		draw_rect(Rect2(origin.x + inset, origin.y, 24, vp.y), col)
-		draw_rect(Rect2(origin.x + vp.x - inset - 24, origin.y, 24, vp.y), col)
+		draw_rect(Rect2(origin.x, origin.y + inset, vp.x, band), col)
+		draw_rect(Rect2(origin.x, origin.y + vp.y - inset - band, vp.x, band), col)
+		draw_rect(Rect2(origin.x + inset, origin.y, band, vp.y), col)
+		draw_rect(Rect2(origin.x + vp.x - inset - band, origin.y, band, vp.y), col)
 	# Halo doux autour du joueur.
 	if is_instance_valid(player):
 		var c := Iso.project(player.global_position) + Vector2(0, -16)

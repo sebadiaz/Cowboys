@@ -14,6 +14,7 @@ var _toast_label: Label
 var _health_label: Label
 var _ammo_label: Label
 var _pause_root: Control
+var _flash: ColorRect
 
 var _money: int = 0
 
@@ -21,8 +22,30 @@ var _money: int = 0
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_ui()
+	_build_flash()
 	_build_pause_menu()
 	_build_mobile_controls()
+
+
+## Couche de flash plein écran (dégâts / alarme), au-dessus du jeu mais sous les
+## libellés HUD. Couvre tout l'écran quelle que soit la résolution.
+func _build_flash() -> void:
+	_flash = ColorRect.new()
+	_flash.color = Color(1, 0, 0, 0)
+	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flash.z_index = -1
+	add_child(_flash)
+	move_child(_flash, 0)
+
+
+## Déclenche un flash plein écran qui s'estompe.
+func flash(color: Color) -> void:
+	if not _flash:
+		return
+	_flash.color = color
+	var tween := create_tween()
+	tween.tween_property(_flash, "color:a", 0.0, 0.45)
 
 
 func _process(_delta: float) -> void:
