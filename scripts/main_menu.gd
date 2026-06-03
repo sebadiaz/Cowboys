@@ -33,6 +33,12 @@ func _ready() -> void:
 	play.pressed.connect(_on_play)
 	box.add_child(play)
 
+	var shop := Button.new()
+	shop.text = "🛒 BOUTIQUE (upgrades)"
+	shop.custom_minimum_size = Vector2(460, 50)
+	shop.pressed.connect(_on_shop)
+	box.add_child(shop)
+
 	var visual := Button.new()
 	visual.text = "Voir le décor banque (test)"
 	visual.custom_minimum_size = Vector2(460, 46)
@@ -58,6 +64,10 @@ func _ready() -> void:
 
 func _on_play() -> void:
 	GameManager.start_town()
+
+
+func _on_shop() -> void:
+	get_tree().change_scene_to_file("res://scenes/ShopScreen.tscn")
 
 
 func _on_visual_test() -> void:

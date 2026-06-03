@@ -53,6 +53,14 @@ var _safe_open := false
 var _loot_bags := 0
 var _loot_value := 0
 
+# Suivi pour le score et la tension.
+var _elapsed := 0.0
+var _alarm_triggered := false
+var _alarm_peak := 0.0
+var _was_engaged := false
+var _foot_t := 0.0
+var _reinforced := false
+
 
 func _ready() -> void:
 	randomize()
@@ -79,6 +87,7 @@ func _build_bullets() -> void:
 	_bullets.guards = _guards
 	add_child(_bullets)
 	_bullets.guard_killed.connect(_on_guard_killed)
+	_bullets.guard_hit.connect(_on_guard_hit)
 	_bullets.player_hit.connect(_on_player_hit)
 	player.bullet_system = _bullets
 	player.health_changed.connect(_on_player_health)
@@ -112,11 +121,13 @@ func _build_effects() -> void:
 	_bullets.wall_impact.connect(func(pos): _fx.wall_puff(pos))
 	player.fired.connect(func(pos, dir):
 		_fx.muzzle_flash(pos, dir)
-		_fx.add_shake(3.0))
+		_fx.add_shake(3.0)
+		AudioManager.play("shot"))
 	player.damaged.connect(func():
 		if hud.has_method("flash"):
 			hud.flash(Color(0.8, 0.0, 0.0, 0.45))
-		_fx.add_shake(7.0))
+		_fx.add_shake(7.0)
+		AudioManager.play("hit_player"))
 
 
 func _build_iso_renderer() -> void:
@@ -240,7 +251,8 @@ func _spawn_loot() -> void:
 		bag.value = int(entry.get("value", 150))
 		bag.visible = false
 		world.add_child(bag)
-		bag.collected.connect(_on_loot_collected)
+		# On capture la position du sac (il est libéré juste après l'émission).
+		bag.collected.connect(func(v): _on_loot_collected(v, bag.global_position))
 		_loot_nodes.append(bag)
 
 
@@ -249,7 +261,8 @@ func _spawn_safe() -> void:
 	_safe = SafeScene.instantiate()
 	_safe.global_position = _to_vec(s.get("pos", [1040, 540]))
 	_safe.value = int(s.get("value", 500))
-	_safe.open_time = float(s.get("open_time", 2.5))
+	# Upgrade "crochets" : le coffre s'ouvre plus vite.
+	_safe.open_time = float(s.get("open_time", 2.5)) * SaveManager.safe_mult()
 	_safe.visible = false
 	world.add_child(_safe)
 	_safe.opened.connect(_on_safe_opened)
@@ -275,6 +288,7 @@ func _spawn_guards() -> void:
 		g.global_position = route[0]
 		g.player = player
 		g.alarm = alarm
+		g.alarm_gain_mult = SaveManager.stealth_mult()
 		g.visible = false
 		world.add_child(g)
 		g.player_caught.connect(_on_player_caught)
@@ -298,27 +312,87 @@ func _connect_hud() -> void:
 
 # --- Boucle ---
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	# Applique le screen-shake en décalant le renderer autour de sa position de repos.
 	if _fx != null and _renderer != null:
 		_renderer.position = _renderer_home + _fx.get_shake_offset()
 	if _mission_over:
 		return
+	_elapsed += delta
 	# État discret / alerte = au moins un garde qui enquête ou poursuit.
 	var engaged := false
 	for g in _guards:
 		if is_instance_valid(g) and g.has_method("is_engaged") and g.is_engaged():
 			engaged = true
 			break
+	# Feedback "VU !" au moment où un garde commence à nous repérer.
+	if engaged and not _was_engaged and not (alarm != null and alarm.global_alert):
+		if hud.has_method("show_toast"):
+			hud.show_toast("VU !")
+		AudioManager.play("hit_guard", -6.0)
+	_was_engaged = engaged
 	if hud.has_method("set_state"):
 		hud.set_state(engaged or (alarm != null and alarm.global_alert))
+	# Poussière de pas pendant le déplacement.
+	_foot_t -= delta
+	if _fx != null and player != null and player.is_moving and _foot_t <= 0.0:
+		_fx.foot_dust(player.global_position)
+		_foot_t = 0.18
+
+
+## Renfort : un shérif supplémentaire surgit de la sortie quand l'alarme éclate.
+func _spawn_reinforcement() -> void:
+	if _reinforced:
+		return
+	_reinforced = true
+	var route := PackedVector2Array([
+		_exit.global_position + Vector2(40, 0),
+		Vector2(600, 400), Vector2(900, 300),
+	])
+	var g := GuardScene.instantiate()
+	g.patrol_points = route
+	g.global_position = _exit.global_position
+	g.player = player
+	g.alarm = alarm
+	g.bullet_system = _bullets
+	g.alarm_gain_mult = SaveManager.stealth_mult()
+	g.visible = false
+	world.add_child(g)
+	g.player_caught.connect(_on_player_caught)
+	_guards.append(g)
+	if hud.has_method("show_toast"):
+		hud.show_toast("RENFORTS !")
+
+
+## Score de mission : butin + bonus discrétion + bonus temps.
+func _compute_score() -> Dictionary:
+	var loot: int = _loot_value
+	# Discrétion : récompense de ne pas avoir déclenché l'alarme générale, et
+	# d'avoir gardé la jauge basse.
+	var stealth := 0
+	if not _alarm_triggered:
+		stealth += 200
+	stealth += int(round((1.0 - clampf(_alarm_peak / 100.0, 0.0, 1.0)) * 150.0))
+	# Temps : prime à la rapidité (sous 2 minutes).
+	var time_bonus: int = max(0, int(round((120.0 - _elapsed) * 2.0)))
+	return {
+		"loot": loot,
+		"stealth": stealth,
+		"time": time_bonus,
+		"total": loot + stealth + time_bonus,
+	}
 
 
 # --- Signaux ---
 
-func _on_loot_collected(value: int) -> void:
+func _on_loot_collected(value: int, pos := Vector2.ZERO) -> void:
 	if player != null:
 		player.add_loot(value)
+	AudioManager.play("pickup")
+	if _fx != null:
+		_fx.loot_pickup(pos)
+	if hud.has_method("show_toast"):
+		hud.show_toast("+%d $ !" % value)
 
 
 func _on_loot_changed(bags: int, value: int) -> void:
@@ -333,23 +407,30 @@ func _on_safe_opened(value: int) -> void:
 	_safe_open = true
 	if player != null:
 		player.add_safe_reward(value)
+	AudioManager.play("safe")
+	if _fx != null and _safe != null:
+		_fx.safe_burst(_safe.global_position)
 	if hud.has_method("show_toast"):
-		hud.show_toast("Coffre ouvert ! +%d $" % value)
+		hud.show_toast("COFFRE OUVERT ! +%d $" % value)
 	_update_objective()
 
 
 func _on_alarm_changed(value: float) -> void:
+	_alarm_peak = max(_alarm_peak, value)
 	if hud.has_method("set_alarm"):
 		hud.set_alarm(value)
 
 
 func _on_global_alert() -> void:
 	if hud.has_method("show_toast"):
-		hud.show_toast("ALERTE GÉNÉRALE !")
+		hud.show_toast("ALARME ! TOUS AUX ARMES !")
 	if hud.has_method("flash"):
 		hud.flash(Color(0.9, 0.1, 0.1, 0.5))
 	if _fx != null:
 		_fx.add_shake(8.0)
+	AudioManager.play("alarm", 2.0)
+	_alarm_triggered = true
+	_spawn_reinforcement()
 
 
 func _on_exit_entered() -> void:
@@ -376,10 +457,18 @@ func _on_guard_killed(g: Node) -> void:
 		_renderer.add_corpse(g.global_position, g.get_facing())
 	if _fx != null:
 		_fx.add_shake(4.0)
+	AudioManager.play("hit_guard")
 	_guards.erase(g)
 	g.queue_free()
 	if hud.has_method("show_toast"):
 		hud.show_toast("Garde abattu !")
+
+
+func _on_guard_hit(_g: Node) -> void:
+	# Garde touché mais encore debout.
+	AudioManager.play("hit_guard", -4.0)
+	if _fx != null:
+		_fx.add_shake(2.0)
 
 
 func _on_player_hit() -> void:
@@ -429,7 +518,8 @@ func _end_mission(success: bool) -> void:
 			g.stop()
 	if player != null:
 		player.get_caught()  # fige le joueur
+	AudioManager.play("win" if success else "lose", 2.0)
 	if hud.has_method("show_toast"):
-		hud.show_toast("MISSION RÉUSSIE" if success else "REPÉRÉ ! ÉCHEC")
+		hud.show_toast("FUITE RÉUSSIE !" if success else "REPÉRÉ ! ÉCHEC")
 	await get_tree().create_timer(0.9).timeout
-	GameManager.finish_mission(success, _loot_value, _loot_bags)
+	GameManager.finish_mission(success, _loot_value, _loot_bags, _compute_score())

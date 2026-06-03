@@ -14,6 +14,7 @@ var last_result := {
 	"loot_value": 0,
 	"loot_bags": 0,
 	"money_earned": 0,
+	"score": {"loot": 0, "stealth": 0, "time": 0, "total": 0},
 }
 
 
@@ -30,14 +31,18 @@ func start_mission() -> void:
 	_change_scene(SCENE_MISSION)
 
 
-## Appelé par mission_manager à la fin d'une mission.
-func finish_mission(success: bool, loot_value: int, loot_bags: int) -> void:
-	var money_earned := loot_value if success else 0
+## Appelé par mission_manager à la fin d'une mission. `score` détaille le calcul
+## (butin + discrétion + temps) ; l'argent gagné = total du score si réussite.
+func finish_mission(success: bool, loot_value: int, loot_bags: int, score: Dictionary = {}) -> void:
+	if score.is_empty():
+		score = {"loot": loot_value, "stealth": 0, "time": 0, "total": loot_value}
+	var money_earned: int = int(score.get("total", loot_value)) if success else 0
 	last_result = {
 		"success": success,
 		"loot_value": loot_value,
 		"loot_bags": loot_bags,
 		"money_earned": money_earned,
+		"score": score,
 	}
 	if success:
 		SaveManager.register_success(money_earned)

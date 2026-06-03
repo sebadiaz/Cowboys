@@ -58,6 +58,18 @@ func _ready() -> void:
 	_reload_btn.pressed.connect(func() -> void: InputManager.trigger_touch_reload())
 	add_child(_reload_btn)
 
+	# Retour visuel + sonore à l'appui (sensation tactile).
+	for b in [_interact_btn, _fire_btn, _reload_btn]:
+		b.button_down.connect(func() -> void: _press_feedback(b))
+
+
+## Petit "enfoncement" du bouton + clic sonore.
+func _press_feedback(b: Button) -> void:
+	b.modulate = Color(1.4, 1.4, 1.4, 1.0)
+	var tw := create_tween()
+	tw.tween_property(b, "modulate", Color(1, 1, 1, 0.9), 0.18)
+	AudioManager.play("click", -8.0)
+
 
 func _in_joystick_zone(pos: Vector2) -> bool:
 	# Moitié gauche de l'écran (le bouton interaction occupe le bas-droite).

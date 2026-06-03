@@ -30,8 +30,20 @@ var ammo: int = CYLINDER
 var is_moving: bool = false   # le tir n'est possible qu'à l'arrêt
 var recoil: float = 0.0       # 0..1, décroît, pour l'animation de recul
 var walk_phase: float = 0.0   # phase d'animation de marche
+var speed_mult: float = 1.0   # upgrade "vitesse"
+var reload_mult: float = 1.0  # upgrade "recharge"
 var _fire_cd: float = 0.0
 var _reload_t: float = 0.0    # > 0 = rechargement en cours
+
+
+func _ready() -> void:
+	# Applique les upgrades persistés (SaveManager est un autoload).
+	speed_mult = SaveManager.speed_mult()
+	reload_mult = SaveManager.reload_mult()
+
+
+func _reload_time() -> float:
+	return RELOAD_TIME * reload_mult
 
 
 func _physics_process(delta: float) -> void:
@@ -43,7 +55,7 @@ func _physics_process(delta: float) -> void:
 	var dir := Iso.screen_to_world(input)
 	if dir.length() > 1.0:
 		dir = dir.normalized()
-	velocity = dir * SPEED
+	velocity = dir * SPEED * speed_mult
 	is_moving = dir.length() > 0.05
 	if is_moving:
 		facing = dir.normalized()
@@ -90,12 +102,15 @@ func _handle_fire(delta: float) -> void:
 
 
 func _start_reload() -> void:
-	_reload_t = RELOAD_TIME
+	if _reload_t > 0.0:
+		return
+	_reload_t = _reload_time()
+	AudioManager.play("reload")
 	ammo_changed.emit(ammo, CYLINDER, true)
 
 
 func get_reload_ratio() -> float:
-	return 1.0 - (_reload_t / RELOAD_TIME) if _reload_t > 0.0 else 1.0
+	return 1.0 - (_reload_t / _reload_time()) if _reload_t > 0.0 else 1.0
 
 
 ## Direction de tir : vers le point pointé (souris/clic) si dispo, sinon vers la

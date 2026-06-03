@@ -15,8 +15,12 @@ var _health_label: Label
 var _ammo_label: Label
 var _pause_root: Control
 var _flash: ColorRect
+var _alert_overlay: ColorRect
 
 var _money: int = 0
+var _alarm_ratio: float = 0.0
+var _global_alert: bool = false
+var _pulse_t: float = 0.0
 
 
 func _ready() -> void:
@@ -30,13 +34,22 @@ func _ready() -> void:
 ## Couche de flash plein écran (dégâts / alarme), au-dessus du jeu mais sous les
 ## libellés HUD. Couvre tout l'écran quelle que soit la résolution.
 func _build_flash() -> void:
+	# Teinte rouge d'ambiance qui pulse quand l'alarme monte (sous le flash).
+	_alert_overlay = ColorRect.new()
+	_alert_overlay.color = Color(0.8, 0.05, 0.05, 0.0)
+	_alert_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_alert_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_alert_overlay.z_index = -2
+	add_child(_alert_overlay)
+	move_child(_alert_overlay, 0)
+
 	_flash = ColorRect.new()
 	_flash.color = Color(1, 0, 0, 0)
 	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_flash.z_index = -1
 	add_child(_flash)
-	move_child(_flash, 0)
+	move_child(_flash, 1)
 
 
 ## Déclenche un flash plein écran qui s'estompe.
@@ -48,9 +61,21 @@ func flash(color: Color) -> void:
 	tween.tween_property(_flash, "color:a", 0.0, 0.45)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if InputManager.is_pause_just_pressed():
 		_toggle_pause()
+	# Pulsation rouge : plus l'alarme est haute, plus ça bat fort et vite.
+	if _alert_overlay != null:
+		var base := _alarm_ratio * 0.10
+		var amp := 0.04 + _alarm_ratio * 0.12
+		var speed := 3.0 + _alarm_ratio * 6.0
+		if _global_alert:
+			base = 0.12
+			amp = 0.12
+			speed = 9.0
+		_pulse_t += delta * speed
+		var a: float = base + amp * (0.5 + 0.5 * sin(_pulse_t))
+		_alert_overlay.color.a = clampf(a, 0.0, 0.32) if (_alarm_ratio > 0.02 or _global_alert) else 0.0
 
 
 # --- Construction de l'UI ---
@@ -200,10 +225,12 @@ func set_money(amount: int) -> void:
 
 
 func set_alarm(value: float) -> void:
+	_alarm_ratio = clampf(value / 100.0, 0.0, 1.0)
+	if value >= 100.0:
+		_global_alert = true
 	if _alarm_bar:
 		_alarm_bar.value = value
-		var t := clampf(value / 100.0, 0.0, 1.0)
-		_alarm_bar.modulate = Color(1.0, 1.0 - t, 0.2)
+		_alarm_bar.modulate = Color(1.0, 1.0 - _alarm_ratio, 0.2)
 
 
 func set_state(alert: bool) -> void:

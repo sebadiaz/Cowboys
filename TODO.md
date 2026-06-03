@@ -2,10 +2,24 @@
 
 Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.md`) :
 
+## Fait dans la passe "arcade V2" (cf. CLAUDE.md §6 bis)
+- [x] Game juice : screen-shake, recul joueur, flash de touche des gardes.
+- [x] Particules : poussière de pas, étincelles, impact de balle, douilles,
+      gerbe dorée au ramassage ; animation de mort des gardes.
+- [x] Vignette d'ambiance + overlay rouge **pulsé** quand l'alarme monte.
+- [x] Tir six-coups (6 balles), recharge auto/manuelle, cadence western.
+- [x] IA gardes : état `SEARCH` + dernière position connue + fouille ; **renfort**
+      déclenché à l'alarme 100 ; gardes à 2 PV.
+- [x] Messages dramatiques : `VU !`, `ALARME !`, `COFFRE OUVERT !`, `FUITE !`.
+- [x] Audio **procédural** (autoload `AudioManager`, aucun asset).
+- [x] Scoring (butin + coffre + bonus discrétion + bonus temps) + **boutique**
+      d'upgrades (vitesse, coffre, recharge, discrétion) persistés dans la save.
+- [x] Rendu adapté à la taille d'écran (zoom auto, mobile + desktop).
+
 ## Direction artistique
 - [ ] Vrais graphismes (sprites animés joueur/gardes, tuiles de banque).
 - [ ] Animations de marche 8 directions, feedback de capture.
-- [ ] Effets : poussière, flash d'alarme, particules sur le coffre.
+- [ ] Vrais bruitages / musique western (remplacer l'audio procédural).
 
 ## Assets & intégration (suite)
 - [x] Intégrer les vraies planches PNG (1254²) + props en régions d'atlas.
@@ -21,18 +35,20 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 ## Gameplay & IA
 - [ ] **Occlusion des cônes de vision par les murs** (découpe visuelle du cône).
 - [ ] Mode **tactique ralenti** (bullet-time pour planifier).
-- [ ] **Shérifs supplémentaires** et renforts quand l'alarme est pleine.
-- [ ] Mémoire des gardes (dernière position connue, fouille de zone).
+- [x] **Shérifs supplémentaires** et renforts quand l'alarme est pleine.
+- [x] Mémoire des gardes (dernière position connue, fouille de zone).
 - [ ] Phase de **fuite à cheval** après le braquage.
 
 ## Contenu & progression
 - [ ] **Carte du monde** et plusieurs **villes** / banques.
 - [ ] Plusieurs missions avec objectifs variés.
-- [ ] **Boutique** et **upgrades** (vitesse, crochetage plus rapide, leurres).
+- [x] **Boutique** et **upgrades** (vitesse, coffre rapide, recharge, discrétion).
+- [ ] Nouveaux types d'upgrades (leurres, plus de PV, chargeur+).
 - [ ] **Vraie minimap** en jeu.
 
 ## Audio
-- [ ] **Sons** (pas, alarme, coffre, ramassage) et **musique** western.
+- [x] **Sons procéduraux** (tir, reload, ramassage, coffre, alarme, hit, fin).
+- [ ] **Vrais bruitages** + **musique** western (ambiance).
 
 ## Technique / plateforme
 - [ ] **PWA** (installable, jouable hors-ligne).

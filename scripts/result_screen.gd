@@ -36,9 +36,21 @@ func _ready() -> void:
 
 	box.add_child(_spacer(10))
 
-	box.add_child(_label("Sacs récupérés : %d / 3" % int(r.get("loot_bags", 0)), 20))
-	box.add_child(_label("Butin de la mission : %d $" % int(r.get("loot_value", 0)), 20))
-	box.add_child(_label("Argent gagné : %d $" % int(r.get("money_earned", 0)), 20))
+	box.add_child(_label("Sacs récupérés : %d" % int(r.get("loot_bags", 0)), 20))
+
+	# Détail du score (butin + discrétion + temps).
+	var score: Dictionary = r.get("score", {})
+	if success and not score.is_empty():
+		box.add_child(_spacer(4))
+		box.add_child(_row("Butin", int(score.get("loot", 0))))
+		box.add_child(_row("Bonus discrétion", int(score.get("stealth", 0))))
+		box.add_child(_row("Bonus rapidité", int(score.get("time", 0))))
+		var total := _label("TOTAL GAGNÉ : %d $" % int(r.get("money_earned", 0)), 26)
+		total.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
+		box.add_child(total)
+	else:
+		box.add_child(_label("Butin perdu : %d $" % int(r.get("loot_value", 0)), 20))
+		box.add_child(_label("Argent gagné : 0 $", 20))
 
 	box.add_child(_spacer(8))
 
@@ -48,14 +60,20 @@ func _ready() -> void:
 	box.add_child(_spacer(16))
 
 	var retry := Button.new()
-	retry.text = "Rejouer la mission"
+	retry.text = "Rejouer le braquage"
 	retry.custom_minimum_size = Vector2(460, 52)
 	retry.pressed.connect(_on_retry)
 	box.add_child(retry)
 
+	var shop := Button.new()
+	shop.text = "🛒 Boutique (dépenser le magot)"
+	shop.custom_minimum_size = Vector2(460, 50)
+	shop.pressed.connect(_on_shop)
+	box.add_child(shop)
+
 	var menu := Button.new()
 	menu.text = "Menu principal"
-	menu.custom_minimum_size = Vector2(460, 52)
+	menu.custom_minimum_size = Vector2(460, 50)
 	menu.pressed.connect(_on_menu)
 	box.add_child(menu)
 
@@ -64,8 +82,17 @@ func _on_retry() -> void:
 	GameManager.start_mission()
 
 
+func _on_shop() -> void:
+	get_tree().change_scene_to_file("res://scenes/ShopScreen.tscn")
+
+
 func _on_menu() -> void:
 	GameManager.goto_main_menu()
+
+
+## Ligne "Libellé .......... +N $" pour le détail du score.
+func _row(label: String, amount: int) -> Label:
+	return _label("%s : +%d $" % [label, amount], 19)
 
 
 func _label(text: String, font_size: int) -> Label:

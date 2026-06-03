@@ -1,19 +1,22 @@
 extends CharacterBody2D
 ## guard_ai.gd
-## Garde avec patrouille et détection progressive du joueur.
-## États : PATROL (ronde) → SUSPECT (enquête) → ALERT (poursuite).
-## En alerte, s'il touche le joueur, la mission échoue.
+## Garde avec patrouille, détection progressive et MÉMOIRE du joueur.
+## États : PATROL (ronde) → SUSPECT (enquête) → SEARCH (fouille la dernière
+## position connue) → ALERT (poursuite + tir). En alerte, s'il touche le joueur,
+## la mission échoue.
 
 signal player_caught()
 
-enum State { PATROL, SUSPECT, ALERT }
+enum State { PATROL, SUSPECT, SEARCH, ALERT }
 
 const PATROL_SPEED := 72.0
 const SUSPECT_SPEED := 45.0
+const SEARCH_SPEED := 90.0
 const CHASE_SPEED := 165.0
 const BODY_RADIUS := 14.0
 const CATCH_DISTANCE := 26.0
 const WAYPOINT_REACHED := 8.0
+const SEARCH_TIME := 4.0        # durée de fouille après avoir perdu le joueur
 
 # Cinétique de la détection.
 const DETECT_RISE := 1.15      # par seconde quand le joueur est vu
@@ -27,6 +30,7 @@ var player: Node2D = null
 var alarm: Node = null
 var bullet_system: Node = null
 var active: bool = true
+var alarm_gain_mult: float = 1.0   # réduit par l'upgrade "discrétion"
 
 const GUARD_FIRE_RATE := 1.1   # secondes entre deux tirs de garde
 const MAX_HP := 2              # le garde encaisse 2 balles
@@ -38,6 +42,9 @@ var _state: int = State.PATROL
 var _detect: float = 0.0
 var _wp_index: int = 0
 var _facing := Vector2.DOWN
+var _last_known := Vector2.ZERO   # dernière position où le joueur a été vu
+var _search_t := 0.0              # temps de fouille restant
+var _look_t := 0.0                # minuterie pour "regarder autour"
 
 @onready var _cone: Node2D = $VisionCone
 
@@ -57,22 +64,27 @@ func _physics_process(delta: float) -> void:
 
 	var sees_player: bool = _cone != null and _cone.can_see(player.global_position)
 
-	# Mise à jour de la détection.
+	# Mise à jour de la détection et de la mémoire.
 	if sees_player:
 		_detect = min(ALERT_THRESHOLD, _detect + DETECT_RISE * delta)
 		if alarm != null and alarm.has_method("add_detection"):
-			alarm.add_detection(ALARM_GAIN * delta)
+			alarm.add_detection(ALARM_GAIN * alarm_gain_mult * delta)
+		_last_known = player.global_position
+		_search_t = SEARCH_TIME
 	else:
 		_detect = max(0.0, _detect - DETECT_FALL * delta)
+		_search_t = max(0.0, _search_t - delta)
 
 	# Alerte globale forcée par la jauge d'alarme.
 	var global_alert: bool = alarm != null and "global_alert" in alarm and alarm.global_alert
 
-	# Transitions d'état.
+	# Transitions d'état (du plus urgent au plus calme).
 	if global_alert or _detect >= ALERT_THRESHOLD:
 		_state = State.ALERT
-	elif _detect >= SUSPECT_THRESHOLD or sees_player:
+	elif sees_player or _detect >= SUSPECT_THRESHOLD:
 		_state = State.SUSPECT
+	elif _search_t > 0.0:
+		_state = State.SEARCH
 	else:
 		_state = State.PATROL
 
@@ -81,6 +93,8 @@ func _physics_process(delta: float) -> void:
 			_do_patrol(delta)
 		State.SUSPECT:
 			_do_suspect(delta)
+		State.SEARCH:
+			_do_search(delta)
 		State.ALERT:
 			_do_alert(delta)
 
@@ -116,6 +130,20 @@ func _do_suspect(_delta: float) -> void:
 	var to_player := player.global_position - global_position
 	_facing = to_player.normalized()
 	velocity = _facing * SUSPECT_SPEED
+
+
+## Fouille : fonce vers la dernière position connue, puis regarde autour.
+func _do_search(delta: float) -> void:
+	var to_target := _last_known - global_position
+	if to_target.length() > WAYPOINT_REACHED * 2.0:
+		# Rejoint le dernier point connu.
+		_facing = to_target.normalized()
+		velocity = _facing * SEARCH_SPEED
+	else:
+		# Sur place : balaie le regard pour chercher le joueur.
+		velocity = Vector2.ZERO
+		_look_t += delta
+		_facing = Vector2.RIGHT.rotated(_look_t * 2.2)
 
 
 func _do_alert(_delta: float) -> void:

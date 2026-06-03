@@ -75,6 +75,27 @@ func wall_puff(world_pos: Vector2) -> void:
 				_rng.randf_range(3, 5), Color(0.55, 0.42, 0.3, 0.7), "smoke"))
 
 
+func loot_pickup(world_pos: Vector2) -> void:
+	var s := _proj(world_pos)
+	# Gerbe dorée qui jaillit vers le haut.
+	for i in range(14):
+		var a := -PI / 2 + _rng.randf_range(-0.9, 0.9)
+		var spd := _rng.randf_range(70, 190)
+		_parts.append(_mk(s, Vector2.RIGHT.rotated(a) * spd, _rng.randf_range(0.3, 0.6),
+				_rng.randf_range(2.5, 4.5), Color(1.0, 0.85, 0.25), "shell"))
+
+
+func safe_burst(world_pos: Vector2) -> void:
+	var s := _proj(world_pos)
+	for i in range(18):
+		var a := _rng.randf_range(0, TAU)
+		var spd := _rng.randf_range(60, 200)
+		var col := Color(1.0, 0.9, 0.4) if _rng.randf() < 0.6 else Color(0.8, 0.8, 0.85)
+		_parts.append(_mk(s, Vector2.RIGHT.rotated(a) * spd, _rng.randf_range(0.3, 0.7),
+				_rng.randf_range(2.5, 5.0), col, "spark"))
+	add_shake(5.0)
+
+
 func foot_dust(world_pos: Vector2) -> void:
 	var s := _proj(world_pos)
 	_parts.append(_mk(s + Vector2(0, -2), _rand_v(18) + Vector2(0, -10),

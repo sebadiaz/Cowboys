@@ -74,9 +74,32 @@ Affiche en permanence : **objectif courant**, **butin ramassé**, **argent gagn�
 
 Fichier `user://save.json` :
 ```json
-{ "total_money": 0, "missions_completed": 0 }
+{ "total_money": 0, "missions_completed": 0,
+  "upgrades": { "speed": 0, "safe": 0, "reload": 0, "stealth": 0 } }
 ```
 Géré par l'autoload `SaveManager` (load/save robustes, valeurs par défaut).
+Rétrocompatible : une save sans `upgrades` est lue sans planter (valeurs 0).
+
+## 6 bis. Vision fun / arcade V2
+
+Objectif : un vrai **feeling de braquage** nerveux et rejouable, sans refonte.
+
+- **Game juice** : screen-shake au tir/impact, recul du joueur, flash de touche
+  des gardes, particules (poussière de pas, étincelles, impact, douilles,
+  gerbe dorée au ramassage), animation de mort des gardes, vignette d'ambiance,
+  overlay rouge **pulsé** quand l'alarme monte.
+- **Tir western** : six-coups de 6 balles, recharge auto/manuelle, cadence
+  lisible (pan… pan… pause… reload), visée au clic / direction tactile.
+- **IA gardes** : `PATROL → SUSPECT → SEARCH → ALERT`. Mémoire de la **dernière
+  position connue** + fouille temporisée ; **renfort** déclenché à l'alarme 100.
+- **Drame** : messages courts (`VU !`, `ALARME !`, `COFFRE OUVERT !`, `FUITE !`),
+  objectif courant clair, montée de tension visuelle + sonore.
+- **Audio procédural** : autoload `AudioManager` qui **synthétise** les sons
+  (tir, reload, ramassage, coffre, alarme, hit, victoire/échec) — aucun asset
+  audio requis, web-compatible.
+- **Progression** : score de mission = butin + coffre + **bonus discrétion** +
+  **bonus temps** ; **boutique** d'upgrades (vitesse, coffre, recharge,
+  discrétion) persistés dans la save et appliqués en mission.
 
 ## 7. Architecture
 
@@ -85,23 +108,30 @@ Géré par l'autoload `SaveManager` (load/save robustes, valeurs par défaut).
 - `save_manager.gd` — lecture/écriture `user://save.json`.
 - `input_manager.gd` — input unifié clavier + joystick virtuel.
 
+### Autoloads (suite)
+- `audio_manager.gd` — sons **synthétisés** à la volée (pas d'asset audio).
+
 ### Scripts gameplay
-- `player_controller.gd` — cowboy 8 directions, interactions, capture.
-- `guard_ai.gd` — patrouille, états PATROL / SUSPECT / ALERTE, poursuite.
+- `player_controller.gd` — cowboy 8 directions, tir six-coups, interactions.
+- `guard_ai.gd` — patrouille, états PATROL / SUSPECT / SEARCH / ALERT, mémoire
+  de la dernière position connue, riposte.
 - `vision_cone.gd` — cône de vision dessiné + détection (couleur selon état).
 - `alarm_system.gd` — jauge d'alarme 0→100, décroissance, alerte globale.
 - `loot_system.gd` — suivi des sacs + coffre, valeur totale du butin.
-- `mission_manager.gd` — construit le niveau, orchestre objectifs / fin.
-- `hud_controller.gd` — HUD + menu pause.
-- `mobile_controls.gd` — joystick virtuel + bouton interaction tactiles.
-- `result_screen.gd` — écran de résultat + boutons rejouer / menu.
+- `mission_manager.gd` — construit le niveau, orchestre objectifs / score / fin,
+  renforts, effets et audio.
+- `effects.gd` — particules, screen-shake (rendu dans l'espace du renderer).
+- `hud_controller.gd` — HUD + menu pause + flash + overlay d'alerte pulsé.
+- `mobile_controls.gd` — joystick virtuel + boutons TIR / RECH / E tactiles.
+- `result_screen.gd` — écran de résultat (détail du score) + rejouer / menu.
+- `shop_screen.gd` — boutique d'upgrades (achat via le magot, persisté).
 
 ### Scènes
 - `Boot.tscn` → charge la save, va au menu.
-- `MainMenu.tscn` → titre + bouton Jouer / Quitter.
+- `MainMenu.tscn` → titre + boutons Jouer / Boutique / Quitter.
 - `MissionRoot.tscn` → la mission jouable (construit le niveau en code).
 - `Player.tscn`, `Guard.tscn`, `Safe.tscn`, `LootBag.tscn`, `ExitZone.tscn`.
-- `HUD.tscn`, `ResultScreen.tscn`.
+- `HUD.tscn`, `ResultScreen.tscn`, `ShopScreen.tscn`.
 
 ## 8. Assets temporaires (formes Godot, pas d'images requises)
 
