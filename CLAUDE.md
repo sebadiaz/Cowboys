@@ -135,12 +135,16 @@ Objectif : un vrai **feeling de braquage** nerveux et rejouable, sans refonte.
 
 ## 8. Assets temporaires (formes Godot, pas d'images requises)
 
-Tout est dessiné via `_draw()` pour rester léger et sans assets externes :
-- Joueur : corps **marron** + **chapeau**.
-- Gardes : **bleus**.
+Tout est dessiné via `_draw()` pour rester léger et sans assets externes. Le
+rendu de mission utilise une **projection iso + caméra qui suit le cowboy**.
+- Joueur : **vrai cowboy** dessiné en couches (grand chapeau à bandeau, bandana
+  rouge, duster/manteau, ceinturon + boucle + holster, bottes, visage). Rendu
+  **directionnel** (face / dos / profils) et **animé** (marche, recul au tir,
+  flash de touche). Le cowboy est volontairement plus charismatique que les PNJ.
+- Gardes : **shérifs bleus** (long manteau, étoile), même squelette directionnel.
 - Cônes de vision : **jaune** (calme) → **orange** (suspect) → **rouge** (alerte).
-- Coffre : **gris**. Sacs : **jaunes** avec **`$`**. Sortie : **verte**.
-- Murs / comptoirs : rectangles simples.
+- Coffre / sacs / props : **textures d'atlas** (planches PNG) en billboards iso.
+- Sortie : **verte**. Murs : **boîtes 3D iso** (faces + dessus bois).
 
 ## 9. Méthode de travail
 

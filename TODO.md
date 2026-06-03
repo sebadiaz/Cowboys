@@ -17,8 +17,11 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [x] Rendu adapté à la taille d'écran (zoom auto, mobile + desktop).
 
 ## Direction artistique
-- [ ] Vrais graphismes (sprites animés joueur/gardes, tuiles de banque).
-- [ ] Animations de marche 8 directions, feedback de capture.
+- [x] **Cowboy charismatique** dessiné en couches (chapeau, bandana, duster,
+      ceinturon/holster, bottes, visage), directionnel + animé.
+- [x] Gardes shérifs distincts (manteau bleu, étoile).
+- [ ] Sprites PNG animés (remplacer le rendu procédural par des planches).
+- [ ] Animation de mort plus riche (le corps reprend le style du cowboy).
 - [ ] Vrais bruitages / musique western (remplacer l'audio procédural).
 
 ## Assets & intégration (suite)
