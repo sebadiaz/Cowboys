@@ -48,36 +48,61 @@ func add_corpse(world_pos: Vector2, facing: Vector2) -> void:
 	_corpses.append({"pos": world_pos, "facing": facing, "t": 0.0})
 
 
+var _cam_pos := Vector2.ZERO   # position de caméra lissée (sans le shake)
+
+
 func setup() -> void:
 	if ResourceLoader.exists(CHAR_SHEET_PATH):
 		_char_tex = load(CHAR_SHEET_PATH)
 	_build_billboards()
-	_fit_to_viewport()
+	_apply_zoom()
+	_cam_pos = _camera_target()
+	position = _cam_pos
 	queue_redraw()
 
 
-## Re-ajuste le zoom (appelé sur redimensionnement de la fenêtre). Retourne la
-## position de repos pour que l'appelant resynchronise le shake/les effets.
+## Recalcule le zoom (sur redimensionnement de la fenêtre / rotation mobile).
 func refit() -> Vector2:
-	_fit_to_viewport()
+	_apply_zoom()
+	_cam_pos = _camera_target()
+	position = _cam_pos
 	queue_redraw()
-	return position
+	return _cam_pos
 
 
-## Zoome et centre le niveau pour qu'il remplisse l'écran (toutes résolutions).
-## On calcule la boîte englobante du niveau PROJETÉ (sol + sommets des murs +
-## marge pour la hauteur des personnages), puis on choisit l'échelle qui le fait
-## tenir avec une petite marge.
-func _fit_to_viewport() -> void:
+## Choisit un zoom RAPPROCHÉ pour que le cowboy et l'action soient bien gros.
+## Basé sur la plus petite dimension de l'écran (marche en paysage et portrait).
+func _apply_zoom() -> void:
 	var vp := get_viewport_rect().size
-	var bounds := _level_screen_bounds()
-	var margin := 48.0
-	var avail := vp - Vector2(margin, margin) * 2.0
-	var s := minf(avail.x / bounds.size.x, avail.y / bounds.size.y)
-	s = clampf(s, 0.4, 3.0)
-	scale = Vector2(s, s)
-	# Centre la boîte englobante (en coords locales) au centre de l'écran.
-	position = vp * 0.5 - bounds.get_center() * s
+	var z := clampf(minf(vp.x, vp.y) / 360.0, 1.8, 3.6)
+	scale = Vector2(z, z)
+
+
+## Position de caméra cible : centre le joueur, bornée à l'emprise du niveau
+## pour ne pas montrer le vide au-delà des murs.
+func _camera_target() -> Vector2:
+	var vp := get_viewport_rect().size
+	var s: float = scale.x
+	var b := _level_screen_bounds()
+	var focus := Vector2.ZERO
+	if is_instance_valid(player):
+		focus = Iso.project(player.global_position) + Vector2(0, -16)
+	else:
+		focus = b.get_center()
+	var t := vp * 0.5 - focus * s
+	t.x = _clamp_axis(t.x, s, vp.x, b.position.x, b.end.x)
+	t.y = _clamp_axis(t.y, s, vp.y, b.position.y, b.end.y)
+	return t
+
+
+## Borne un axe de caméra : garde l'écran à l'intérieur du niveau, ou centre si
+## le niveau est plus petit que l'écran sur cet axe.
+func _clamp_axis(t: float, s: float, screen: float, bmin: float, bmax: float) -> float:
+	var lo := screen - s * bmax   # pour que le bord droit/bas du niveau >= écran
+	var hi := -s * bmin           # pour que le bord gauche/haut du niveau <= 0
+	if lo > hi:
+		return screen * 0.5 - s * (bmin + bmax) * 0.5   # niveau plus petit : centré
+	return clampf(t, lo, hi)
 
 
 ## Boîte englobante du niveau en coordonnées LOCALES (Iso.project, avant scale).
@@ -144,6 +169,12 @@ func _process(delta: float) -> void:
 		if c["t"] < 0.7:
 			live.append(c)
 	_corpses = live
+	# Caméra : suit le joueur en douceur, plus le screen-shake.
+	_cam_pos = _cam_pos.lerp(_camera_target(), clampf(delta * 8.0, 0.0, 1.0))
+	var shake := Vector2.ZERO
+	if fx != null and fx.has_method("get_shake_offset"):
+		shake = fx.get_shake_offset()
+	position = _cam_pos + shake
 	queue_redraw()
 
 

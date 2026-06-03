@@ -46,7 +46,6 @@ var _loot_nodes: Array = []
 var _renderer: Node2D
 var _bullets: Node
 var _fx: Node2D
-var _renderer_home := Vector2.ZERO   # position de repos (pour le screen-shake)
 
 var _mission_over := false
 var _safe_open := false
@@ -96,25 +95,19 @@ func _build_bullets() -> void:
 		g.bullet_system = _bullets
 
 
-## Re-fit du niveau et resynchronisation des effets quand l'écran change de taille.
+## Recalcule le zoom de caméra quand l'écran change de taille (navigateur/mobile).
 func _on_viewport_resized() -> void:
-	if not is_instance_valid(_renderer) or not _renderer.has_method("refit"):
-		return
-	_renderer_home = _renderer.refit()
-	if is_instance_valid(_fx):
-		_fx.scale = _renderer.scale
-		_fx.position = _renderer_home
+	if is_instance_valid(_renderer) and _renderer.has_method("refit"):
+		_renderer.refit()
 
 
 func _build_effects() -> void:
 	_fx = preload("res://scripts/effects.gd").new()
 	_fx.name = "Effects"
-	# Les effets partagent le MÊME zoom/position que le renderer pour rester
-	# alignés sur les entités (le shake ne décale que le renderer).
+	# Enfant du renderer : hérite du zoom/position de la caméra, donc les
+	# particules restent toujours alignées sur les entités (et suivent le shake).
 	_fx.iso_offset = Vector2.ZERO
-	_fx.scale = _renderer.scale
-	_fx.position = _renderer_home
-	add_child(_fx)
+	_renderer.add_child(_fx)
 	_renderer.fx = _fx
 	# Branche les effets sur les évènements de combat.
 	_bullets.impact.connect(func(pos, dir, friendly): _fx.impact_spark(pos, dir, friendly))
@@ -143,8 +136,7 @@ func _build_iso_renderer() -> void:
 	_renderer.bullets = _bullets
 	add_child(_renderer)
 	_renderer.setup()
-	_renderer_home = _renderer.position
-	# Re-ajuste le zoom si la fenêtre/écran change de taille (navigateur, mobile).
+	# Recalcule le zoom si la fenêtre/écran change de taille (navigateur, mobile).
 	get_viewport().size_changed.connect(_on_viewport_resized)
 	# Le joueur vise vers le clic : il a besoin du renderer pour convertir
 	# la position écran/souris en point monde cartésien.
@@ -313,9 +305,7 @@ func _connect_hud() -> void:
 # --- Boucle ---
 
 func _process(delta: float) -> void:
-	# Applique le screen-shake en décalant le renderer autour de sa position de repos.
-	if _fx != null and _renderer != null:
-		_renderer.position = _renderer_home + _fx.get_shake_offset()
+	# La caméra (suivi + shake) est gérée par l'IsoRenderer lui-même.
 	if _mission_over:
 		return
 	_elapsed += delta
