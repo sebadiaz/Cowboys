@@ -146,15 +146,26 @@ func _build_billboards() -> void:
 
 	# Salle des coffres : porte blindée dans l'ouverture du mur (x=820, y~290).
 	_add_bb(SHEET_OBJ, R_VAULT, Vector2(832, 300), 116.0)
+	_add_bb(SHEET_OBJ, R_CRATE, Vector2(900, 250), 60.0)    # caisse de lingots
+	_add_bb(SHEET_OBJ, R_CRATE, Vector2(1110, 110), 58.0)   # caisse au fond du coffre
 
-	# Bureau du directeur (alcôve haut-gauche) : bureau.
+	# Bureau du directeur (alcôve haut-gauche) + chaise/bureau dans le personnel.
 	_add_bb(SHEET_OBJ, R_DESK, Vector2(100, 160), 84.0)
+	_add_bb(SHEET_OBJ, R_DESK, Vector2(430, 150), 78.0)
+	_add_bb(SHEET_OBJ, R_DESK, Vector2(700, 150), 78.0)
 
-	# Décor du hall public (bas) : tonneaux et caisses contre les murs.
+	# Grand hall public (bas) : tonneaux et caisses (couverture) le long des murs.
 	_add_bb(SHEET_OBJ, R_BARREL, Vector2(70, 560), 70.0)
-	_add_bb(SHEET_OBJ, R_CRATE, Vector2(300, 595), 62.0)
-	# Salle des coffres : caisse de lingots à côté du coffre (coffre = 1015,170).
-	_add_bb(SHEET_OBJ, R_CRATE, Vector2(900, 250), 60.0)
+	_add_bb(SHEET_OBJ, R_BARREL, Vector2(70, 800), 70.0)
+	_add_bb(SHEET_OBJ, R_CRATE, Vector2(300, 815), 62.0)
+	_add_bb(SHEET_OBJ, R_CRATE, Vector2(560, 815), 60.0)
+	_add_bb(SHEET_OBJ, R_BARREL, Vector2(1000, 800), 68.0)
+
+	# Aile droite (couloir + petit office) : tonneaux/caisses de couverture.
+	_add_bb(SHEET_OBJ, R_BARREL, Vector2(1450, 200), 70.0)
+	_add_bb(SHEET_OBJ, R_CRATE, Vector2(1250, 560), 62.0)
+	_add_bb(SHEET_OBJ, R_BARREL, Vector2(1450, 800), 70.0)
+	_add_bb(SHEET_OBJ, R_DESK, Vector2(1290, 560), 78.0)
 
 
 func _add_bb(tex: Texture2D, region: Rect2, pos: Vector2, h: float) -> void:
@@ -180,6 +191,7 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	_draw_floor()
+	_draw_decor()
 	if is_instance_valid(exit_zone):
 		_draw_exit()
 	_draw_cones()
@@ -264,6 +276,40 @@ func _draw_bullets() -> void:
 		var col := Color(1.0, 0.9, 0.3) if b["friendly"] else Color(1.0, 0.4, 0.2)
 		draw_circle(p, 4.5, Color(0, 0, 0, 0.3))
 		draw_circle(p, 3.5, col)
+
+
+# --- Décor au sol (tapis) + lampes d'ambiance ---
+
+## Tapis western et lampes : posés à plat sur le sol (sous les acteurs/props),
+## ajoutent couleur et richesse sans collision.
+func _draw_decor() -> void:
+	# Tapis rouge devant l'entrée du coffre (zone prestige).
+	_rug(Vector2(1000, 295), 150, 150, Color(0.55, 0.14, 0.12), Color(0.85, 0.68, 0.25))
+	# Grand tapis du hall, sous le lustre.
+	_rug(Vector2(560, 640), 230, 200, Color(0.40, 0.20, 0.30), Color(0.80, 0.62, 0.30))
+	# Tapis d'accueil au pied de la porte d'entrée.
+	_rug(Vector2(150, 555), 120, 110, Color(0.30, 0.24, 0.14), Color(0.70, 0.58, 0.30))
+	# Lampes murales : halo chaud le long des murs (ambiance saloon).
+	for p in [Vector2(300, 28), Vector2(820, 28), Vector2(1300, 28),
+			Vector2(28, 430), Vector2(1492, 430), Vector2(560, 640)]:
+		_lamp(p)
+
+
+func _rug(center: Vector2, w: float, h: float, col: Color, accent: Color) -> void:
+	var r := Rect2(center - Vector2(w * 0.5, h * 0.5), Vector2(w, h))
+	var poly := _rect_diamond(r)
+	draw_colored_polygon(poly, col)
+	draw_polyline(_closed(poly), accent, 2.5)
+	var inner := Rect2(center - Vector2(w * 0.32, h * 0.32), Vector2(w * 0.64, h * 0.64))
+	draw_polyline(_closed(_rect_diamond(inner)), accent.darkened(0.1), 1.5)
+
+
+func _lamp(world_pos: Vector2) -> void:
+	var p := Iso.project(world_pos)
+	# Halo lumineux chaud (plusieurs cercles dégradés).
+	for i in range(4):
+		draw_circle(p + Vector2(0, -6), 26.0 - i * 6.0, Color(1.0, 0.85, 0.45, 0.06))
+	draw_circle(p + Vector2(0, -6), 4.0, Color(1.0, 0.92, 0.6, 0.9))
 
 
 # --- Sol texturé (dalles iso) ---

@@ -16,17 +16,23 @@ const CONFIG_PATH := "res://data/mission_01.json"
 # Plan de banque réaliste : hall public (bas), comptoir des guichets (milieu,
 # avec passage), salle des coffres fermée (haut-droite), bureau (haut-gauche).
 const DEFAULT_CFG := {
-	"player_start": [590, 575],          # entrée (hall public, en bas)
-	"exit": [110, 560],                  # porte d'entrée (front, bas-gauche)
-	"safe": {"pos": [1015, 170], "value": 500, "open_time": 2.5},  # dans le coffre-fort
+	"player_start": [560, 600],          # entrée (grand hall public, en bas)
+	"exit": [95, 555],                   # porte d'entrée (front, bas-gauche)
+	"safe": {"pos": [1015, 170], "value": 600, "open_time": 2.5},  # dans le coffre-fort
 	"loot": [
-		{"pos": [935, 175], "value": 250},   # dans la salle des coffres
-		{"pos": [650, 300], "value": 150},   # derrière le comptoir
-		{"pos": [350, 520], "value": 150},   # dans le hall
+		{"pos": [935, 175], "value": 250},    # salle des coffres
+		{"pos": [1060, 300], "value": 250},   # salle des coffres (fond)
+		{"pos": [650, 300], "value": 150},    # derrière le comptoir
+		{"pos": [330, 520], "value": 150},    # hall (gauche)
+		{"pos": [760, 760], "value": 150},    # grand hall (bas)
+		{"pos": [1330, 250], "value": 200},   # aile droite (haut)
+		{"pos": [1330, 760], "value": 200},   # aile droite (bas)
 	],
 	"guards": [
-		{"route": [[480, 320], [1000, 320], [1000, 300], [480, 300]]},  # zone personnel
-		{"route": [[250, 500], [820, 500], [820, 470], [250, 470]]},    # hall public
+		{"route": [[210, 320], [800, 320], [800, 300], [210, 300]]},      # zone personnel
+		{"route": [[120, 720], [1380, 720], [1380, 760], [120, 760]]},    # grand hall
+		{"route": [[900, 120], [1080, 120], [1080, 320], [900, 320]]},    # salle des coffres
+		{"route": [[1340, 120], [1340, 420], [1440, 420], [1440, 120]]},  # aile droite
 	],
 }
 
@@ -182,32 +188,38 @@ func _build_alarm() -> void:
 
 func _build_floor() -> void:
 	# Le sol est dessiné par l'IsoRenderer ; on mémorise juste son emprise.
-	_floor_rect = Rect2(20, 20, 1140, 600)
+	# Grande banque : vaste hall (bas), zone personnel + bureau (haut-gauche),
+	# salle des coffres (haut-droite) et aile/couloir droit.
+	_floor_rect = Rect2(20, 20, 1480, 840)
 
 
 func _build_walls() -> void:
-	# Murs extérieurs (épaisseur 20). Porte d'entrée = trou dans le mur gauche.
-	_add_wall(Rect2(0, 0, 1180, 20), true)            # haut
-	_add_wall(Rect2(0, 620, 1180, 20), true)          # bas
-	_add_wall(Rect2(1160, 0, 20, 640), true)          # droite
+	# --- Murs extérieurs (épaisseur 20). Porte d'entrée = trou dans le mur gauche.
+	_add_wall(Rect2(0, 0, 1520, 20), true)            # haut
+	_add_wall(Rect2(0, 860, 1520, 20), true)          # bas
+	_add_wall(Rect2(1500, 0, 20, 880), true)          # droite
 	_add_wall(Rect2(0, 0, 20, 500), true)             # gauche (au-dessus de la porte)
-	_add_wall(Rect2(0, 600, 20, 40), true)            # gauche (sous la porte)
+	_add_wall(Rect2(0, 600, 20, 260), true)           # gauche (sous la porte)
 
-	# --- Salle des coffres (vault) fermée, haut-droite, avec une ouverture ---
-	# Cloison verticale gauche du coffre (x=820), trou d'entrée vers y=250..330.
+	# --- Salle des coffres (vault) fermée, haut-droite, avec une entrée ---
+	# Cloison verticale gauche (x=820), ouverture d'accès vers y=250..330.
 	_add_wall(Rect2(820, 20, 24, 230))                # haut du mur vertical
-	_add_wall(Rect2(820, 330, 24, 60))                # bas du mur vertical
-	# Cloison horizontale basse du coffre (y=370), de x=820 à droite.
-	_add_wall(Rect2(844, 366, 316, 24))
+	_add_wall(Rect2(820, 330, 24, 40))                # bas du mur vertical
+	_add_wall(Rect2(844, 366, 312, 24))               # cloison basse du coffre
+	_add_wall(Rect2(1156, 20, 24, 346))               # paroi droite du coffre (referme)
 
 	# --- Comptoir des guichets : sépare hall (bas) du personnel (haut) ---
-	# Cloison basse du comptoir à y=360, avec un passage (gap) vers x=560..660.
+	# Cloison basse du comptoir à y=354, avec un passage (gap) vers x=540..680.
 	_add_wall(Rect2(180, 354, 360, 22))               # tronçon gauche
 	_add_wall(Rect2(680, 354, 140, 22))               # tronçon droit (jusqu'au vault)
 
 	# --- Bureau du directeur (haut-gauche), petite alcôve ---
 	_add_wall(Rect2(180, 110, 22, 150))               # cloison verticale du bureau
 	_add_wall(Rect2(20, 240, 182, 22))                # cloison horizontale du bureau
+
+	# --- Aile droite : petit office cloisonné (cover), accès large par le bas ---
+	_add_wall(Rect2(1180, 470, 22, 200))              # cloison verticale de l'aile
+	_add_wall(Rect2(1180, 470, 200, 22))              # cloison horizontale de l'aile
 
 
 ## Crée la collision cartésienne du mur ; le visuel iso est géré par le renderer.

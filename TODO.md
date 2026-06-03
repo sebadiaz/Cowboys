@@ -2,6 +2,13 @@
 
 Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.md`) :
 
+## Fait dans la passe "grande banque + cowboy"
+- [x] **Grande banque** (1480×840) : hall étendu, zone personnel, bureau, salle
+      des coffres refermée, **aile droite** ; 7 sacs, 4 gardes.
+- [x] Décor enrichi : tapis (prestige coffre / hall / entrée), lampes d'ambiance,
+      tonneaux/caisses/bureaux de couverture.
+- [x] Accessibilité vérifiée (BFS) : aucune entité dans un mur, tout atteignable.
+
 ## Fait dans la passe "arcade V2" (cf. CLAUDE.md §6 bis)
 - [x] Game juice : screen-shake, recul joueur, flash de touche des gardes.
 - [x] Particules : poussière de pas, étincelles, impact de balle, douilles,
