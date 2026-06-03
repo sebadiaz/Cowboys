@@ -6,7 +6,10 @@ extends Node2D
 ## le joueur. Les murs (couche 1) bloquent les balles (raycast).
 
 signal guard_killed(guard: Node)
+signal guard_hit(guard: Node)
 signal player_hit()
+signal impact(pos: Vector2, dir: Vector2, friendly: bool)
+signal wall_impact(pos: Vector2)
 
 const SPEED := 620.0
 const HIT_RADIUS := 20.0
@@ -41,7 +44,9 @@ func _physics_process(delta: float) -> void:
 		var query := PhysicsRayQueryParameters2D.create(from, to, WALL_MASK)
 		query.collide_with_areas = false
 		query.collide_with_bodies = true
-		if not space.intersect_ray(query).is_empty():
+		var wall_hit := space.intersect_ray(query)
+		if not wall_hit.is_empty():
+			wall_impact.emit(wall_hit.get("position", to))
 			continue  # balle absorbée par le mur
 		b["pos"] = to
 		b["dist"] += step
@@ -52,7 +57,11 @@ func _physics_process(delta: float) -> void:
 			var hit := false
 			for g in guards:
 				if is_instance_valid(g) and g.active and to.distance_to(g.global_position) < HIT_RADIUS:
-					guard_killed.emit(g)
+					impact.emit(to, b["dir"], true)
+					if g.has_method("hit") and g.hit():
+						guard_killed.emit(g)   # le garde est tombé
+					else:
+						guard_hit.emit(g)      # touché mais encore debout
 					hit = true
 					break
 			if hit:
@@ -60,6 +69,7 @@ func _physics_process(delta: float) -> void:
 		else:
 			if is_instance_valid(player) and not player.is_caught \
 					and to.distance_to(player.global_position) < HIT_RADIUS:
+				impact.emit(to, b["dir"], false)
 				player_hit.emit()
 				continue
 		survivors.append(b)

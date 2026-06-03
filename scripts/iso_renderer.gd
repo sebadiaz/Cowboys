@@ -36,9 +36,16 @@ const R_DESK := Rect2(685, 60, 290, 275)
 const R_PLAYER := Rect2(0, 0, 128, 128)
 const R_GUARD := Rect2(128, 0, 128, 128)
 
+var fx: Node2D = null
 var _char_tex: Texture2D = null
 var _billboards: Array[Dictionary] = []   # décor + comptoirs texturés
 var _box_walls: Array[Dictionary] = []    # murs dessinés en boîtes 3D
+var _corpses: Array[Dictionary] = []      # gardes abattus (animation de chute)
+
+
+## Démarre l'animation de mort d'un garde à `world_pos`.
+func add_corpse(world_pos: Vector2, facing: Vector2) -> void:
+	_corpses.append({"pos": world_pos, "facing": facing, "t": 0.0})
 
 
 func setup() -> void:
@@ -82,7 +89,14 @@ func _add_bb(tex: Texture2D, region: Rect2, pos: Vector2, h: float) -> void:
 	_billboards.append({"tex": tex, "region": region, "pos": pos, "h": h})
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	# Avance et purge les corps en cours de chute (~0,7 s).
+	var live: Array[Dictionary] = []
+	for c in _corpses:
+		c["t"] += delta
+		if c["t"] < 0.7:
+			live.append(c)
+	_corpses = live
 	queue_redraw()
 
 
@@ -99,6 +113,9 @@ func _draw() -> void:
 	for b in loot:
 		if is_instance_valid(b):
 			_shadow(b.global_position, 11.0)
+	# Corps des gardes abattus (au sol, sous les acteurs debout).
+	for c in _corpses:
+		_draw_corpse(c)
 
 	# Tout ce qui est "debout", trié par profondeur (lointain -> proche).
 	var items: Array[Dictionary] = []
@@ -133,6 +150,29 @@ func _draw() -> void:
 			"player": _draw_player()
 
 	_draw_bullets()
+	_draw_vignette()
+
+
+## Pénombre western : assombrit les bords, halo clair autour du joueur.
+func _draw_vignette() -> void:
+	var vp := get_viewport_rect().size
+	var origin := -position   # coin haut-gauche de l'écran en coords locales
+	# Cadres semi-transparents concentriques pour assombrir les bords.
+	var bands := 4
+	for i in range(bands):
+		var inset := float(i) * 24.0
+		var a := 0.06 * (bands - i) / bands
+		var col := Color(0.05, 0.03, 0.02, a)
+		# Quatre bandes (haut/bas/gauche/droite) pour ne pas réassombrir le centre.
+		draw_rect(Rect2(origin.x, origin.y + inset, vp.x, 24), col)
+		draw_rect(Rect2(origin.x, origin.y + vp.y - inset - 24, vp.x, 24), col)
+		draw_rect(Rect2(origin.x + inset, origin.y, 24, vp.y), col)
+		draw_rect(Rect2(origin.x + vp.x - inset - 24, origin.y, 24, vp.y), col)
+	# Halo doux autour du joueur.
+	if is_instance_valid(player):
+		var c := Iso.project(player.global_position) + Vector2(0, -16)
+		for i in range(4):
+			draw_circle(c, 120.0 - i * 26.0, Color(1.0, 0.93, 0.7, 0.04))
 
 
 func _draw_bullets() -> void:
@@ -248,7 +288,8 @@ func _draw_player() -> void:
 		"vest": Color(0.45, 0.30, 0.16), "pants": Color(0.28, 0.22, 0.16),
 		"skin": Color(0.86, 0.66, 0.48),
 	}
-	_draw_person(player.global_position, player.facing, pal, false, false)
+	_draw_person(player.global_position, player.facing, pal, false, false,
+			player.walk_phase, player.recoil, 0.0)
 
 
 func _draw_guard(g: Node) -> void:
@@ -262,56 +303,83 @@ func _draw_guard(g: Node) -> void:
 		"vest": Color(0.16, 0.24, 0.50), "pants": Color(0.16, 0.18, 0.26),
 		"skin": Color(0.84, 0.64, 0.46),
 	}
-	_draw_person(g.global_position, g.get_facing(), pal, true, alert)
+	var flash: float = g.hit_flash if "hit_flash" in g else 0.0
+	_draw_person(g.global_position, g.get_facing(), pal, true, alert,
+			_wphase(g), 0.0, flash)
 
 
-## Personnage "debout" vu en iso : ombre, jambes, torse, bras + pistolet,
-## tête et chapeau de cowboy. `facing` oriente le corps et l'arme.
-func _draw_person(world_pos: Vector2, facing: Vector2, pal: Dictionary, is_guard: bool, alert: bool) -> void:
+func _wphase(g: Node) -> float:
+	# Phase de marche dérivée de la vitesse (pas d'état stocké côté garde).
+	return (Time.get_ticks_msec() * 0.012) if (("velocity" in g) and g.velocity.length() > 5.0) else 0.0
+
+
+## Personnage "debout" vu en iso : ombre, jambes (animées), torse, bras + pistolet
+## (recul), tête et chapeau. `flash` blanchit le corps quand touché.
+func _draw_person(world_pos: Vector2, facing: Vector2, pal: Dictionary, is_guard: bool,
+		alert: bool, walk: float, recoil: float, flash: float) -> void:
 	var base := Iso.project(world_pos)
-	# Direction projetée à l'écran (gauche/droite) pour orienter l'arme.
 	var f := Iso.project(world_pos + facing) - base
 	if f.length() > 0.001:
 		f = f.normalized()
 	var side := signf(f.x) if absf(f.x) > 0.15 else 1.0
 	var facing_up := f.y < -0.25
 
+	# Teinte (flash blanc quand touché).
+	var shirt: Color = pal["shirt"].lerp(Color.WHITE, flash * 0.7)
+	var vest: Color = pal["vest"].lerp(Color.WHITE, flash * 0.7)
+
 	# Ombre au sol.
 	draw_colored_polygon(_ellipse(base, 13.0, 6.0), Color(0, 0, 0, 0.22))
 
-	var hip := base + Vector2(0, -16.0)
-	var shoulder := base + Vector2(0, -30.0)
+	# Balancement de marche.
+	var sw := sin(walk) * 3.0
+	var bob := absf(sin(walk)) * -1.5
+	var hip := base + Vector2(0, -16.0 + bob)
+	var shoulder := base + Vector2(0, -30.0 + bob)
 
-	# Jambes.
-	draw_line(hip + Vector2(-4, 0), base + Vector2(-5, -1), pal["pants"], 5.0)
-	draw_line(hip + Vector2(4, 0), base + Vector2(5, -1), pal["pants"], 5.0)
-	# Bottes.
-	draw_circle(base + Vector2(-5, -1), 2.6, Color(0.18, 0.12, 0.08))
-	draw_circle(base + Vector2(5, -1), 2.6, Color(0.18, 0.12, 0.08))
+	# Jambes (alternées).
+	draw_line(hip + Vector2(-4, 0), base + Vector2(-5 - sw, -1), pal["pants"], 5.0)
+	draw_line(hip + Vector2(4, 0), base + Vector2(5 + sw, -1), pal["pants"], 5.0)
+	draw_circle(base + Vector2(-5 - sw, -1), 2.6, Color(0.18, 0.12, 0.08))
+	draw_circle(base + Vector2(5 + sw, -1), 2.6, Color(0.18, 0.12, 0.08))
 
-	# Torse (chemise) + gilet.
-	_draw_capsule(hip, shoulder, 9.0, pal["shirt"])
-	_draw_capsule(hip + Vector2(0, -2), shoulder, 6.0, pal["vest"])
+	# Torse + gilet.
+	_draw_capsule(hip, shoulder, 9.0, shirt)
+	_draw_capsule(hip + Vector2(0, -2), shoulder, 6.0, vest)
 	if is_guard:
-		# Étoile de shérif.
 		draw_circle(shoulder + Vector2(-3.0 * side, 6.0), 2.6,
 				Color(1.0, 0.9, 0.3) if alert else Color(0.85, 0.78, 0.3))
 
-	# Bras arrière + bras qui tient le pistolet (vers facing).
+	# Bras + pistolet (recul = bras ramené vers l'épaule).
 	var gun_dir := Vector2(side, -0.15 if not facing_up else -0.5).normalized()
-	var hand := shoulder + gun_dir * 13.0 + Vector2(0, 4)
-	draw_line(shoulder + Vector2(-side * 4, 2), shoulder + Vector2(-side * 7, 7), pal["shirt"].darkened(0.1), 4.0)
-	draw_line(shoulder + Vector2(side * 3, 3), hand, pal["shirt"], 4.0)
-	# Pistolet.
+	var reach := 13.0 - recoil * 4.0
+	var hand := shoulder + gun_dir * reach + Vector2(0, 4)
+	draw_line(shoulder + Vector2(-side * 4, 2), shoulder + Vector2(-side * 7, 7), shirt.darkened(0.1), 4.0)
+	draw_line(shoulder + Vector2(side * 3, 3), hand, shirt, 4.0)
 	draw_line(hand, hand + gun_dir * 7.0, Color(0.15, 0.15, 0.17), 3.0)
 	draw_line(hand, hand + Vector2(0, 4), Color(0.10, 0.10, 0.12), 3.0)
 
-	# Tête + chapeau de cowboy (couronne + bord).
+	# Tête + chapeau.
 	var head := shoulder + Vector2(0, -7.0)
 	draw_circle(head, 5.5, pal["skin"])
-	draw_colored_polygon(_ellipse(head + Vector2(0, -3.0), 11.0, 3.4), pal["hat"])      # bord
-	draw_colored_polygon(_ellipse(head + Vector2(0, -6.0), 5.0, 4.5), pal["hat"].darkened(0.1))  # couronne
+	draw_colored_polygon(_ellipse(head + Vector2(0, -3.0), 11.0, 3.4), pal["hat"])
+	draw_colored_polygon(_ellipse(head + Vector2(0, -6.0), 5.0, 4.5), pal["hat"].darkened(0.1))
 	draw_line(head + Vector2(-9, -3), head + Vector2(9, -3), pal["hat"].lightened(0.15), 1.5)
+
+
+## Garde abattu : bascule au sol + fondu.
+func _draw_corpse(c: Dictionary) -> void:
+	var t: float = clampf(c["t"] / 0.7, 0.0, 1.0)
+	var base := Iso.project(c["pos"])
+	var a := (1.0 - t) * 0.9
+	# S'aplatit progressivement en une silhouette couchée.
+	var fall := lerpf(0.0, 10.0, t)
+	draw_colored_polygon(_ellipse(base, 13.0 + fall, 6.0 + fall * 0.4), Color(0, 0, 0, 0.18 * (1.0 - t)))
+	var col := Color(0.22, 0.34, 0.66, a)
+	draw_colored_polygon(_ellipse(base + Vector2(0, -4 + fall * 0.3), 9.0 + fall, 5.0), col)
+	# Tête qui roule légèrement.
+	draw_circle(base + Vector2((6.0 + fall) * signf(c["facing"].x if c["facing"].x != 0 else 1), -2),
+			4.0, Color(0.84, 0.64, 0.46, a))
 
 
 func _draw_capsule(a: Vector2, b: Vector2, width: float, col: Color) -> void:

@@ -29,7 +29,10 @@ var bullet_system: Node = null
 var active: bool = true
 
 const GUARD_FIRE_RATE := 1.1   # secondes entre deux tirs de garde
+const MAX_HP := 2              # le garde encaisse 2 balles
 var _fire_cd: float = 0.0
+var hp: int = MAX_HP
+var hit_flash: float = 0.0     # 0..1, pour le clignotement quand touché
 
 var _state: int = State.PATROL
 var _detect: float = 0.0
@@ -47,6 +50,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	hit_flash = max(0.0, hit_flash - delta * 5.0)
 	if not active or player == null:
 		velocity = Vector2.ZERO
 		return
@@ -158,6 +162,16 @@ func get_view_distance() -> float:
 
 func get_view_half_angle() -> float:
 	return deg_to_rad(_cone.view_angle_deg) if _cone != null else 0.0
+
+
+## Encaisse une balle. Retourne true si le garde est abattu (PV à 0).
+## Être touché déclenche l'alerte immédiate (le garde riposte).
+func hit() -> bool:
+	hp -= 1
+	hit_flash = 1.0
+	_detect = ALERT_THRESHOLD
+	_state = State.ALERT
+	return hp <= 0
 
 
 func stop() -> void:

@@ -7,12 +7,15 @@ signal loot_changed(loot_bags: int, loot_value: int)
 signal caught()
 signal health_changed(hp: int)
 signal ammo_changed(in_cylinder: int, capacity: int, reloading: bool)
+signal fired(muzzle_pos: Vector2, dir: Vector2)
+signal damaged()
 
 const SPEED := 220.0
 const BODY_RADIUS := 14.0
 const MAX_HP := 3
 const FIRE_RATE := 0.32      # secondes entre deux tirs
 const MUZZLE := 16.0         # distance du canon
+const RECOIL_TIME := 0.12    # durée du recul visuel
 const CYLINDER := 6          # six-coups
 const RELOAD_TIME := 1.6     # rechargement (lent, sensible)
 
@@ -25,6 +28,8 @@ var bullet_system: Node = null
 var iso_renderer: Node2D = null   # pour convertir la position du clic en point monde
 var ammo: int = CYLINDER
 var is_moving: bool = false   # le tir n'est possible qu'à l'arrêt
+var recoil: float = 0.0       # 0..1, décroît, pour l'animation de recul
+var walk_phase: float = 0.0   # phase d'animation de marche
 var _fire_cd: float = 0.0
 var _reload_t: float = 0.0    # > 0 = rechargement en cours
 
@@ -42,6 +47,10 @@ func _physics_process(delta: float) -> void:
 	is_moving = dir.length() > 0.05
 	if is_moving:
 		facing = dir.normalized()
+		walk_phase += delta * 10.0
+	else:
+		walk_phase = 0.0
+	recoil = max(0.0, recoil - delta / RECOIL_TIME)
 	move_and_slide()
 	_handle_fire(delta)
 
@@ -74,7 +83,9 @@ func _handle_fire(delta: float) -> void:
 		facing = dir
 		bullet_system.spawn(global_position + dir * MUZZLE, dir, true)
 		ammo -= 1
+		recoil = 1.0
 		ammo_changed.emit(ammo, CYLINDER, false)
+		fired.emit(global_position + dir * MUZZLE, dir)
 		_fire_cd = FIRE_RATE
 
 
@@ -105,6 +116,7 @@ func take_damage(amount: int = 1) -> void:
 		return
 	hp = max(0, hp - amount)
 	health_changed.emit(hp)
+	damaged.emit()
 	if hp <= 0:
 		get_caught()
 
