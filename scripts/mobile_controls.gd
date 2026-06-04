@@ -11,6 +11,8 @@ const KNOB_RADIUS := 38.0
 
 ## Boutons de combat (TIR / RECH / E). Désactivés en ville (déplacement seul).
 @export var combat_buttons := true
+## Mode ville : seulement le bouton E (entrer dans la banque), pas de tir.
+@export var interact_only := false
 
 var _active := false
 var _touch_index := -1
@@ -24,8 +26,8 @@ var _reload_btn: Button
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if not combat_buttons:
-		return  # en ville : joystick seul (pas de tir/recharge/interaction)
+	if not combat_buttons and not interact_only:
+		return  # déplacement seul : joystick uniquement
 	_interact_btn = Button.new()
 	_interact_btn.text = "E"
 	_interact_btn.add_theme_font_size_override("font_size", 28)
@@ -36,6 +38,9 @@ func _ready() -> void:
 	_interact_btn.button_down.connect(func() -> void: InputManager.set_touch_interact_held(true))
 	_interact_btn.button_up.connect(func() -> void: InputManager.set_touch_interact_held(false))
 	add_child(_interact_btn)
+	if interact_only:
+		_interact_btn.button_down.connect(func() -> void: _press_feedback(_interact_btn))
+		return  # ville : seulement le bouton E
 
 	_fire_btn = Button.new()
 	_fire_btn.text = "TIR"

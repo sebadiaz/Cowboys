@@ -449,146 +449,15 @@ func _wphase(g: Node) -> float:
 	return (Time.get_ticks_msec() * 0.012) if (("velocity" in g) and g.velocity.length() > 5.0) else 0.0
 
 
-## Cowboy/garde dessiné en iso, vu de 3/4 : duster, ceinturon + holster, grand
-## chapeau, bandana et visage selon l'orientation. Animé (marche, recul, flash).
+## Cowboy/garde dessiné en iso (duster, ceinturon, grand chapeau, bandana,
+## visage selon l'orientation). Délègue au module partagé CharacterArt.
 func _draw_person(world_pos: Vector2, facing: Vector2, pal: Dictionary, is_guard: bool,
 		alert: bool, walk: float, recoil: float, flash: float) -> void:
 	var base := Iso.project(world_pos)
 	var f := Iso.project(world_pos + facing) - base
 	if f.length() > 0.001:
 		f = f.normalized()
-	var side := 1.0 if f.x >= 0.0 else -1.0
-	if absf(f.x) < 0.12:
-		side = 1.0
-	var facing_up := f.y < -0.30     # de dos (s'éloigne de la caméra)
-	var facing_down := f.y > 0.20    # de face
-
-	# Flash blanc quand touché.
-	var coat: Color = (pal["coat"] as Color).lerp(Color.WHITE, flash * 0.7)
-	var coat_dark: Color = (pal["coat_dark"] as Color).lerp(Color.WHITE, flash * 0.7)
-	var shirt: Color = (pal["shirt"] as Color).lerp(Color.WHITE, flash * 0.7)
-
-	# Animation : balancement + petit "bob" vertical.
-	var sw := sin(walk) * 3.2
-	var bob := absf(sin(walk)) * -1.6
-	var hip := base + Vector2(0, -17.0 + bob)
-	var shoulder := base + Vector2(0, -32.0 + bob)
-
-	# Ombre portée.
-	draw_colored_polygon(_ellipse(base + Vector2(1, 1), 13.0, 6.0), Color(0, 0, 0, 0.25))
-
-	# Jambes + bottes (alternées par la marche).
-	var footL := base + Vector2(-5 - sw, -1)
-	var footR := base + Vector2(5 + sw, -1)
-	draw_line(hip + Vector2(-4, 0), footL, pal["pants"], 6.0)
-	draw_line(hip + Vector2(4, 0), footR, pal["pants"], 6.0)
-	_draw_boot(footL, side, pal["boots"])
-	_draw_boot(footR, side, pal["boots"])
-
-	# Pan du manteau (duster) : silhouette western qui évase vers les genoux.
-	var knee := base.y - 7.0 + bob * 0.4
-	var skirt := PackedVector2Array([
-		hip + Vector2(-7, 0), Vector2(base.x - 10 - sw * 0.4, knee),
-		Vector2(base.x + 10 + sw * 0.4, knee), hip + Vector2(7, 0),
-	])
-	draw_colored_polygon(skirt, coat_dark)
-
-	# Torse : chemise puis manteau ouvert (deux pans).
-	_draw_capsule(hip + Vector2(0, -1), shoulder, 11.0, shirt)
-	draw_colored_polygon(PackedVector2Array([
-		shoulder + Vector2(-9, 1), shoulder + Vector2(-1, 2),
-		hip + Vector2(-2, 1), hip + Vector2(-9, -1)]), coat)
-	draw_colored_polygon(PackedVector2Array([
-		shoulder + Vector2(9, 1), shoulder + Vector2(1, 2),
-		hip + Vector2(2, 1), hip + Vector2(9, -1)]), coat.darkened(0.06))
-
-	# Ceinturon + boucle + holster (sur la hanche opposée à l'arme).
-	draw_line(hip + Vector2(-9, 1), hip + Vector2(9, 1), pal["belt"], 4.0)
-	draw_rect(Rect2(hip + Vector2(-3, -1), Vector2(6, 4)), pal["buckle"])
-	var holster_x := -side
-	draw_colored_polygon(_ellipse(hip + Vector2(8 * holster_x, 4), 3.5, 5.0),
-			(pal["belt"] as Color).darkened(0.1))
-
-	# Étoile de shérif (gardes).
-	if is_guard:
-		_draw_star(shoulder + Vector2(-4.0 * side, 6.0), 3.4,
-				Color(1.0, 0.92, 0.4) if alert else Color(0.85, 0.78, 0.35))
-
-	# Bras + revolver (le recul ramène la main vers l'épaule).
-	var gun_dir := Vector2(side, -0.12 if not facing_up else -0.45).normalized()
-	var reach := 14.0 - recoil * 4.5
-	var hand := shoulder + gun_dir * reach + Vector2(0, 5)
-	draw_line(shoulder + Vector2(-side * 5, 2), shoulder + Vector2(-side * 8, 8), coat.darkened(0.08), 4.5)
-	draw_line(shoulder + Vector2(side * 4, 3), hand, shirt, 4.5)
-	# Revolver : canon + crosse + reflet.
-	draw_line(hand, hand + gun_dir * 9.0, Color(0.16, 0.16, 0.19), 3.5)
-	draw_line(hand, hand + Vector2(0, 5), Color(0.10, 0.08, 0.06), 3.5)
-	draw_circle(hand + gun_dir * 9.0, 1.4, Color(0.75, 0.76, 0.8))
-
-	# Cou + tête.
-	var head := shoulder + Vector2(side * 1.0, -8.0)
-	draw_line(shoulder, head + Vector2(0, 4), pal["skin"], 4.0)
-	# Bandana au cou (caché si totalement de dos).
-	if not facing_up:
-		draw_colored_polygon(PackedVector2Array([
-			shoulder + Vector2(-5, 1), shoulder + Vector2(5, 1),
-			shoulder + Vector2(0, 6)]), pal["bandana"])
-	draw_circle(head, 6.0, pal["skin"])
-	# Visage : seulement si on voit l'avant (de face ou de profil).
-	if not facing_up:
-		var eye := head + Vector2(side * 1.5, -1.0)
-		if facing_down:
-			draw_circle(head + Vector2(-2.2, -1.0), 0.9, Color(0.1, 0.08, 0.07))
-			draw_circle(head + Vector2(2.2, -1.0), 0.9, Color(0.1, 0.08, 0.07))
-			draw_line(head + Vector2(-2.5, 2.2), head + Vector2(2.5, 2.2), pal["hair"], 1.6)  # moustache
-		else:
-			draw_circle(eye, 0.9, Color(0.1, 0.08, 0.07))
-			draw_line(head + Vector2(side * 1.0, 2.2), head + Vector2(side * 3.0, 2.2), pal["hair"], 1.6)
-	else:
-		# De dos : nuque/cheveux.
-		draw_arc(head, 5.0, 0.2, PI - 0.2, 8, pal["hair"], 2.2)
-
-	# Grand chapeau de cowboy par-dessus.
-	_draw_hat(head + Vector2(0, -3.5), side, facing_up, pal)
-
-
-## Botte avec petit talon, orientée vers `side`.
-func _draw_boot(p: Vector2, side: float, col: Color) -> void:
-	draw_circle(p, 3.0, col)
-	draw_rect(Rect2(p + Vector2(min(0.0, side * 3.0), 0.0), Vector2(absf(side) * 3.0 + 3.0, 2.4)), col)
-
-
-## Étoile à 5 branches.
-func _draw_star(c: Vector2, r: float, col: Color) -> void:
-	var pts := PackedVector2Array()
-	for i in range(10):
-		var rad := r if i % 2 == 0 else r * 0.45
-		var a := -PI / 2 + PI * float(i) / 5.0
-		pts.append(c + Vector2(cos(a), sin(a)) * rad)
-	draw_colored_polygon(pts, col)
-
-
-## Grand chapeau western : large bord, couronne, bandeau, reflet.
-func _draw_hat(center: Vector2, side: float, facing_up: bool, pal: Dictionary) -> void:
-	var hat: Color = pal["hat"]
-	# Bord large (légèrement décalé vers l'avant selon l'orientation).
-	var brim_c := center + Vector2(side * 0.8, 1.0)
-	draw_colored_polygon(_ellipse(brim_c, 13.0, 4.2), hat.darkened(0.12))
-	draw_polyline(_closed(_ellipse(brim_c, 13.0, 4.2)), hat.darkened(0.28), 1.0)
-	# Couronne (trapèze légèrement pincé) + sommet bombé.
-	var cx := center.x + side * 0.8
-	var crown := PackedVector2Array([
-		Vector2(cx - 6.5, center.y + 1.0), Vector2(cx - 5.0, center.y - 7.0),
-		Vector2(cx + 5.0, center.y - 7.0), Vector2(cx + 6.5, center.y + 1.0),
-	])
-	draw_colored_polygon(crown, hat)
-	draw_colored_polygon(_ellipse(Vector2(cx, center.y - 7.0), 5.0, 1.8), hat.lightened(0.06))
-	# Bandeau coloré à la base de la couronne.
-	draw_line(Vector2(cx - 6.2, center.y - 0.2), Vector2(cx + 6.2, center.y - 0.2), pal["hat_band"], 2.6)
-	# Petit reflet.
-	if not facing_up:
-		draw_line(Vector2(cx - 3.0, center.y - 5.5), Vector2(cx + 1.0, center.y - 6.0),
-				hat.lightened(0.22), 1.2)
+	CharacterArt.draw_person(self, base, f, pal, is_guard, alert, walk, recoil, flash)
 
 
 ## Garde abattu : bascule au sol + fondu.
