@@ -74,11 +74,16 @@ Affiche en permanence : **objectif courant**, **butin ramassé**, **argent gagn�
 
 Fichier `user://save.json` :
 ```json
-{ "total_money": 0, "missions_completed": 0,
+{ "total_money": 0, "missions_completed": 0, "levels_unlocked": 1,
   "upgrades": { "speed": 0, "safe": 0, "reload": 0, "stealth": 0 } }
 ```
 Géré par l'autoload `SaveManager` (load/save robustes, valeurs par défaut).
-Rétrocompatible : une save sans `upgrades` est lue sans planter (valeurs 0).
+Rétrocompatible : une save sans `upgrades`/`levels_unlocked` est lue sans planter.
+
+**Niveaux** : 3 banques jouables, géométrie **pilotée par les données**
+(`data/mission_0N.json` : `floor`, `walls`, `props`, `loot`, `guards`, `safe`,
+`exit`, `player_start`). Le niveau suivant se débloque à chaque réussite ;
+sélection via `LevelSelect.tscn`.
 
 ## 6 bis. Vision fun / arcade V2
 

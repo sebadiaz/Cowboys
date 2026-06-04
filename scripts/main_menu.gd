@@ -33,6 +33,12 @@ func _ready() -> void:
 	play.pressed.connect(_on_play)
 	box.add_child(play)
 
+	var levels := Button.new()
+	levels.text = "🗺 CHOISIR LE NIVEAU"
+	levels.custom_minimum_size = Vector2(460, 50)
+	levels.pressed.connect(func(): GameManager.goto_level_select())
+	box.add_child(levels)
+
 	var shop := Button.new()
 	shop.text = "🛒 BOUTIQUE (upgrades)"
 	shop.custom_minimum_size = Vector2(460, 50)

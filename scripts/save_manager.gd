@@ -19,6 +19,7 @@ const UPGRADE_ORDER := ["speed", "reload", "safe", "stealth"]
 var total_money: int = 0
 var missions_completed: int = 0
 var upgrades: Dictionary = {}
+var levels_unlocked: int = 1   # niveaux débloqués (1 = seul le 1er)
 
 
 func _ready() -> void:
@@ -31,6 +32,7 @@ func load_game() -> void:
 	total_money = 0
 	missions_completed = 0
 	upgrades = _default_upgrades()
+	levels_unlocked = 1
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
@@ -43,6 +45,7 @@ func load_game() -> void:
 		return
 	total_money = int(data.get("total_money", 0))
 	missions_completed = int(data.get("missions_completed", 0))
+	levels_unlocked = maxi(1, int(data.get("levels_unlocked", 1)))
 	# Upgrades : on ne lit que les clés connues, bornées à leur max.
 	var saved: Variant = data.get("upgrades", {})
 	if typeof(saved) == TYPE_DICTIONARY:
@@ -63,6 +66,7 @@ func save_game() -> void:
 		"total_money": total_money,
 		"missions_completed": missions_completed,
 		"upgrades": upgrades,
+		"levels_unlocked": levels_unlocked,
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
@@ -77,6 +81,17 @@ func register_success(money_earned: int) -> void:
 	total_money += max(0, money_earned)
 	missions_completed += 1
 	save_game()
+
+
+## Débloque (au moins) jusqu'au niveau donné.
+func unlock_level(level: int) -> void:
+	if level > levels_unlocked:
+		levels_unlocked = level
+		save_game()
+
+
+func is_level_unlocked(level: int) -> bool:
+	return level <= levels_unlocked
 
 
 # --- Upgrades ---

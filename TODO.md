@@ -59,8 +59,10 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [ ] Phase de **fuite à cheval** après le braquage.
 
 ## Contenu & progression
-- [ ] **Carte du monde** et plusieurs **villes** / banques.
-- [ ] Plusieurs missions avec objectifs variés.
+- [x] **3 niveaux** (banques distinctes) pilotés par les données, débloqués au
+      fil des réussites + écran de **sélection de niveau**.
+- [ ] **Carte du monde** et plusieurs **villes**.
+- [ ] Plus de niveaux + objectifs variés (otages, coffre à temps, etc.).
 - [x] **Boutique** et **upgrades** (vitesse, coffre rapide, recharge, discrétion).
 - [ ] Nouveaux types d'upgrades (leurres, plus de PV, chargeur+).
 - [ ] **Vraie minimap** en jeu.

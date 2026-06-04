@@ -31,6 +31,12 @@ func _ready() -> void:
 		Color(0.4, 0.9, 0.4) if success else Color(0.95, 0.4, 0.35))
 	box.add_child(title)
 
+	# Niveau joué.
+	var lvl_info := GameManager.level_info(GameManager.current_level)
+	var sub := _label("Niveau %d — %s" % [GameManager.current_level, lvl_info["name"]], 18)
+	sub.add_theme_color_override("font_color", Color(0.9, 0.85, 0.6))
+	box.add_child(sub)
+
 	box.add_child(_label(
 		"Tu t'es enfui avec le butin !" if success else "Repéré par les gardes...", 18))
 
@@ -58,6 +64,15 @@ func _ready() -> void:
 	box.add_child(_label("Missions réussies : %d" % SaveManager.missions_completed, 18))
 
 	box.add_child(_spacer(16))
+
+	# Niveau suivant (si réussite et qu'il en reste un).
+	if success and GameManager.current_level < GameManager.LEVEL_COUNT:
+		var nxt := Button.new()
+		var ni := GameManager.level_info(GameManager.current_level + 1)
+		nxt.text = "➡ Niveau suivant : %s" % ni["name"]
+		nxt.custom_minimum_size = Vector2(460, 54)
+		nxt.pressed.connect(func(): GameManager.play_level(GameManager.current_level + 1))
+		box.add_child(nxt)
 
 	var retry := Button.new()
 	retry.text = "Rejouer le braquage"

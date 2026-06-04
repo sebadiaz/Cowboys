@@ -7,6 +7,11 @@ const SCENE_MAIN_MENU := "res://scenes/MainMenu.tscn"
 const SCENE_TOWN := "res://scenes/levels/Town.tscn"
 const SCENE_MISSION := "res://scenes/MissionRoot.tscn"
 const SCENE_RESULT := "res://scenes/ResultScreen.tscn"
+const SCENE_LEVEL_SELECT := "res://scenes/LevelSelect.tscn"
+
+const LEVEL_COUNT := 3
+## Niveau en cours de jeu (1..LEVEL_COUNT).
+var current_level: int = 1
 
 ## Résultat de la dernière mission jouée, lu par ResultScreen.
 var last_result := {
@@ -22,9 +27,21 @@ func goto_main_menu() -> void:
 	_change_scene(SCENE_MAIN_MENU)
 
 
+func goto_level_select() -> void:
+	_change_scene(SCENE_LEVEL_SELECT)
+
+
 ## Le bouton "Jouer" amène d'abord en ville (on rejoint la banque à pied).
+## On (re)prend le dernier niveau débloqué par défaut.
 func start_town() -> void:
+	current_level = clampi(SaveManager.levels_unlocked, 1, LEVEL_COUNT)
 	_change_scene(SCENE_TOWN)
+
+
+## Lance directement un niveau (depuis la sélection de niveaux ou "suivant").
+func play_level(level: int) -> void:
+	current_level = clampi(level, 1, LEVEL_COUNT)
+	_change_scene(SCENE_MISSION)
 
 
 func start_mission() -> void:
@@ -46,7 +63,24 @@ func finish_mission(success: bool, loot_value: int, loot_bags: int, score: Dicti
 	}
 	if success:
 		SaveManager.register_success(money_earned)
+		# Débloque le niveau suivant.
+		if current_level < LEVEL_COUNT:
+			SaveManager.unlock_level(current_level + 1)
 	_change_scene(SCENE_RESULT)
+
+
+## Métadonnées d'un niveau (nom + difficulté) lues dans son fichier de données.
+func level_info(level: int) -> Dictionary:
+	var path := "res://data/mission_%02d.json" % clampi(level, 1, LEVEL_COUNT)
+	if FileAccess.file_exists(path):
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f != null:
+			var d: Variant = JSON.parse_string(f.get_as_text())
+			f.close()
+			if typeof(d) == TYPE_DICTIONARY:
+				return {"name": str(d.get("name", "Banque %d" % level)),
+						"difficulty": str(d.get("difficulty", ""))}
+	return {"name": "Banque %d" % level, "difficulty": ""}
 
 
 func _change_scene(path: String) -> void:

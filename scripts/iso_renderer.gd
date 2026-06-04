@@ -7,7 +7,8 @@ extends Node2D
 ## (characters_sheet.png) si présente, sinon un rendu en formes.
 
 var floor_rect: Rect2
-var walls: Array[Dictionary] = []     # { "rect": Rect2, "outer": bool }
+var walls: Array[Dictionary] = []     # { "rect": Rect2, "outer": bool, "low": bool }
+var props: Array = []                 # [ ["type", x, y, h?], ... ] depuis les données
 var player: Node2D
 var guards: Array = []
 var loot: Array = []
@@ -129,43 +130,34 @@ func _level_screen_bounds() -> Rect2:
 	return Rect2(mn, mx - mn)
 
 
+## Table des props : type -> [planche, région, hauteur par défaut].
+func _prop_def(t: String) -> Array:
+	match t:
+		"counter": return [SHEET_BUILD, R_COUNTER, 70.0]
+		"vault": return [SHEET_OBJ, R_VAULT, 116.0]
+		"desk": return [SHEET_OBJ, R_DESK, 82.0]
+		"barrel": return [SHEET_OBJ, R_BARREL, 70.0]
+		"crate": return [SHEET_OBJ, R_CRATE, 60.0]
+		_: return []
+
+
 func _build_billboards() -> void:
 	_billboards.clear()
 	_box_walls.clear()
-	# Tous les murs/cloisons sont dessinés en boîtes 3D (hauteur selon type).
+	# Murs/cloisons dessinés en boîtes 3D (hauteur selon le drapeau "low").
 	for w in walls:
-		var r: Rect2 = w["rect"]
-		# Les cloisons intérieures basses (comptoir guichet à y~354) restent des
-		# murs bas pour laisser voir par-dessus ; le reste = pleine hauteur.
-		var low: bool = (not w["outer"]) and r.position.y > 340 and r.position.y < 380 and r.size.x > r.size.y
-		_box_walls.append({"rect": r, "outer": w["outer"], "low": low})
+		_box_walls.append({"rect": w["rect"], "outer": w["outer"], "low": w.get("low", false)})
 
-	# Comptoir des guichets : meubles "BANK" posés le long de la cloison basse.
-	_add_bb(SHEET_BUILD, R_COUNTER, Vector2(360, 343), 70.0)
-	_add_bb(SHEET_BUILD, R_COUNTER, Vector2(745, 343), 70.0)
-
-	# Salle des coffres : porte blindée dans l'ouverture du mur (x=820, y~290).
-	_add_bb(SHEET_OBJ, R_VAULT, Vector2(832, 300), 116.0)
-	_add_bb(SHEET_OBJ, R_CRATE, Vector2(900, 250), 60.0)    # caisse de lingots
-	_add_bb(SHEET_OBJ, R_CRATE, Vector2(1110, 110), 58.0)   # caisse au fond du coffre
-
-	# Bureau du directeur (alcôve haut-gauche) + chaise/bureau dans le personnel.
-	_add_bb(SHEET_OBJ, R_DESK, Vector2(100, 160), 84.0)
-	_add_bb(SHEET_OBJ, R_DESK, Vector2(430, 150), 78.0)
-	_add_bb(SHEET_OBJ, R_DESK, Vector2(700, 150), 78.0)
-
-	# Grand hall public (bas) : tonneaux et caisses (couverture) le long des murs.
-	_add_bb(SHEET_OBJ, R_BARREL, Vector2(70, 560), 70.0)
-	_add_bb(SHEET_OBJ, R_BARREL, Vector2(70, 800), 70.0)
-	_add_bb(SHEET_OBJ, R_CRATE, Vector2(300, 815), 62.0)
-	_add_bb(SHEET_OBJ, R_CRATE, Vector2(560, 815), 60.0)
-	_add_bb(SHEET_OBJ, R_BARREL, Vector2(1000, 800), 68.0)
-
-	# Aile droite (couloir + petit office) : tonneaux/caisses de couverture.
-	_add_bb(SHEET_OBJ, R_BARREL, Vector2(1450, 200), 70.0)
-	_add_bb(SHEET_OBJ, R_CRATE, Vector2(1250, 560), 62.0)
-	_add_bb(SHEET_OBJ, R_BARREL, Vector2(1450, 800), 70.0)
-	_add_bb(SHEET_OBJ, R_DESK, Vector2(1290, 560), 78.0)
+	# Props décoratifs pilotés par les données du niveau.
+	for p in props:
+		if not (p is Array) or p.size() < 3:
+			continue
+		var def := _prop_def(str(p[0]))
+		if def.is_empty():
+			continue
+		var pos := Vector2(float(p[1]), float(p[2]))
+		var h: float = float(p[3]) if p.size() > 3 else float(def[2])
+		_add_bb(def[0], def[1], pos, h)
 
 
 func _add_bb(tex: Texture2D, region: Rect2, pos: Vector2, h: float) -> void:
@@ -280,19 +272,22 @@ func _draw_bullets() -> void:
 
 # --- Décor au sol (tapis) + lampes d'ambiance ---
 
-## Tapis western et lampes : posés à plat sur le sol (sous les acteurs/props),
-## ajoutent couleur et richesse sans collision.
+## Tapis western et lampes : posés à plat sur le sol (sous les acteurs/props).
+## Générique : s'adapte à la taille du niveau et à la position du coffre.
 func _draw_decor() -> void:
-	# Tapis rouge devant l'entrée du coffre (zone prestige).
-	_rug(Vector2(1000, 295), 150, 150, Color(0.55, 0.14, 0.12), Color(0.85, 0.68, 0.25))
-	# Grand tapis du hall, sous le lustre.
-	_rug(Vector2(560, 640), 230, 200, Color(0.40, 0.20, 0.30), Color(0.80, 0.62, 0.30))
-	# Tapis d'accueil au pied de la porte d'entrée.
-	_rug(Vector2(150, 555), 120, 110, Color(0.30, 0.24, 0.14), Color(0.70, 0.58, 0.30))
-	# Lampes murales : halo chaud le long des murs (ambiance saloon).
-	for p in [Vector2(300, 28), Vector2(820, 28), Vector2(1300, 28),
-			Vector2(28, 430), Vector2(1492, 430), Vector2(560, 640)]:
-		_lamp(p)
+	# Tapis prestige devant le coffre.
+	if is_instance_valid(safe):
+		_rug(safe.global_position + Vector2(0, 90), 150, 150,
+				Color(0.55, 0.14, 0.12), Color(0.85, 0.68, 0.25))
+	# Grand tapis au centre du niveau (sous le lustre).
+	_rug(floor_rect.get_center(), 230, 200, Color(0.40, 0.20, 0.30), Color(0.80, 0.62, 0.30))
+	# Lampes d'ambiance réparties le long du bord haut du niveau + côtés.
+	var fr := floor_rect
+	var n := maxi(3, int(fr.size.x / 360.0))
+	for i in range(n + 1):
+		_lamp(Vector2(lerpf(fr.position.x + 60.0, fr.end.x - 60.0, float(i) / n), fr.position.y + 8.0))
+	_lamp(Vector2(fr.position.x + 8.0, fr.get_center().y))
+	_lamp(Vector2(fr.end.x - 8.0, fr.get_center().y))
 
 
 func _rug(center: Vector2, w: float, h: float, col: Color, accent: Color) -> void:

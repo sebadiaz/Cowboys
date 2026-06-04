@@ -10,30 +10,26 @@ const SafeScene := preload("res://scenes/Safe.tscn")
 const LootBagScene := preload("res://scenes/LootBag.tscn")
 const ExitZoneScene := preload("res://scenes/ExitZone.tscn")
 
-const CONFIG_PATH := "res://data/mission_01.json"
+const LEVEL_COUNT := 3
+const CONFIG_DIR := "res://data/"
 
-# Configuration par défaut si le fichier de données est absent ou invalide.
-# Plan de banque réaliste : hall public (bas), comptoir des guichets (milieu,
-# avec passage), salle des coffres fermée (haut-droite), bureau (haut-gauche).
+# Fichier de niveau : data/mission_0N.json selon GameManager.current_level.
+# Géométrie pilotée par les données (floor / walls / props / loot / guards).
+# DEFAULT_CFG est un filet de sécurité minimal mais JOUABLE si un fichier manque.
 const DEFAULT_CFG := {
-	"player_start": [560, 600],          # entrée (grand hall public, en bas)
-	"exit": [95, 555],                   # porte d'entrée (front, bas-gauche)
-	"safe": {"pos": [1015, 170], "value": 600, "open_time": 2.5},  # dans le coffre-fort
-	"loot": [
-		{"pos": [935, 175], "value": 250},    # salle des coffres
-		{"pos": [1060, 300], "value": 250},   # salle des coffres (fond)
-		{"pos": [650, 300], "value": 150},    # derrière le comptoir
-		{"pos": [330, 520], "value": 150},    # hall (gauche)
-		{"pos": [760, 760], "value": 150},    # grand hall (bas)
-		{"pos": [1330, 250], "value": 200},   # aile droite (haut)
-		{"pos": [1330, 760], "value": 200},   # aile droite (bas)
+	"name": "Banque (secours)",
+	"floor": [20, 20, 820, 560],
+	"walls": [
+		[0, 0, 860, 20, 1], [0, 580, 860, 20, 1], [840, 0, 20, 600, 1],
+		[0, 0, 20, 240, 1], [0, 340, 20, 260, 1],
+		[560, 20, 20, 180], [560, 300, 20, 160], [580, 200, 100, 20],
 	],
-	"guards": [
-		{"route": [[210, 320], [800, 320], [800, 300], [210, 300]]},      # zone personnel
-		{"route": [[120, 720], [1380, 720], [1380, 760], [120, 760]]},    # grand hall
-		{"route": [[900, 120], [1080, 120], [1080, 320], [900, 320]]},    # salle des coffres
-		{"route": [[1340, 120], [1340, 420], [1440, 420], [1440, 120]]},  # aile droite
-	],
+	"props": [["vault", 580, 150], ["counter", 300, 300], ["barrel", 70, 520]],
+	"player_start": [400, 500],
+	"exit": [70, 300],
+	"safe": {"pos": [650, 120], "value": 500, "open_time": 2.5},
+	"loot": [{"pos": [650, 190], "value": 250}, {"pos": [300, 460], "value": 150}],
+	"guards": [{"route": [[150, 250], [760, 250], [760, 230], [150, 230]]}],
 }
 
 var _cfg: Dictionary = {}
@@ -83,6 +79,11 @@ func _ready() -> void:
 	_build_effects()
 	_connect_hud()
 	_update_objective()
+	# Annonce le braquage en cours (nom + difficulté du niveau).
+	if hud.has_method("show_toast"):
+		var diff := str(_cfg.get("difficulty", ""))
+		var lbl := str(_cfg.get("name", "Braquage"))
+		hud.show_toast("%s%s" % [lbl, (" — " + diff) if diff != "" else ""])
 
 
 func _build_bullets() -> void:
@@ -134,6 +135,7 @@ func _build_iso_renderer() -> void:
 	_renderer.name = "IsoRenderer"
 	_renderer.floor_rect = _floor_rect
 	_renderer.walls = _walls
+	_renderer.props = _cfg.get("props", [])
 	_renderer.player = player
 	_renderer.guards = _guards
 	_renderer.loot = _loot_nodes
@@ -151,11 +153,16 @@ func _build_iso_renderer() -> void:
 
 # --- Données de mission ---
 
-## Charge data/mission_01.json. Retombe sur DEFAULT_CFG si absent/invalide.
+func _config_path() -> String:
+	var lvl: int = clampi(GameManager.current_level, 1, LEVEL_COUNT)
+	return "%smission_%02d.json" % [CONFIG_DIR, lvl]
+
+## Charge le niveau courant. Retombe sur DEFAULT_CFG si absent/invalide.
 func _load_config() -> Dictionary:
-	if not FileAccess.file_exists(CONFIG_PATH):
+	var path := _config_path()
+	if not FileAccess.file_exists(path):
 		return DEFAULT_CFG.duplicate(true)
-	var file := FileAccess.open(CONFIG_PATH, FileAccess.READ)
+	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return DEFAULT_CFG.duplicate(true)
 	var data: Variant = JSON.parse_string(file.get_as_text())
@@ -187,43 +194,27 @@ func _build_alarm() -> void:
 
 
 func _build_floor() -> void:
-	# Le sol est dessiné par l'IsoRenderer ; on mémorise juste son emprise.
-	# Grande banque : vaste hall (bas), zone personnel + bureau (haut-gauche),
-	# salle des coffres (haut-droite) et aile/couloir droit.
-	_floor_rect = Rect2(20, 20, 1480, 840)
+	# Emprise du sol lue depuis les données du niveau.
+	var f: Variant = _cfg.get("floor", [20, 20, 820, 560])
+	if f is Array and f.size() >= 4:
+		_floor_rect = Rect2(float(f[0]), float(f[1]), float(f[2]), float(f[3]))
+	else:
+		_floor_rect = Rect2(20, 20, 820, 560)
 
 
 func _build_walls() -> void:
-	# --- Murs extérieurs (épaisseur 20). Porte d'entrée = trou dans le mur gauche.
-	_add_wall(Rect2(0, 0, 1520, 20), true)            # haut
-	_add_wall(Rect2(0, 860, 1520, 20), true)          # bas
-	_add_wall(Rect2(1500, 0, 20, 880), true)          # droite
-	_add_wall(Rect2(0, 0, 20, 500), true)             # gauche (au-dessus de la porte)
-	_add_wall(Rect2(0, 600, 20, 260), true)           # gauche (sous la porte)
-
-	# --- Salle des coffres (vault) fermée, haut-droite, avec une entrée ---
-	# Cloison verticale gauche (x=820), ouverture d'accès vers y=250..330.
-	_add_wall(Rect2(820, 20, 24, 230))                # haut du mur vertical
-	_add_wall(Rect2(820, 330, 24, 40))                # bas du mur vertical
-	_add_wall(Rect2(844, 366, 312, 24))               # cloison basse du coffre
-	_add_wall(Rect2(1156, 20, 24, 346))               # paroi droite du coffre (referme)
-
-	# --- Comptoir des guichets : sépare hall (bas) du personnel (haut) ---
-	# Cloison basse du comptoir à y=354, avec un passage (gap) vers x=540..680.
-	_add_wall(Rect2(180, 354, 360, 22))               # tronçon gauche
-	_add_wall(Rect2(680, 354, 140, 22))               # tronçon droit (jusqu'au vault)
-
-	# --- Bureau du directeur (haut-gauche), petite alcôve ---
-	_add_wall(Rect2(180, 110, 22, 150))               # cloison verticale du bureau
-	_add_wall(Rect2(20, 240, 182, 22))                # cloison horizontale du bureau
-
-	# --- Aile droite : petit office cloisonné (cover), accès large par le bas ---
-	_add_wall(Rect2(1180, 470, 22, 200))              # cloison verticale de l'aile
-	_add_wall(Rect2(1180, 470, 200, 22))              # cloison horizontale de l'aile
+	# Chaque mur = [x, y, w, h, outer?(0/1), low?(0/1)].
+	for w in _cfg.get("walls", []):
+		if not (w is Array) or w.size() < 4:
+			continue
+		var rect := Rect2(float(w[0]), float(w[1]), float(w[2]), float(w[3]))
+		var outer: bool = w.size() > 4 and int(w[4]) != 0
+		var low: bool = w.size() > 5 and int(w[5]) != 0
+		_add_wall(rect, outer, low)
 
 
 ## Crée la collision cartésienne du mur ; le visuel iso est géré par le renderer.
-func _add_wall(rect: Rect2, outer := false) -> void:
+func _add_wall(rect: Rect2, outer := false, low := false) -> void:
 	var body := StaticBody2D.new()
 	body.collision_layer = 1
 	body.collision_mask = 0
@@ -234,7 +225,7 @@ func _add_wall(rect: Rect2, outer := false) -> void:
 	cs.shape = shape
 	body.add_child(cs)
 	world.add_child(body)
-	_walls.append({"rect": rect, "outer": outer})
+	_walls.append({"rect": rect, "outer": outer, "low": low})
 
 
 # --- Entités ---
@@ -347,9 +338,9 @@ func _spawn_reinforcement() -> void:
 	if _reinforced:
 		return
 	_reinforced = true
+	# Renfort générique : surgit de la sortie et fonce vers le centre du niveau.
 	var route := PackedVector2Array([
-		_exit.global_position + Vector2(40, 0),
-		Vector2(600, 400), Vector2(900, 300),
+		_exit.global_position, _floor_rect.get_center(),
 	])
 	var g := GuardScene.instantiate()
 	g.patrol_points = route
