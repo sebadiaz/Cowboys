@@ -6,9 +6,12 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [x] **Ville EL DORADO** visitable : grande carte, rue principale, 7 commerces
       nommés (Banque, Saloon, Hôtel, Magasin, Shérif, Écurie, Poste), **PNJ**
       cowboys, props (chariot, tonneaux, cactus, panneaux), trottoirs en bois.
+- [x] **Dialogues** : E pour parler aux habitants (répliques qui défilent).
+- [x] **Saloon entrable** (intérieur : barman, clients, pianiste, piano, tables,
+      comptoir) avec dialogues, sortie qui ramène en ville.
 - [x] **Collisions** sur les bâtiments (on ne traverse plus les murs).
-- [x] Caméra fixe ajustée (tout le village visible, banque repérable + flèche).
-- [x] Entrée banque sur **E** (clavier + bouton tactile) au lieu d'auto-trigger.
+- [x] Caméra qui suit le cowboy (ville + saloon) ; banque repérable + flèche.
+- [x] Entrée banque/saloon sur **E** (clavier + bouton tactile).
 - [x] Rendu du cowboy **mutualisé** (`character_art.gd`) entre ville et mission.
 
 ## Fait dans la passe "grande banque + cowboy"

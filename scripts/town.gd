@@ -32,8 +32,10 @@ var _walk := 0.0
 var _entered := false
 var _hint_t := 0.0
 var _can_enter := false
-var _near_label := ""      # commerce à portée (pour le prompt)
-var _near_flavor := ""
+var _near_label := ""        # libellé du prompt d'action courant
+var _target_kind := ""       # "bank" | "saloon" | "npc" | "flavor"
+var _target_npc = null       # PNJ ciblé (Dictionary) si _target_kind == "npc"
+var _target_flavor := ""
 var _interact_was := false
 
 var _buildings: Array[Dictionary] = []   # {region,pos,h,label,tint,flavor}
@@ -47,6 +49,11 @@ var _toast: Label
 
 
 func _ready() -> void:
+	# Réapparition à la sortie du saloon (sinon, entrée du village).
+	if GameManager.town_return_pos != Vector2.ZERO:
+		_player_pos = GameManager.town_return_pos
+		_facing = Vector2.DOWN
+		GameManager.town_return_pos = Vector2.ZERO
 	_build_town()
 	_apply_zoom()
 	_cam = _camera_target()
@@ -60,9 +67,9 @@ func _build_town() -> void:
 	# Bâtiment cible, au fond de la grand-rue.
 	_add_building(R_BANK, Vector2(1100, 230), 250.0, "★ BANQUE ★", Color(1, 1, 1),
 			"", Vector2(210, 150))
-	# Côté ouest de la rue (x ~ 760).
+	# Côté ouest de la rue (x ~ 760). Le SALOON est ENTRABLE.
 	_add_building(R_SALOON, Vector2(760, 560), 210.0, "SALOON", Color(1.0, 0.92, 0.9),
-			"Saloon Le Cactus — désert, le barman s'est caché derrière le bar.", Vector2(180, 120))
+			"Saloon Le Cactus — pousse les portes battantes.", Vector2(180, 120), "saloon")
 	_add_building(R_HOUSE, Vector2(760, 900), 195.0, "HÔTEL", Color(0.92, 0.96, 1.0),
 			"Hôtel de la Frontière — chambres à l'étage, 2 $ la nuit.", Vector2(180, 120))
 	_add_building(R_SHED, Vector2(760, 1240), 185.0, "MAGASIN", Color(1.0, 0.96, 0.85),
@@ -96,24 +103,40 @@ func _build_town() -> void:
 			Vector2(2040, 1500), Vector2(120, 900), Vector2(2080, 1100)]:
 		_add_prop(R_CACTUS, c, 130.0)
 
-	# Habitants : cowboys aux palettes variées qui peuplent la ville.
-	_add_npc(Vector2(980, 1080), Vector2(1, 0.2), Color(0.30, 0.45, 0.55), Color(0.85, 0.8, 0.7))
-	_add_npc(Vector2(1230, 880), Vector2(-1, 0.2), Color(0.45, 0.30, 0.45), Color(0.9, 0.85, 0.5))
-	_add_npc(Vector2(1100, 1180), Vector2(0, 1), Color(0.25, 0.35, 0.25), Color(0.8, 0.7, 0.55))
-	_add_npc(Vector2(1180, 700), Vector2(-0.4, 1), Color(0.5, 0.4, 0.2), Color(0.95, 0.7, 0.2))
-	_add_npc(Vector2(1000, 1380), Vector2(1, -0.3), Color(0.5, 0.2, 0.2), Color(0.8, 0.75, 0.7))
-	_add_npc(Vector2(1300, 1480), Vector2(-1, -0.2), Color(0.2, 0.3, 0.5), Color(0.9, 0.9, 0.8))
-	_add_npc(Vector2(1700, 1080), Vector2(-1, 0.1), Color(0.4, 0.45, 0.3), Color(0.85, 0.6, 0.4))
-	_add_npc(Vector2(520, 1080), Vector2(1, 0.1), Color(0.35, 0.3, 0.45), Color(0.9, 0.8, 0.6))
+	# Habitants : cowboys aux palettes variées, chacun a quelques répliques.
+	_add_npc(Vector2(980, 1080), Vector2(1, 0.2), Color(0.30, 0.45, 0.55), Color(0.85, 0.8, 0.7),
+			"Vieux Hank", ["La banque ? Personne n'a jamais réussi à la braquer...",
+			"Le shérif a la gâchette facile, méfie-toi.",
+			"De mon temps, l'or coulait à flots dans cette ville."])
+	_add_npc(Vector2(1230, 880), Vector2(-1, 0.2), Color(0.45, 0.30, 0.45), Color(0.9, 0.85, 0.5),
+			"Rosita", ["Tu as l'air d'un homme à histoires, étranger.",
+			"Le coffre de la banque ? On dit qu'il faut un moment pour l'ouvrir."])
+	_add_npc(Vector2(1100, 1180), Vector2(0, 1), Color(0.25, 0.35, 0.25), Color(0.8, 0.7, 0.55),
+			"Petit Joe", ["Wow, t'as vu son flingue ?!", "Un jour je serai un hors-la-loi, moi aussi !"])
+	_add_npc(Vector2(1180, 700), Vector2(-0.4, 1), Color(0.5, 0.4, 0.2), Color(0.95, 0.7, 0.2),
+			"Marshal à la retraite", ["Range ce six-coups avant de t'attirer des ennuis.",
+			"J'ai accroché mon étoile. La ville se débrouillera."])
+	_add_npc(Vector2(1000, 1380), Vector2(1, -0.3), Color(0.5, 0.2, 0.2), Color(0.8, 0.75, 0.7),
+			"Veuve Carson", ["Les temps sont durs depuis la fermeture de la mine.",
+			"Garde tes distances, jeune homme."])
+	_add_npc(Vector2(1300, 1480), Vector2(-1, -0.2), Color(0.2, 0.3, 0.5), Color(0.9, 0.9, 0.8),
+			"Doc Whitman", ["Si tu te prends une balle, tu sais où me trouver.",
+			"Le whisky soigne tout, ou presque."])
+	_add_npc(Vector2(1700, 1080), Vector2(-1, 0.1), Color(0.4, 0.45, 0.3), Color(0.85, 0.6, 0.4),
+			"Palefrenier", ["Ton cheval est sellé à l'écurie, prêt pour la fuite.",
+			"File vite après le coup, ils lanceront une battue."])
+	_add_npc(Vector2(520, 1080), Vector2(1, 0.1), Color(0.35, 0.3, 0.45), Color(0.9, 0.8, 0.6),
+			"Prêcheur", ["Repens-toi, pécheur, avant qu'il ne soit trop tard !",
+			"Que le Seigneur ait pitié de ton âme... et de ton butin."])
 
 	# Puits central (collision).
 	_foots.append(Rect2(WELL - Vector2(40, 36), Vector2(80, 72)))
 
 
 func _add_building(region: Rect2, pos: Vector2, h: float, label: String, tint: Color,
-		flavor: String, foot: Vector2) -> void:
+		flavor: String, foot: Vector2, enter := "") -> void:
 	_buildings.append({"region": region, "pos": pos, "h": h, "label": label,
-			"tint": tint, "flavor": flavor})
+			"tint": tint, "flavor": flavor, "enter": enter})
 	_foots.append(Rect2(pos - Vector2(foot.x * 0.5, foot.y * 0.6), foot))
 
 
@@ -121,7 +144,8 @@ func _add_prop(region: Rect2, pos: Vector2, h: float) -> void:
 	_props.append({"region": region, "pos": pos, "h": h})
 
 
-func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color) -> void:
+func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color,
+		npc_name := "", lines: Array = []) -> void:
 	var pal := CharacterArt.hero_palette()
 	pal["coat"] = coat
 	pal["coat_dark"] = coat.darkened(0.2)
@@ -129,7 +153,8 @@ func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color) -> void:
 	pal["hat"] = hat
 	pal["hat_band"] = hat.darkened(0.3)
 	pal["bandana"] = coat.lightened(0.3)
-	_npcs.append({"pos": pos, "facing": facing.normalized(), "pal": pal, "phase": randf() * TAU})
+	_npcs.append({"pos": pos, "facing": facing.normalized(), "pal": pal, "phase": randf() * TAU,
+			"name": npc_name, "lines": lines, "li": 0})
 
 
 # --- Boucle ---
@@ -154,29 +179,62 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
-## Détecte la banque / le commerce le plus proche et gère la touche E.
+## Choisit l'interaction la plus proche (banque, saloon, PNJ, commerce) et gère E.
 func _update_interaction() -> void:
 	_can_enter = _player_pos.distance_to(BANK_DOOR) < DOOR_RADIUS
 	_near_label = ""
-	_near_flavor = ""
-	if not _can_enter:
+	_target_kind = ""
+	_target_npc = null
+	_target_flavor = ""
+	if _can_enter:
+		_target_kind = "bank"
+		_near_label = "ENTRER dans la BANQUE"
+	else:
 		var best := TALK_RADIUS
+		# Habitants à qui parler (priorité au plus proche).
+		for n in _npcs:
+			if (n["lines"] as Array).is_empty():
+				continue
+			var d := _player_pos.distance_to(n["pos"])
+			if d < best:
+				best = d
+				_target_kind = "npc"
+				_target_npc = n
+				_near_label = "Parler à %s" % n["name"]
+		# Commerces : entrer (saloon) ou observer (texte d'ambiance).
 		for b in _buildings:
-			if b["flavor"] == "":
+			if b["flavor"] == "" and b["enter"] == "":
 				continue
 			var d := _player_pos.distance_to(b["pos"] + Vector2(0, 60))
 			if d < best:
 				best = d
-				_near_label = b["label"]
-				_near_flavor = b["flavor"]
+				if b["enter"] == "saloon":
+					_target_kind = "saloon"
+					_near_label = "Entrer au %s" % b["label"]
+				else:
+					_target_kind = "flavor"
+					_target_flavor = b["flavor"]
+					_near_label = b["label"]
 	# Front montant de E.
 	var held := InputManager.is_interact_held()
 	if held and not _interact_was:
-		if _can_enter:
-			_enter_bank()
-		elif _near_flavor != "":
-			_show_toast(_near_flavor)
+		match _target_kind:
+			"bank": _enter_bank()
+			"saloon": GameManager.goto_saloon()
+			"npc": _talk(_target_npc)
+			"flavor": _show_toast(_target_flavor)
 	_interact_was = held
+
+
+## Affiche la réplique courante d'un PNJ et passe à la suivante.
+func _talk(npc) -> void:
+	var lines: Array = npc["lines"]
+	if lines.is_empty():
+		return
+	var i: int = npc["li"] % lines.size()
+	npc["li"] = i + 1
+	_facing = (npc["pos"] - _player_pos).normalized()
+	_show_toast("%s : « %s »" % [npc["name"], lines[i]])
 
 
 func _move(motion: Vector2) -> void:
@@ -290,12 +348,14 @@ func _draw() -> void:
 						false, false, sin(n["phase"]) * 0.3 + 0.3, 0.0, 0.0)
 			"me": _draw_me()
 
-	# Prompts d'interaction.
-	if _can_enter and int(_hint_t * 2.0) % 2 == 0:
-		_text(d + Vector2(0, -110), "Appuie sur E pour ENTRER", 18, Color(1, 1, 0.6))
-	elif _near_label != "":
-		var pp := Iso.project(_player_pos) + Vector2(0, -64)
-		_text(pp, "E : %s" % _near_label, 15, Color(1, 1, 0.7))
+	# Marqueur "💬" au-dessus des PNJ à qui l'on peut parler.
+	for n in _npcs:
+		if not (n["lines"] as Array).is_empty() and _player_pos.distance_to(n["pos"]) < TALK_RADIUS:
+			_text(Iso.project(n["pos"]) + Vector2(0, -58), "💬", 16, Color(1, 1, 0.7))
+	# Prompt d'action contextuel au-dessus du joueur.
+	if _near_label != "" and int(_hint_t * 2.0) % 2 == 0:
+		var pp := Iso.project(_player_pos) + Vector2(0, -66)
+		_text(pp, "E : %s" % _near_label, 16, Color(1, 1, 0.7))
 
 
 func _draw_ground() -> void:
@@ -439,9 +499,15 @@ func _build_ui() -> void:
 	_toast.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	_toast.add_theme_constant_override("outline_size", 5)
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_toast.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_toast.position = Vector2(0, -120)
-	_toast.size = Vector2(get_viewport_rect().size.x, 40)
+	_toast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_toast.anchor_left = 0.0
+	_toast.anchor_right = 1.0
+	_toast.anchor_top = 1.0
+	_toast.anchor_bottom = 1.0
+	_toast.offset_left = 40
+	_toast.offset_right = -40
+	_toast.offset_top = -150
+	_toast.offset_bottom = -64
 	_toast.modulate.a = 0.0
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_toast)

@@ -1,0 +1,380 @@
+extends Node2D
+## saloon.gd
+## Intérieur du saloon (vue iso). On déambule, on parle au barman et aux clients
+## (touche E), on admire le piano, puis on ressort par la porte (E près de la
+## SORTIE ou Échap) pour revenir en ville. Tout est dessiné (aucun asset requis).
+
+const SPEED := 220.0
+const FLOOR := Rect2(0, 0, 1000, 680)
+const DOOR := Vector2(500, 650)             # porte de sortie (bas)
+const DOOR_RADIUS := 80.0
+const PLAYER_RADIUS := 14.0
+const TALK_RADIUS := 120.0   # un peu large pour parler au barman par-dessus le comptoir
+const TOWN_EXIT := Vector2(760, 720)        # réapparition en ville (devant le saloon)
+
+var _player_pos := Vector2(500, 600)
+var _facing := Vector2.UP
+var _walk := 0.0
+var _hint_t := 0.0
+var _near_label := ""
+var _target_npc = null
+var _can_exit := false
+var _interact_was := false
+
+var _npcs: Array[Dictionary] = []
+var _foots: Array[Rect2] = []
+var _zoom := 2.2
+var _cam := Vector2.ZERO
+var _toast: Label
+
+
+func _ready() -> void:
+	_build()
+	_apply_zoom()
+	_cam = _camera_target()
+	position = _cam
+	_build_ui()
+
+
+func _build() -> void:
+	# Murs (porte = trou en bas, x 420..580).
+	for r in [Rect2(0, 0, 1000, 20), Rect2(0, 660, 420, 20), Rect2(580, 660, 420, 20),
+			Rect2(0, 0, 20, 680), Rect2(980, 0, 20, 680)]:
+		_foots.append(r)
+	# Comptoir + piano (collisions).
+	_foots.append(Rect2(140, 120, 720, 64))     # bar
+	_foots.append(Rect2(800, 230, 120, 90))      # piano
+	for t in [Vector2(250, 430), Vector2(500, 500), Vector2(700, 440)]:
+		_foots.append(Rect2(t - Vector2(42, 30), Vector2(84, 60)))   # tables
+
+	# Personnel & clients (chacun a ses répliques).
+	_add_npc(Vector2(500, 95), Vector2(0, 1), Color(0.55, 0.4, 0.25), Color(0.9, 0.85, 0.7),
+			"Sam le barman", ["Qu'est-ce que je te sers, l'ami ? On n'a plus que du whisky.",
+			"La banque ? J'ai rien vu, rien entendu. Compris ?",
+			"Pas d'embrouilles dans mon saloon."])
+	_add_npc(Vector2(250, 360), Vector2(0.3, 1), Color(0.3, 0.25, 0.4), Color(0.7, 0.6, 0.4),
+			"Joueur de poker", ["Une partie ? Mise tout ton butin, ha !",
+			"J'ai un carré d'as... ou pas."])
+	_add_npc(Vector2(835, 360), Vector2(-1, 0.2), Color(0.2, 0.3, 0.45), Color(0.85, 0.8, 0.8),
+			"Pianiste", ["Une petite mélodie pour le hors-la-loi ?",
+			"♪ Oh Susanna... ♪"])
+	_add_npc(Vector2(640, 560), Vector2(-0.4, -1), Color(0.5, 0.2, 0.2), Color(0.8, 0.7, 0.6),
+			"Ivrogne", ["*hic* T'as pas une pièce, l'ami ?",
+			"J'ai vu le shérif rentrer son or à la banque... *hic*"])
+
+
+func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color,
+		npc_name: String, lines: Array) -> void:
+	var pal := CharacterArt.hero_palette()
+	pal["coat"] = coat
+	pal["coat_dark"] = coat.darkened(0.2)
+	pal["shirt"] = coat.lightened(0.2)
+	pal["hat"] = hat
+	pal["hat_band"] = hat.darkened(0.3)
+	pal["bandana"] = coat.lightened(0.3)
+	_npcs.append({"pos": pos, "facing": facing.normalized(), "pal": pal, "phase": randf() * TAU,
+			"name": npc_name, "lines": lines, "li": 0})
+
+
+# --- Boucle ---
+
+func _process(delta: float) -> void:
+	var dir := Iso.screen_to_world(InputManager.get_move_vector())
+	if dir.length() > 1.0:
+		dir = dir.normalized()
+	if dir.length() > 0.05:
+		_facing = dir.normalized()
+		_walk += delta * 10.0
+	else:
+		_walk = 0.0
+	_move(dir * SPEED * delta)
+	_update_interaction()
+	for n in _npcs:
+		n["phase"] += delta * 2.0
+	_cam = _cam.lerp(_camera_target(), clampf(delta * 8.0, 0.0, 1.0))
+	position = _cam
+	_hint_t += delta
+	queue_redraw()
+
+
+func _update_interaction() -> void:
+	_can_exit = _player_pos.distance_to(DOOR) < DOOR_RADIUS
+	_near_label = ""
+	_target_npc = null
+	if _can_exit:
+		_near_label = "SORTIR du saloon"
+	else:
+		var best := TALK_RADIUS
+		for n in _npcs:
+			var d := _player_pos.distance_to(n["pos"])
+			if d < best:
+				best = d
+				_target_npc = n
+				_near_label = "Parler à %s" % n["name"]
+	var held := InputManager.is_interact_held()
+	if held and not _interact_was:
+		if _can_exit:
+			_leave()
+		elif _target_npc != null:
+			_talk(_target_npc)
+	_interact_was = held
+
+
+func _talk(npc) -> void:
+	var lines: Array = npc["lines"]
+	if lines.is_empty():
+		return
+	var i: int = npc["li"] % lines.size()
+	npc["li"] = i + 1
+	_facing = (npc["pos"] - _player_pos).normalized()
+	_show_toast("%s : « %s »" % [npc["name"], lines[i]])
+
+
+func _leave() -> void:
+	AudioManager.play("click")
+	GameManager.return_to_town(TOWN_EXIT)
+
+
+func _move(motion: Vector2) -> void:
+	var p := _player_pos
+	var nx := p + Vector2(motion.x, 0)
+	if not _blocked(nx):
+		p = nx
+	var ny := p + Vector2(0, motion.y)
+	if not _blocked(ny):
+		p = ny
+	p.x = clampf(p.x, 30, FLOOR.size.x - 30)
+	p.y = clampf(p.y, 30, FLOOR.size.y - 10)
+	_player_pos = p
+
+
+func _blocked(pos: Vector2) -> bool:
+	for r in _foots:
+		if r.grow(PLAYER_RADIUS).has_point(pos):
+			return true
+	return false
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("pause"):
+		GameManager.return_to_town(TOWN_EXIT)
+
+
+# --- Caméra qui suit ---
+
+func _apply_zoom() -> void:
+	var vp := get_viewport_rect().size
+	_zoom = clampf(minf(vp.x, vp.y) / 360.0, 1.8, 3.0)
+	scale = Vector2(_zoom, _zoom)
+
+
+func _camera_target() -> Vector2:
+	var vp := get_viewport_rect().size
+	var b := _bounds()
+	var focus := Iso.project(_player_pos) + Vector2(0, -16)
+	var t := vp * 0.5 - focus * _zoom
+	t.x = _clamp_axis(t.x, vp.x, b.position.x, b.end.x)
+	t.y = _clamp_axis(t.y, vp.y, b.position.y, b.end.y)
+	return t
+
+
+func _clamp_axis(t: float, screen: float, bmin: float, bmax: float) -> float:
+	var lo := screen - _zoom * bmax
+	var hi := -_zoom * bmin
+	if lo > hi:
+		return screen * 0.5 - _zoom * (bmin + bmax) * 0.5
+	return clampf(t, lo, hi)
+
+
+func _bounds() -> Rect2:
+	var c := [Iso.project(FLOOR.position), Iso.project(Vector2(FLOOR.size.x, 0)),
+			Iso.project(FLOOR.size), Iso.project(Vector2(0, FLOOR.size.y))]
+	var mn: Vector2 = c[0]
+	var mx: Vector2 = c[0]
+	for p in c:
+		mn = mn.min(p)
+		mx = mx.max(p)
+	mn.y -= 220.0
+	return Rect2(mn, mx - mn)
+
+
+func _on_viewport_resized() -> void:
+	_apply_zoom()
+	_cam = _camera_target()
+	position = _cam
+
+
+# --- Rendu ---
+
+func _draw() -> void:
+	_draw_floor()
+	# Tapis d'entrée + zone de sortie verte.
+	draw_colored_polygon(_rect_diamond(Rect2(420, 600, 160, 80)), Color(0.2, 0.6, 0.25, 0.5))
+	_text(Iso.project(DOOR) + Vector2(0, -10), "SORTIE", 14, Color(0.9, 1, 0.9))
+
+	# Murs bas (boîtes) pour donner du volume à la pièce.
+	_box(Rect2(0, 0, 1000, 20), 70.0, Color(0.45, 0.30, 0.18), Color(0.32, 0.2, 0.12))
+	_box(Rect2(0, 0, 20, 680), 70.0, Color(0.42, 0.28, 0.16), Color(0.3, 0.19, 0.11))
+	_box(Rect2(980, 0, 20, 680), 70.0, Color(0.42, 0.28, 0.16), Color(0.3, 0.19, 0.11))
+
+	# Étagère à bouteilles derrière le bar.
+	for i in range(10):
+		var x := 180.0 + i * 64.0
+		draw_circle(Iso.project(Vector2(x, 70)) + Vector2(0, -54), 4.0,
+				Color(0.3, 0.6, 0.3) if i % 2 == 0 else Color(0.6, 0.4, 0.2))
+
+	# Profondeur : trie bar, piano, tables, PNJ, joueur.
+	var items: Array[Dictionary] = []
+	items.append({"d": Iso.depth(Vector2(500, 184)), "k": "bar"})
+	items.append({"d": Iso.depth(Vector2(860, 320)), "k": "piano"})
+	for t in [Vector2(250, 430), Vector2(500, 500), Vector2(700, 440)]:
+		items.append({"d": Iso.depth(t), "k": "table", "p": t})
+	for n in _npcs:
+		items.append({"d": Iso.depth(n["pos"]), "k": "npc", "o": n})
+	items.append({"d": Iso.depth(_player_pos), "k": "me"})
+	items.sort_custom(func(a, b): return a["d"] < b["d"])
+	for it in items:
+		match it["k"]:
+			"bar": _box(Rect2(140, 120, 720, 64), 40.0, Color(0.55, 0.36, 0.2), Color(0.38, 0.24, 0.13))
+			"piano": _box(Rect2(800, 230, 120, 90), 60.0, Color(0.12, 0.1, 0.1), Color(0.07, 0.06, 0.06))
+			"table": _draw_table(it["p"])
+			"npc":
+				var n: Dictionary = it["o"]
+				CharacterArt.draw_person(self, Iso.project(n["pos"]), _sf(n["pos"], n["facing"]),
+						n["pal"], false, false, sin(n["phase"]) * 0.3 + 0.3, 0.0, 0.0)
+			"me":
+				CharacterArt.draw_person(self, Iso.project(_player_pos), _sf(_player_pos, _facing),
+						CharacterArt.hero_palette(), false, false, _walk, 0.0, 0.0)
+
+	# Marqueurs de dialogue + prompt.
+	for n in _npcs:
+		if _player_pos.distance_to(n["pos"]) < TALK_RADIUS:
+			_text(Iso.project(n["pos"]) + Vector2(0, -56), "💬", 16, Color(1, 1, 0.7))
+	if _near_label != "" and int(_hint_t * 2.0) % 2 == 0:
+		_text(Iso.project(_player_pos) + Vector2(0, -64), "E : %s" % _near_label, 16, Color(1, 1, 0.7))
+
+
+func _draw_floor() -> void:
+	var cell := 80.0
+	var y := 0.0
+	var row := 0
+	while y < FLOOR.size.y:
+		var x := 0.0
+		var col := 0
+		while x < FLOOR.size.x:
+			var w: float = min(cell, FLOOR.size.x - x)
+			var h: float = min(cell, FLOOR.size.y - y)
+			var c := Color(0.46, 0.31, 0.18) if (row + col) % 2 == 0 else Color(0.40, 0.27, 0.15)
+			draw_colored_polygon(_rect_diamond(Rect2(x, y, w, h)), c)
+			x += cell
+			col += 1
+		y += cell
+		row += 1
+
+
+func _draw_table(p: Vector2) -> void:
+	draw_colored_polygon(_diamond_shadow(Iso.project(p), 26.0), Color(0, 0, 0, 0.2))
+	_box(Rect2(p.x - 26, p.y - 18, 52, 36), 26.0, Color(0.5, 0.33, 0.18), Color(0.34, 0.22, 0.12))
+	# Verre sur la table.
+	draw_circle(Iso.project(p) + Vector2(6, -30), 2.4, Color(0.8, 0.7, 0.3))
+
+
+## Petite boîte iso (meuble) : faces avant + dessus.
+func _box(r: Rect2, h: float, top: Color, side: Color) -> void:
+	var b0 := Iso.project(r.position)
+	var b1 := Iso.project(Vector2(r.end.x, r.position.y))
+	var b2 := Iso.project(r.end)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
+	var up := Vector2(0, -h)
+	draw_colored_polygon(PackedVector2Array([b3, b2, b2 + up, b3 + up]), side.darkened(0.1))
+	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + up, b1 + up]), side)
+	draw_colored_polygon(PackedVector2Array([b0 + up, b1 + up, b2 + up, b3 + up]), top)
+
+
+# --- Primitives ---
+
+func _rect_diamond(r: Rect2) -> PackedVector2Array:
+	return PackedVector2Array([
+		Iso.project(r.position), Iso.project(Vector2(r.end.x, r.position.y)),
+		Iso.project(r.end), Iso.project(Vector2(r.position.x, r.end.y))])
+
+
+func _diamond_shadow(center: Vector2, rx: float) -> PackedVector2Array:
+	return PackedVector2Array([
+		center + Vector2(-rx, 0), center + Vector2(0, -rx * 0.5),
+		center + Vector2(rx, 0), center + Vector2(0, rx * 0.5)])
+
+
+func _sf(world_pos: Vector2, facing: Vector2) -> Vector2:
+	var f := Iso.project(world_pos + facing) - Iso.project(world_pos)
+	return f.normalized() if f.length() > 0.001 else Vector2.DOWN
+
+
+func _text(pos: Vector2, s: String, size: int, col: Color) -> void:
+	var font := ThemeDB.fallback_font
+	var w := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	draw_string(font, pos - Vector2(w * 0.5, 0), s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
+
+
+# --- UI ---
+
+func _build_ui() -> void:
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	get_viewport().size_changed.connect(_on_viewport_resized)
+
+	var title := Label.new()
+	title.text = "SALOON LE CACTUS — parle aux clients (E), ressors par la SORTIE"
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", Color(1, 1, 1))
+	title.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	title.add_theme_constant_override("outline_size", 4)
+	title.position = Vector2(16, 12)
+	layer.add_child(title)
+
+	var back := Button.new()
+	back.text = "← Ville"
+	back.add_theme_font_size_override("font_size", 20)
+	back.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	back.position = Vector2(-150, 12)
+	back.custom_minimum_size = Vector2(130, 44)
+	back.pressed.connect(func() -> void: GameManager.return_to_town(TOWN_EXIT))
+	layer.add_child(back)
+
+	_toast = Label.new()
+	_toast.add_theme_font_size_override("font_size", 22)
+	_toast.add_theme_color_override("font_color", Color(1, 1, 0.85))
+	_toast.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	_toast.add_theme_constant_override("outline_size", 5)
+	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_toast.anchor_left = 0.0
+	_toast.anchor_right = 1.0
+	_toast.anchor_top = 1.0
+	_toast.anchor_bottom = 1.0
+	_toast.offset_left = 40
+	_toast.offset_right = -40
+	_toast.offset_top = -150
+	_toast.offset_bottom = -64
+	_toast.modulate.a = 0.0
+	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_toast)
+
+	var mc := Control.new()
+	mc.set_script(load("res://scripts/mobile_controls.gd"))
+	mc.set("combat_buttons", false)
+	mc.set("interact_only", true)
+	mc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	mc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(mc)
+
+
+func _show_toast(text: String) -> void:
+	if _toast == null:
+		return
+	AudioManager.play("click", -6.0)
+	_toast.text = text
+	_toast.modulate.a = 1.0
+	var tw := create_tween()
+	tw.tween_interval(2.2)
+	tw.tween_property(_toast, "modulate:a", 0.0, 0.8)

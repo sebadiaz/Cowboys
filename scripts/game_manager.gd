@@ -5,6 +5,7 @@ extends Node
 
 const SCENE_MAIN_MENU := "res://scenes/MainMenu.tscn"
 const SCENE_TOWN := "res://scenes/levels/Town.tscn"
+const SCENE_SALOON := "res://scenes/levels/Saloon.tscn"
 const SCENE_MISSION := "res://scenes/MissionRoot.tscn"
 const SCENE_RESULT := "res://scenes/ResultScreen.tscn"
 const SCENE_LEVEL_SELECT := "res://scenes/LevelSelect.tscn"
@@ -12,6 +13,8 @@ const SCENE_LEVEL_SELECT := "res://scenes/LevelSelect.tscn"
 const LEVEL_COUNT := 3
 ## Niveau en cours de jeu (1..LEVEL_COUNT).
 var current_level: int = 1
+## Position de réapparition en ville (ex. en sortant du saloon). Zero = défaut.
+var town_return_pos := Vector2.ZERO
 
 ## Résultat de la dernière mission jouée, lu par ResultScreen.
 var last_result := {
@@ -29,6 +32,17 @@ func goto_main_menu() -> void:
 
 func goto_level_select() -> void:
 	_change_scene(SCENE_LEVEL_SELECT)
+
+
+## Entre dans le saloon (depuis la ville).
+func goto_saloon() -> void:
+	_change_scene(SCENE_SALOON)
+
+
+## Revient en ville à une position donnée (ex. devant la porte du saloon).
+func return_to_town(pos := Vector2.ZERO) -> void:
+	town_return_pos = pos
+	_change_scene(SCENE_TOWN)
 
 
 ## Le bouton "Jouer" amène d'abord en ville (on rejoint la banque à pied).
