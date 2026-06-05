@@ -17,9 +17,12 @@ var _facing := Vector2.UP
 var _walk := 0.0
 var _hint_t := 0.0
 var _near_label := ""
+var _target_kind := ""        # "exit" | "npc"
 var _target_npc = null
+var _target_anchor := Vector2.ZERO
 var _can_exit := false
 var _interact_was := false
+var _action_btn: Button
 
 var _npcs: Array[Dictionary] = []
 var _foots: Array[Rect2] = []
@@ -102,24 +105,46 @@ func _process(delta: float) -> void:
 func _update_interaction() -> void:
 	_can_exit = _player_pos.distance_to(DOOR) < DOOR_RADIUS
 	_near_label = ""
+	_target_kind = ""
 	_target_npc = null
 	if _can_exit:
+		_target_kind = "exit"
 		_near_label = "SORTIR du saloon"
+		_target_anchor = DOOR
 	else:
 		var best := TALK_RADIUS
 		for n in _npcs:
 			var d := _player_pos.distance_to(n["pos"])
 			if d < best:
 				best = d
+				_target_kind = "npc"
 				_target_npc = n
 				_near_label = "Parler à %s" % n["name"]
+				_target_anchor = n["pos"]
 	var held := InputManager.is_interact_held()
 	if held and not _interact_was:
-		if _can_exit:
-			_leave()
-		elif _target_npc != null:
-			_talk(_target_npc)
+		_do_action()
 	_interact_was = held
+	_update_action_button()
+
+
+func _do_action() -> void:
+	if _target_kind == "exit":
+		_leave()
+	elif _target_kind == "npc" and _target_npc != null:
+		_talk(_target_npc)
+
+
+func _update_action_button() -> void:
+	if _action_btn == null:
+		return
+	if _target_kind == "":
+		_action_btn.visible = false
+		return
+	_action_btn.visible = true
+	_action_btn.text = "%s\n%s" % ["🚪" if _target_kind == "exit" else "💬", _near_label]
+	var local := Iso.project(_target_anchor) + Vector2(0, -40)
+	_action_btn.position = position + local * scale - _action_btn.size * 0.5
 
 
 func _talk(npc) -> void:
@@ -259,8 +284,6 @@ func _draw() -> void:
 			_text(head, bub, 15, Color(1, 1, 0.9))
 		elif _player_pos.distance_to(n["pos"]) < TALK_RADIUS:
 			_text(head, "💬", 16, Color(1, 1, 0.7))
-	if _near_label != "" and int(_hint_t * 2.0) % 2 == 0:
-		_text(Iso.project(_player_pos) + Vector2(0, -64), "E : %s" % _near_label, 16, Color(1, 1, 0.7))
 
 
 func _draw_floor() -> void:
@@ -333,7 +356,7 @@ func _build_ui() -> void:
 	get_viewport().size_changed.connect(_on_viewport_resized)
 
 	var title := Label.new()
-	title.text = "SALOON LE CACTUS — parle aux clients (E), ressors par la SORTIE"
+	title.text = "SALOON LE CACTUS — clique le logo (ou E) pour parler / sortir"
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", Color(1, 1, 1))
 	title.add_theme_color_override("font_outline_color", Color(0, 0, 0))
@@ -372,10 +395,38 @@ func _build_ui() -> void:
 	var mc := Control.new()
 	mc.set_script(load("res://scripts/mobile_controls.gd"))
 	mc.set("combat_buttons", false)
-	mc.set("interact_only", true)
 	mc.set_anchors_preset(Control.PRESET_FULL_RECT)
 	mc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(mc)
+
+	# Pastille d'action contextuelle (devant la SORTIE ou un client), cliquable.
+	_action_btn = _make_action_button()
+	layer.add_child(_action_btn)
+
+
+func _make_action_button() -> Button:
+	var b := Button.new()
+	b.size = Vector2(190, 66)
+	b.custom_minimum_size = b.size
+	b.clip_text = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.visible = false
+	b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_color_override("font_color", Color(1, 1, 0.88))
+	b.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	b.add_theme_constant_override("outline_size", 4)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.30, 0.18, 0.08, 0.92)
+	sb.set_corner_radius_all(14)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0.95, 0.8, 0.3)
+	b.add_theme_stylebox_override("normal", sb)
+	var hb := sb.duplicate()
+	hb.bg_color = Color(0.42, 0.26, 0.12, 0.96)
+	b.add_theme_stylebox_override("hover", hb)
+	b.add_theme_stylebox_override("pressed", hb)
+	b.pressed.connect(func(): _do_action())
+	return b
 
 
 func _show_toast(text: String) -> void:

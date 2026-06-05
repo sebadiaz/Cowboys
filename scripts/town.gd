@@ -36,7 +36,9 @@ var _near_label := ""        # libellé du prompt d'action courant
 var _target_kind := ""       # "bank" | "saloon" | "npc" | "flavor"
 var _target_npc = null       # PNJ ciblé (Dictionary) si _target_kind == "npc"
 var _target_flavor := ""
+var _target_anchor := Vector2.ZERO   # point MONDE où afficher le logo d'action
 var _interact_was := false
+var _action_btn: Button
 
 var _buildings: Array[Dictionary] = []   # {region,pos,h,label,tint,flavor}
 var _props: Array[Dictionary] = []        # {region,pos,h}
@@ -191,6 +193,7 @@ func _update_interaction() -> void:
 	if _can_enter:
 		_target_kind = "bank"
 		_near_label = "ENTRER dans la BANQUE"
+		_target_anchor = BANK_DOOR
 	else:
 		var best := TALK_RADIUS
 		# Habitants à qui parler (priorité au plus proche).
@@ -203,6 +206,7 @@ func _update_interaction() -> void:
 				_target_kind = "npc"
 				_target_npc = n
 				_near_label = "Parler à %s" % n["name"]
+				_target_anchor = n["pos"]
 		# Commerces : entrer (saloon) ou observer (texte d'ambiance).
 		for b in _buildings:
 			if b["flavor"] == "" and b["enter"] == "":
@@ -210,6 +214,7 @@ func _update_interaction() -> void:
 			var d := _player_pos.distance_to(b["pos"] + Vector2(0, 60))
 			if d < best:
 				best = d
+				_target_anchor = b["pos"] + Vector2(0, 60)
 				if b["enter"] == "saloon":
 					_target_kind = "saloon"
 					_near_label = "Entrer au %s" % b["label"]
@@ -217,15 +222,45 @@ func _update_interaction() -> void:
 					_target_kind = "flavor"
 					_target_flavor = b["flavor"]
 					_near_label = b["label"]
-	# Front montant de E.
+	# Touche E (front montant) = même action que le logo cliquable.
 	var held := InputManager.is_interact_held()
 	if held and not _interact_was:
-		match _target_kind:
-			"bank": _enter_bank()
-			"saloon": GameManager.goto_saloon()
-			"npc": _talk(_target_npc)
-			"flavor": _show_toast(_target_flavor)
+		_do_action()
 	_interact_was = held
+	_update_action_button()
+
+
+## Exécute l'action de la cible courante (E clavier OU clic sur le logo).
+func _do_action() -> void:
+	match _target_kind:
+		"bank": _enter_bank()
+		"saloon": GameManager.goto_saloon()
+		"npc": _talk(_target_npc)
+		"flavor": _show_toast(_target_flavor)
+
+
+## Icône d'action (emoji) selon le type de cible.
+func _action_icon() -> String:
+	match _target_kind:
+		"bank", "saloon": return "🚪"
+		"npc": return "💬"
+		"flavor": return "👁"
+	return ""
+
+
+## Place/affiche la pastille cliquable devant la porte/cible quand on est proche.
+func _update_action_button() -> void:
+	if _action_btn == null:
+		return
+	if _target_kind == "":
+		_action_btn.visible = false
+		return
+	_action_btn.visible = true
+	_action_btn.text = "%s\n%s" % [_action_icon(), _near_label]
+	# Projection MONDE -> écran (le noeud porte le zoom/position de caméra).
+	var local := Iso.project(_target_anchor) + Vector2(0, -40)
+	var screen := position + local * scale
+	_action_btn.position = screen - _action_btn.size * 0.5
 
 
 ## Affiche la réplique courante d'un PNJ et passe à la suivante.
@@ -362,10 +397,6 @@ func _draw() -> void:
 			_text(head, bub, 15, Color(1, 1, 0.9))
 		elif not (n["lines"] as Array).is_empty() and _player_pos.distance_to(n["pos"]) < TALK_RADIUS:
 			_text(head, "💬", 16, Color(1, 1, 0.7))
-	# Prompt d'action contextuel au-dessus du joueur.
-	if _near_label != "" and int(_hint_t * 2.0) % 2 == 0:
-		var pp := Iso.project(_player_pos) + Vector2(0, -66)
-		_text(pp, "E : %s" % _near_label, 16, Color(1, 1, 0.7))
 
 
 func _draw_ground() -> void:
@@ -485,7 +516,7 @@ func _build_ui() -> void:
 	get_viewport().size_changed.connect(_on_viewport_resized)
 
 	var title := Label.new()
-	title.text = "EL DORADO — explore la ville (E pour observer / entrer)"
+	title.text = "EL DORADO — explore la ville · clique le logo près des portes/gens (ou E)"
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", Color(1, 1, 1))
 	title.add_theme_color_override("font_outline_color", Color(0, 0, 0))
@@ -522,13 +553,43 @@ func _build_ui() -> void:
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_toast)
 
+	# Mobile : joystick seul (l'action passe par le logo cliquable près des portes).
 	var mc := Control.new()
 	mc.set_script(load("res://scripts/mobile_controls.gd"))
 	mc.set("combat_buttons", false)
-	mc.set("interact_only", true)
 	mc.set_anchors_preset(Control.PRESET_FULL_RECT)
 	mc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(mc)
+
+	# Pastille d'action contextuelle (apparaît devant la porte/cible, cliquable).
+	_action_btn = _make_action_button()
+	layer.add_child(_action_btn)
+
+
+## Crée la pastille d'action (logo + libellé) cliquable.
+func _make_action_button() -> Button:
+	var b := Button.new()
+	b.size = Vector2(190, 66)
+	b.custom_minimum_size = b.size
+	b.clip_text = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.visible = false
+	b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_color_override("font_color", Color(1, 1, 0.88))
+	b.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	b.add_theme_constant_override("outline_size", 4)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.30, 0.18, 0.08, 0.92)
+	sb.set_corner_radius_all(14)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0.95, 0.8, 0.3)
+	b.add_theme_stylebox_override("normal", sb)
+	var hb := sb.duplicate()
+	hb.bg_color = Color(0.42, 0.26, 0.12, 0.96)
+	b.add_theme_stylebox_override("hover", hb)
+	b.add_theme_stylebox_override("pressed", hb)
+	b.pressed.connect(func(): _do_action())
+	return b
 
 
 func _show_toast(text: String) -> void:
