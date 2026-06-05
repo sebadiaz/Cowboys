@@ -31,6 +31,11 @@ var alarm: Node = null
 var bullet_system: Node = null
 var active: bool = true
 var alarm_gain_mult: float = 1.0   # réduit par l'upgrade "discrétion"
+var detect_mult: float = 1.0       # vitesse de détection (assist = plus lent)
+var chase_mult: float = 1.0        # vitesse de poursuite (assist = plus lent)
+var fire_mult: float = 1.0         # cadence de tir (assist = plus lent)
+var lethal_touch: bool = true      # contact mortel (false en assist)
+var _touch_cd: float = 0.0         # délai entre deux dégâts de contact
 
 const GUARD_FIRE_RATE := 1.1   # secondes entre deux tirs de garde
 const MAX_HP := 2              # le garde encaisse 2 balles
@@ -66,7 +71,7 @@ func _physics_process(delta: float) -> void:
 
 	# Mise à jour de la détection et de la mémoire.
 	if sees_player:
-		_detect = min(ALERT_THRESHOLD, _detect + DETECT_RISE * delta)
+		_detect = min(ALERT_THRESHOLD, _detect + DETECT_RISE * detect_mult * delta)
 		if alarm != null and alarm.has_method("add_detection"):
 			alarm.add_detection(ALARM_GAIN * alarm_gain_mult * delta)
 		_last_known = player.global_position
@@ -103,7 +108,7 @@ func _physics_process(delta: float) -> void:
 	if _state == State.ALERT and sees_player and bullet_system != null and _fire_cd <= 0.0:
 		var aim := player.global_position - global_position
 		bullet_system.spawn(global_position + aim.normalized() * 18.0, aim, false)
-		_fire_cd = GUARD_FIRE_RATE
+		_fire_cd = GUARD_FIRE_RATE * fire_mult
 
 	move_and_slide()
 	_aim_cone(delta)
@@ -146,13 +151,21 @@ func _do_search(delta: float) -> void:
 		_facing = Vector2.RIGHT.rotated(_look_t * 2.2)
 
 
-func _do_alert(_delta: float) -> void:
+func _do_alert(delta: float) -> void:
 	var to_player := player.global_position - global_position
 	_facing = to_player.normalized()
-	velocity = _facing * CHASE_SPEED
-	if to_player.length() <= CATCH_DISTANCE and player.has_method("get_caught"):
-		player.get_caught()
-		player_caught.emit()
+	velocity = _facing * CHASE_SPEED * chase_mult
+	# Contact : en assist, on n'est PAS tué d'un coup — le garde inflige 1 PV
+	# avec un délai (marge d'erreur). Sinon (hardcore), capture immédiate.
+	_touch_cd = max(0.0, _touch_cd - delta)
+	if to_player.length() <= CATCH_DISTANCE:
+		if lethal_touch:
+			if player.has_method("get_caught"):
+				player.get_caught()
+				player_caught.emit()
+		elif _touch_cd <= 0.0 and player.has_method("take_damage"):
+			player.take_damage(1)
+			_touch_cd = 1.1
 
 
 ## Oriente progressivement le cône vers la direction de regard.

@@ -232,7 +232,47 @@ func _draw() -> void:
 			"player": _draw_player()
 
 	_draw_bullets()
+	_draw_objective_arrow()
 	_draw_vignette()
+
+
+## Flèche d'objectif au-dessus du joueur : pointe vers le butin le plus proche,
+## sinon le coffre, sinon la sortie. Rend l'objectif évident.
+func _draw_objective_arrow() -> void:
+	if not is_instance_valid(player):
+		return
+	var target := Vector2.ZERO
+	var label := ""
+	# Butin restant le plus proche ?
+	var best := INF
+	for b in loot:
+		if is_instance_valid(b):
+			var d: float = player.global_position.distance_to(b.global_position)
+			if d < best:
+				best = d
+				target = b.global_position
+				label = "BUTIN"
+	if label == "" and is_instance_valid(safe) and not safe._is_open:
+		target = safe.global_position
+		label = "COFFRE"
+	if label == "" and is_instance_valid(exit_zone):
+		target = exit_zone.global_position
+		label = "SORTIE"
+	if label == "":
+		return
+	var pp := Iso.project(player.global_position) + Vector2(0, -44)
+	var dir := (Iso.project(target) - Iso.project(player.global_position))
+	if dir.length() < 0.001:
+		return
+	dir = dir.normalized()
+	var bob := sin(Time.get_ticks_msec() * 0.006) * 3.0
+	var c := pp + dir * (14.0 + bob)
+	var perp := dir.orthogonal()
+	# Chevron pointant vers la cible.
+	draw_colored_polygon(PackedVector2Array([
+		c + dir * 9.0, c - dir * 4.0 + perp * 7.0, c - dir * 4.0 - perp * 7.0]),
+		Color(1.0, 0.85, 0.25))
+	_text_centered("» %s »" % label, pp + Vector2(0, -10), 12, Color(1.0, 0.92, 0.6))
 
 
 ## Pénombre western : assombrit les bords, halo clair autour du joueur.

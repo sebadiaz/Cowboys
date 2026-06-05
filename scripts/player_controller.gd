@@ -23,6 +23,7 @@ var loot_bags: int = 0
 var loot_value: int = 0
 var is_caught: bool = false
 var facing := Vector2.DOWN
+var max_hp: int = MAX_HP       # ajusté selon le mode assist
 var hp: int = MAX_HP
 var bullet_system: Node = null
 var iso_renderer: Node2D = null   # pour convertir la position du clic en point monde
@@ -40,6 +41,9 @@ func _ready() -> void:
 	# Applique les upgrades persistés (SaveManager est un autoload).
 	speed_mult = SaveManager.speed_mult()
 	reload_mult = SaveManager.reload_mult()
+	# Mode assist (prototype) : plus de PV pour une vraie marge d'erreur.
+	max_hp = 5 if GameManager.assist else MAX_HP
+	hp = max_hp
 
 
 func _reload_time() -> float:
@@ -150,7 +154,8 @@ func add_safe_reward(value: int) -> void:
 
 
 func has_loot() -> bool:
-	return loot_bags > 0
+	# On peut filer dès qu'on a ramassé quelque chose : un sac OU le coffre.
+	return loot_bags > 0 or loot_value > 0
 
 
 func get_caught() -> void:

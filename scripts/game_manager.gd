@@ -19,6 +19,48 @@ var town_return_pos := Vector2.ZERO
 ## La boutique a-t-elle été ouverte depuis la ville (retour en ville) ?
 var shop_from_town := false
 
+## Mode "assist" (prototype) activé par défaut : plus de PV, alarme plus lente,
+## gardes moins agressifs, contact non létal. Basculable depuis le menu.
+var assist := true
+
+## Cycle jour/nuit : world_time ∈ [0,1) (0 = minuit, 0.5 = midi). Avance en
+## continu et persiste entre les scènes. Le rendu lit ambient_color()/darkness().
+const DAY_LENGTH := 160.0   # secondes pour un cycle complet
+var world_time := 0.34      # on démarre en matinée
+
+const _SKY := [
+	[0.00, Color(0.30, 0.32, 0.58)], [0.22, Color(0.55, 0.45, 0.55)],
+	[0.27, Color(0.98, 0.72, 0.55)], [0.36, Color(1.0, 0.96, 0.90)],
+	[0.50, Color(1.0, 1.0, 1.0)],    [0.70, Color(1.0, 0.93, 0.84)],
+	[0.79, Color(0.97, 0.60, 0.42)], [0.88, Color(0.50, 0.40, 0.58)],
+	[1.00, Color(0.30, 0.32, 0.58)],
+]
+
+
+func _process(delta: float) -> void:
+	world_time = fposmod(world_time + delta / DAY_LENGTH, 1.0)
+
+
+## Teinte d'ambiance (multiplicateur de canvas) selon l'heure.
+func ambient_color() -> Color:
+	for i in range(_SKY.size() - 1):
+		var a: Array = _SKY[i]
+		var b: Array = _SKY[i + 1]
+		if world_time <= float(b[0]):
+			var k := (world_time - float(a[0])) / maxf(0.0001, float(b[0]) - float(a[0]))
+			return (a[1] as Color).lerp(b[1] as Color, clampf(k, 0.0, 1.0))
+	return _SKY[-1][1]
+
+
+## Obscurité 0 (plein jour) → ~0.7 (nuit), pour allumer lampes/halos.
+func darkness() -> float:
+	return clampf(1.0 - ambient_color().g, 0.0, 1.0)
+
+
+## Vrai s'il fait assez sombre pour allumer les lumières.
+func is_dark() -> bool:
+	return darkness() > 0.12
+
 ## Résultat de la dernière mission jouée, lu par ResultScreen.
 var last_result := {
 	"success": false,

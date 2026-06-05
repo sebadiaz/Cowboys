@@ -41,10 +41,14 @@ Règles :
 - **Succès** : sortir avec **au moins un butin**.
 - **Combat** : le joueur tire **à l'arrêt uniquement** (pas de tir en
   mouvement) ; une balle abat un garde. Les gardes **en alerte** tirent sur lui.
-- **Points de vie** : le joueur a **3 PV** ; à **0 PV** (balles / contact garde
-  en alerte) → échec.
+- **Points de vie** : le joueur a **3 PV** (cœur du concept) ; à **0 PV** → échec.
+- **Mode assist** (prototype, **activé par défaut**, basculable au menu) : pour
+  rester fun et finissable, il donne **5 PV**, une **alarme plus lente**, des
+  gardes **moins agressifs** et un **contact non létal** (le garde blesse au lieu
+  de tuer net). Désactivé = règles strictes (3 PV, contact = capture).
 - Détection **progressive** : un garde voit le joueur → la jauge d'alarme monte.
 - Alarme à **100** → tous les gardes passent en **alerte** (chasse + tir).
+- **Flèche d'objectif** en jeu (butin → coffre → sortie) pour la lisibilité.
 - **Écran de résultat** après chaque fin de mission.
 
 ## 4. Contrôles

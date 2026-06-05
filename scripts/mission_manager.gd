@@ -304,6 +304,17 @@ func _spawn_exit() -> void:
 	_exit.player_entered.connect(_on_exit_entered)
 
 
+## Règle un garde selon le mode assist + l'upgrade discrétion.
+func _apply_difficulty(g: Node) -> void:
+	g.alarm_gain_mult = SaveManager.stealth_mult()
+	if GameManager.assist:
+		g.alarm_gain_mult *= 0.5     # alarme monte 2x moins vite
+		g.detect_mult = 0.6          # détection plus lente
+		g.chase_mult = 0.85          # poursuite un peu plus lente que le joueur
+		g.fire_mult = 1.7            # tire moins souvent
+		g.lethal_touch = false       # le contact blesse au lieu de tuer net
+
+
 func _spawn_guards() -> void:
 	for entry in _cfg.get("guards", []):
 		var route := PackedVector2Array()
@@ -316,7 +327,7 @@ func _spawn_guards() -> void:
 		g.global_position = route[0]
 		g.player = player
 		g.alarm = alarm
-		g.alarm_gain_mult = SaveManager.stealth_mult()
+		_apply_difficulty(g)
 		g.visible = false
 		world.add_child(g)
 		g.player_caught.connect(_on_player_caught)
@@ -333,7 +344,7 @@ func _connect_hud() -> void:
 	if hud.has_method("set_state"):
 		hud.set_state(false)
 	if hud.has_method("set_health"):
-		hud.set_health(player.hp, player.MAX_HP)
+		hud.set_health(player.hp, player.max_hp)
 	if hud.has_method("set_ammo"):
 		hud.set_ammo(player.ammo, player.CYLINDER, false)
 
@@ -381,7 +392,7 @@ func _spawn_reinforcement() -> void:
 	g.player = player
 	g.alarm = alarm
 	g.bullet_system = _bullets
-	g.alarm_gain_mult = SaveManager.stealth_mult()
+	_apply_difficulty(g)
 	g.visible = false
 	world.add_child(g)
 	g.player_caught.connect(_on_player_caught)
@@ -504,7 +515,7 @@ func _on_player_hit() -> void:
 
 func _on_player_health(current_hp: int) -> void:
 	if hud.has_method("set_health"):
-		hud.set_health(current_hp, player.MAX_HP)
+		hud.set_health(current_hp, player.max_hp)
 	if current_hp > 0 and hud.has_method("show_toast"):
 		hud.show_toast("Touché ! PV: %d" % current_hp)
 

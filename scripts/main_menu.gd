@@ -3,6 +3,10 @@ extends Control
 ## Menu principal : titre, bouton Jouer, rappel des contrôles et magot total.
 ## Layout via conteneurs (robuste sur desktop et mobile, quelle que soit la taille).
 
+var _assist_btn: Button
+var _magot_label: Label
+
+
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
@@ -45,27 +49,37 @@ func _ready() -> void:
 	shop.pressed.connect(_on_shop)
 	box.add_child(shop)
 
-	var visual := Button.new()
-	visual.text = "Voir le décor banque (test)"
-	visual.custom_minimum_size = Vector2(460, 46)
-	visual.pressed.connect(_on_visual_test)
-	box.add_child(visual)
+	# Mode assist (prototype facile) : basculable.
+	_assist_btn = Button.new()
+	_assist_btn.custom_minimum_size = Vector2(460, 46)
+	_assist_btn.pressed.connect(_on_toggle_assist)
+	box.add_child(_assist_btn)
+	_refresh_assist()
 
 	box.add_child(_spacer(10))
 
 	box.add_child(_label(
-		"Clavier : WASD/ZQSD bouger · Espace/clic TIRER · E interagir · Échap pause", 15,
+		"Clavier : WASD/ZQSD bouger · Espace/clic TIRER · E interagir/porte · R recharger · Échap pause", 15,
 		Color(0.3, 0.2, 0.12)))
 	box.add_child(_label(
-		"Mobile : joystick (gauche) + boutons TIR et E (droite)", 16,
+		"Mobile : joystick (gauche) + boutons TIR / RECH / E (droite)", 16,
 		Color(0.3, 0.2, 0.12)))
 
-	box.add_child(_spacer(16))
+	box.add_child(_spacer(12))
 
-	box.add_child(_label(
+	_magot_label = _label(
 		"Magot total : %d $   ·   Missions réussies : %d" % [
 			SaveManager.total_money, SaveManager.missions_completed], 18,
-		Color(0.3, 0.2, 0.12)))
+		Color(0.3, 0.2, 0.12))
+	box.add_child(_magot_label)
+
+	# Réinitialiser la sauvegarde (discret) si la save bloque le test.
+	var reset := Button.new()
+	reset.text = "Réinitialiser la sauvegarde"
+	reset.custom_minimum_size = Vector2(460, 36)
+	reset.modulate = Color(1, 1, 1, 0.6)
+	reset.pressed.connect(_on_reset_save)
+	box.add_child(reset)
 
 
 func _on_play() -> void:
@@ -76,8 +90,24 @@ func _on_shop() -> void:
 	GameManager.goto_shop()
 
 
-func _on_visual_test() -> void:
-	get_tree().change_scene_to_file("res://scenes/levels/BankVisualTest.tscn")
+func _on_toggle_assist() -> void:
+	GameManager.assist = not GameManager.assist
+	_refresh_assist()
+
+
+func _refresh_assist() -> void:
+	if _assist_btn:
+		_assist_btn.text = "Mode assist : %s (facile)" % ("ACTIVÉ" if GameManager.assist else "désactivé")
+
+
+func _on_reset_save() -> void:
+	SaveManager.total_money = 0
+	SaveManager.missions_completed = 0
+	SaveManager.levels_unlocked = 1
+	SaveManager.upgrades = SaveManager._default_upgrades()
+	SaveManager.save_game()
+	if _magot_label:
+		_magot_label.text = "Sauvegarde réinitialisée."
 
 
 func _label(text: String, font_size: int, color: Color) -> Label:
