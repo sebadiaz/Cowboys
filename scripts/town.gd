@@ -40,6 +40,10 @@ var _target_flavor := ""
 var _target_anchor := Vector2.ZERO   # point MONDE où afficher le logo d'action
 var _interact_was := false
 var _action_btn: Button
+var _horses: Array[Vector2] = []     # chevaux attachés (décor solide + caresse)
+
+const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
+	"*hennissement* Doux, mon beau...", "Ce cheval ferait une belle monture de fuite."]
 
 var _buildings: Array[Dictionary] = []   # {region,pos,h,label,tint,flavor}
 var _props: Array[Dictionary] = []        # {region,pos,h}
@@ -145,6 +149,11 @@ func _build_town() -> void:
 	# Puits central (collision).
 	_foots.append(Rect2(WELL - Vector2(40, 36), Vector2(80, 72)))
 
+	# Chevaux attachés devant l'ÉCURIE (décor solide + on peut les caresser).
+	for hp in [Vector2(1360, 1030), Vector2(1440, 1040), Vector2(1520, 1030)]:
+		_horses.append(hp)
+		_foots.append(Rect2(hp - Vector2(17, 12), Vector2(34, 24)))
+
 
 func _add_building(region: Rect2, pos: Vector2, h: float, label: String, tint: Color,
 		flavor: String, foot: Vector2, enter := "") -> void:
@@ -155,6 +164,15 @@ func _add_building(region: Rect2, pos: Vector2, h: float, label: String, tint: C
 
 func _add_prop(region: Rect2, pos: Vector2, h: float) -> void:
 	_props.append({"region": region, "pos": pos, "h": h})
+	# Décor SOLIDE : empreinte de collision selon le type (on ne traverse plus).
+	var sz := Vector2.ZERO
+	match region:
+		R_WAGON: sz = Vector2(86, 48)
+		R_CACTUS: sz = Vector2(26, 26)
+		R_BARREL: sz = Vector2(28, 28)
+		R_SIGN: sz = Vector2(20, 20)
+	if sz != Vector2.ZERO:
+		_foots.append(Rect2(pos - sz * 0.5, sz))
 
 
 func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color,
@@ -232,6 +250,14 @@ func _update_interaction() -> void:
 					_target_kind = "flavor"
 					_target_flavor = b["flavor"]
 					_near_label = b["label"]
+		# Chevaux à caresser.
+		for hp in _horses:
+			var d := _player_pos.distance_to(hp)
+			if d < best:
+				best = d
+				_target_kind = "horse"
+				_near_label = "Caresser le cheval"
+				_target_anchor = hp
 	# Touche E (front montant) = même action que le logo cliquable.
 	var held := InputManager.is_interact_held()
 	if held and not _interact_was:
@@ -247,6 +273,7 @@ func _do_action() -> void:
 		"saloon": GameManager.goto_saloon()
 		"shop": GameManager.goto_shop_from_town(TOWN_RETURN_MAGASIN)
 		"npc": _talk(_target_npc)
+		"horse": _show_toast(HORSE_LINES[_rng.randi() % HORSE_LINES.size()])
 		"flavor": _show_toast(_target_flavor)
 
 
@@ -256,6 +283,7 @@ func _action_icon() -> String:
 		"bank", "saloon": return "🚪"
 		"shop": return "🛒"
 		"npc": return "💬"
+		"horse": return "🐴"
 		"flavor": return "👁"
 	return ""
 
@@ -387,6 +415,7 @@ func _on_viewport_resized() -> void:
 func _draw() -> void:
 	_draw_ground()
 	_draw_well()
+	_draw_hitch()
 	# Repère banque : halo doré + flèche flottante.
 	var d := Iso.project(BANK_DOOR)
 	for i in range(4):
@@ -405,6 +434,8 @@ func _draw() -> void:
 		items.append({"d": Iso.depth(p["pos"]), "k": "p", "o": p})
 	for n in _npcs:
 		items.append({"d": Iso.depth(n["pos"]), "k": "n", "o": n})
+	for hp in _horses:
+		items.append({"d": Iso.depth(hp), "k": "horse", "o": hp})
 	if _coach_active():
 		items.append({"d": Iso.depth(_coach_pos), "k": "coach", "o": null})
 	items.append({"d": Iso.depth(_player_pos), "k": "me", "o": null})
@@ -414,6 +445,7 @@ func _draw() -> void:
 			"b": _draw_building(it["o"])
 			"p": _billboard(it["o"]["region"], it["o"]["pos"], it["o"]["h"], Color.WHITE)
 			"coach": _draw_coach()
+			"horse": _horse(it["o"])
 			"n":
 				var n: Dictionary = it["o"]
 				var f := _screen_facing(n["pos"], n["facing"])
@@ -477,6 +509,16 @@ func _draw_coach() -> void:
 	_horse(_coach_pos + Vector2(0, 64))
 	# Chariot bâché.
 	_billboard(R_WAGON, _coach_pos, 150.0, Color.WHITE)
+
+
+## Barre d'attache (poteaux + traverse) derrière les chevaux de l'écurie.
+func _draw_hitch() -> void:
+	var a := Iso.project(Vector2(1335, 1012))
+	var b := Iso.project(Vector2(1545, 1012))
+	var wood := Color(0.40, 0.27, 0.15)
+	draw_line(a, a + Vector2(0, -26), wood, 4.0)
+	draw_line(b, b + Vector2(0, -26), wood, 4.0)
+	draw_line(a + Vector2(0, -22), b + Vector2(0, -22), wood, 4.0)
 
 
 func _horse(world_pos: Vector2) -> void:

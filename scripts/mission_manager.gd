@@ -69,6 +69,7 @@ func _ready() -> void:
 	_build_alarm()
 	_build_floor()
 	_build_walls()
+	_spawn_prop_solids()
 	_spawn_player()
 	_spawn_loot()
 	_spawn_safe()
@@ -211,6 +212,38 @@ func _build_walls() -> void:
 		var outer: bool = w.size() > 4 and int(w[4]) != 0
 		var low: bool = w.size() > 5 and int(w[5]) != 0
 		_add_wall(rect, outer, low)
+
+
+## Empreintes de collision des MEUBLES (le décor devient solide : on ne traverse
+## plus tonneaux/caisses/bureaux). Le comptoir a déjà ses murets ; le coffre est
+## dans l'ouverture, on ne le bloque donc pas.
+const PROP_SOLID := {
+	"barrel": Vector2(28, 28), "crate": Vector2(34, 34), "desk": Vector2(70, 42),
+}
+
+func _spawn_prop_solids() -> void:
+	for p in _cfg.get("props", []):
+		if not (p is Array) or p.size() < 3:
+			continue
+		var sz: Vector2 = PROP_SOLID.get(str(p[0]), Vector2.ZERO)
+		if sz == Vector2.ZERO:
+			continue
+		var pos := Vector2(float(p[1]), float(p[2]))
+		_add_solid(Rect2(pos - sz * 0.5, sz))
+
+
+## Collision seule (sans visuel : le rendu du meuble est déjà fait par le renderer).
+func _add_solid(rect: Rect2) -> void:
+	var body := StaticBody2D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	body.position = rect.position + rect.size * 0.5
+	var cs := CollisionShape2D.new()
+	var shape := RectangleShape2D.new()
+	shape.size = rect.size
+	cs.shape = shape
+	body.add_child(cs)
+	world.add_child(body)
 
 
 ## Crée la collision cartésienne du mur ; le visuel iso est géré par le renderer.
