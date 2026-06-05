@@ -26,9 +26,11 @@ var _foots: Array[Rect2] = []
 var _zoom := 2.2
 var _cam := Vector2.ZERO
 var _toast: Label
+var _rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
+	_rng.randomize()
 	_build()
 	_apply_zoom()
 	_cam = _camera_target()
@@ -51,20 +53,20 @@ func _build() -> void:
 	_add_npc(Vector2(500, 95), Vector2(0, 1), Color(0.55, 0.4, 0.25), Color(0.9, 0.85, 0.7),
 			"Sam le barman", ["Qu'est-ce que je te sers, l'ami ? On n'a plus que du whisky.",
 			"La banque ? J'ai rien vu, rien entendu. Compris ?",
-			"Pas d'embrouilles dans mon saloon."])
+			"Pas d'embrouilles dans mon saloon."], 0.0)
 	_add_npc(Vector2(250, 360), Vector2(0.3, 1), Color(0.3, 0.25, 0.4), Color(0.7, 0.6, 0.4),
 			"Joueur de poker", ["Une partie ? Mise tout ton butin, ha !",
-			"J'ai un carré d'as... ou pas."])
+			"J'ai un carré d'as... ou pas."], 36.0)
 	_add_npc(Vector2(835, 360), Vector2(-1, 0.2), Color(0.2, 0.3, 0.45), Color(0.85, 0.8, 0.8),
 			"Pianiste", ["Une petite mélodie pour le hors-la-loi ?",
-			"♪ Oh Susanna... ♪"])
+			"♪ Oh Susanna... ♪"], 0.0)
 	_add_npc(Vector2(640, 560), Vector2(-0.4, -1), Color(0.5, 0.2, 0.2), Color(0.8, 0.7, 0.6),
 			"Ivrogne", ["*hic* T'as pas une pièce, l'ami ?",
-			"J'ai vu le shérif rentrer son or à la banque... *hic*"])
+			"J'ai vu le shérif rentrer son or à la banque... *hic*"], 55.0)
 
 
 func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color,
-		npc_name: String, lines: Array) -> void:
+		npc_name: String, lines: Array, wander := 40.0) -> void:
 	var pal := CharacterArt.hero_palette()
 	pal["coat"] = coat
 	pal["coat_dark"] = coat.darkened(0.2)
@@ -72,8 +74,8 @@ func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color,
 	pal["hat"] = hat
 	pal["hat_band"] = hat.darkened(0.3)
 	pal["bandana"] = coat.lightened(0.3)
-	_npcs.append({"pos": pos, "facing": facing.normalized(), "pal": pal, "phase": randf() * TAU,
-			"name": npc_name, "lines": lines, "li": 0})
+	_npcs.append({"pos": pos, "facing": facing.normalized(), "pal": pal,
+			"name": npc_name, "lines": lines, "li": 0, "wander": wander})
 
 
 # --- Boucle ---
@@ -90,7 +92,7 @@ func _process(delta: float) -> void:
 	_move(dir * SPEED * delta)
 	_update_interaction()
 	for n in _npcs:
-		n["phase"] += delta * 2.0
+		NpcAI.update(n, delta, _blocked, _rng)
 	_cam = _cam.lerp(_camera_target(), clampf(delta * 8.0, 0.0, 1.0))
 	position = _cam
 	_hint_t += delta
@@ -126,6 +128,9 @@ func _talk(npc) -> void:
 		return
 	var i: int = npc["li"] % lines.size()
 	npc["li"] = i + 1
+	npc["state"] = "idle"
+	npc["timer"] = 2.0
+	npc["facing"] = (_player_pos - npc["pos"]).normalized()
 	_facing = (npc["pos"] - _player_pos).normalized()
 	_show_toast("%s : « %s »" % [npc["name"], lines[i]])
 
@@ -241,15 +246,19 @@ func _draw() -> void:
 			"npc":
 				var n: Dictionary = it["o"]
 				CharacterArt.draw_person(self, Iso.project(n["pos"]), _sf(n["pos"], n["facing"]),
-						n["pal"], false, false, sin(n["phase"]) * 0.3 + 0.3, 0.0, 0.0)
+						n["pal"], false, false, float(n.get("walk", 0.0)), 0.0, 0.0)
 			"me":
 				CharacterArt.draw_person(self, Iso.project(_player_pos), _sf(_player_pos, _facing),
 						CharacterArt.hero_palette(), false, false, _walk, 0.0, 0.0)
 
-	# Marqueurs de dialogue + prompt.
+	# Bulles d'ambiance + marqueurs de dialogue.
 	for n in _npcs:
-		if _player_pos.distance_to(n["pos"]) < TALK_RADIUS:
-			_text(Iso.project(n["pos"]) + Vector2(0, -56), "💬", 16, Color(1, 1, 0.7))
+		var head := Iso.project(n["pos"]) + Vector2(0, -56)
+		var bub := NpcAI.bubble(n)
+		if bub != "":
+			_text(head, bub, 15, Color(1, 1, 0.9))
+		elif _player_pos.distance_to(n["pos"]) < TALK_RADIUS:
+			_text(head, "💬", 16, Color(1, 1, 0.7))
 	if _near_label != "" and int(_hint_t * 2.0) % 2 == 0:
 		_text(Iso.project(_player_pos) + Vector2(0, -64), "E : %s" % _near_label, 16, Color(1, 1, 0.7))
 

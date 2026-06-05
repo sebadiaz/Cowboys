@@ -7,6 +7,8 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       nommés (Banque, Saloon, Hôtel, Magasin, Shérif, Écurie, Poste), **PNJ**
       cowboys, props (chariot, tonneaux, cactus, panneaux), trottoirs en bois.
 - [x] **Dialogues** : E pour parler aux habitants (répliques qui défilent).
+- [x] **PNJ vivants** (`npc_ai.gd`) : déambulation avec collisions, coups d'œil,
+      bulles d'ambiance ; ils s'arrêtent et se tournent vers toi quand tu parles.
 - [x] **Saloon entrable** (intérieur : barman, clients, pianiste, piano, tables,
       comptoir) avec dialogues, sortie qui ramène en ville.
 - [x] **Collisions** sur les bâtiments (on ne traverse plus les murs).

@@ -46,9 +46,11 @@ var _foots: Array[Rect2] = []             # collisions
 var _zoom := 2.0
 var _cam := Vector2.ZERO
 var _toast: Label
+var _rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
+	_rng.randomize()
 	# Réapparition à la sortie du saloon (sinon, entrée du village).
 	if GameManager.town_return_pos != Vector2.ZERO:
 		_player_pos = GameManager.town_return_pos
@@ -172,7 +174,7 @@ func _process(delta: float) -> void:
 		_move(dir * SPEED * delta)
 		_update_interaction()
 	for n in _npcs:
-		n["phase"] += delta * 2.0
+		NpcAI.update(n, delta, _blocked, _rng)
 	_cam = _cam.lerp(_camera_target(), clampf(delta * 8.0, 0.0, 1.0))
 	position = _cam
 	_hint_t += delta
@@ -233,6 +235,10 @@ func _talk(npc) -> void:
 		return
 	var i: int = npc["li"] % lines.size()
 	npc["li"] = i + 1
+	# Le PNJ s'arrête et se tourne vers le joueur (conversation).
+	npc["state"] = "idle"
+	npc["timer"] = 2.0
+	npc["facing"] = (_player_pos - npc["pos"]).normalized()
 	_facing = (npc["pos"] - _player_pos).normalized()
 	_show_toast("%s : « %s »" % [npc["name"], lines[i]])
 
@@ -345,13 +351,17 @@ func _draw() -> void:
 				var n: Dictionary = it["o"]
 				var f := _screen_facing(n["pos"], n["facing"])
 				CharacterArt.draw_person(self, Iso.project(n["pos"]), f, n["pal"],
-						false, false, sin(n["phase"]) * 0.3 + 0.3, 0.0, 0.0)
+						false, false, float(n.get("walk", 0.0)), 0.0, 0.0)
 			"me": _draw_me()
 
-	# Marqueur "💬" au-dessus des PNJ à qui l'on peut parler.
+	# Bulles d'ambiance + marqueur "💬" pour les PNJ.
 	for n in _npcs:
-		if not (n["lines"] as Array).is_empty() and _player_pos.distance_to(n["pos"]) < TALK_RADIUS:
-			_text(Iso.project(n["pos"]) + Vector2(0, -58), "💬", 16, Color(1, 1, 0.7))
+		var head := Iso.project(n["pos"]) + Vector2(0, -58)
+		var bub := NpcAI.bubble(n)
+		if bub != "":
+			_text(head, bub, 15, Color(1, 1, 0.9))
+		elif not (n["lines"] as Array).is_empty() and _player_pos.distance_to(n["pos"]) < TALK_RADIUS:
+			_text(head, "💬", 16, Color(1, 1, 0.7))
 	# Prompt d'action contextuel au-dessus du joueur.
 	if _near_label != "" and int(_hint_t * 2.0) % 2 == 0:
 		var pp := Iso.project(_player_pos) + Vector2(0, -66)
