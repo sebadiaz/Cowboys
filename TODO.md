@@ -11,6 +11,10 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       bulles d'ambiance ; ils s'arrêtent et se tournent vers toi quand tu parles.
 - [x] **Saloon entrable** (intérieur : barman, clients, pianiste, piano, tables,
       comptoir) avec dialogues, sortie qui ramène en ville.
+- [x] **Pianiste qui joue** une mélodie honky-tonk (notes piano synthétisées).
+- [x] **Magasin entrable** → ouvre la **boutique d'upgrades** (retour en ville).
+- [x] **Diligence** qui traverse la grande rue (chevaux + poussière).
+- [x] **Logo d'action cliquable** devant les portes/cibles (🚪/🛒/💬/👁).
 - [x] **Collisions** sur les bâtiments (on ne traverse plus les murs).
 - [x] Caméra qui suit le cowboy (ville + saloon) ; banque repérable + flèche.
 - [x] Entrée banque/saloon sur **E** (clavier + bouton tactile).

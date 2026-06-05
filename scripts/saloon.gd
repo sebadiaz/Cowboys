@@ -31,6 +31,11 @@ var _cam := Vector2.ZERO
 var _toast: Label
 var _rng := RandomNumberGenerator.new()
 
+# Mélodie du pianiste (indices dans la gamme ; -1 = silence).
+const MELODY := [0, 2, 4, 2, 4, 5, 4, -1, 2, 4, 0, 2, 4, -1, 0, -1]
+var _beat_t := 0.6
+var _beat_i := 0
+
 
 func _ready() -> void:
 	_rng.randomize()
@@ -96,6 +101,7 @@ func _process(delta: float) -> void:
 	_update_interaction()
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
+	_play_piano(delta)
 	_cam = _cam.lerp(_camera_target(), clampf(delta * 8.0, 0.0, 1.0))
 	position = _cam
 	_hint_t += delta
@@ -145,6 +151,18 @@ func _update_action_button() -> void:
 	_action_btn.text = "%s\n%s" % ["🚪" if _target_kind == "exit" else "💬", _near_label]
 	var local := Iso.project(_target_anchor) + Vector2(0, -40)
 	_action_btn.position = position + local * scale - _action_btn.size * 0.5
+
+
+## Le pianiste égrène la mélodie en boucle (ambiance saloon).
+func _play_piano(delta: float) -> void:
+	_beat_t -= delta
+	if _beat_t > 0.0:
+		return
+	_beat_t = 0.34
+	var n: int = MELODY[_beat_i]
+	_beat_i = (_beat_i + 1) % MELODY.size()
+	if n >= 0:
+		AudioManager.play("piano%d" % n, -9.0, 0.0)
 
 
 func _talk(npc) -> void:

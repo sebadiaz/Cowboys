@@ -51,6 +51,10 @@ func _build_all() -> void:
 	_streams["win"] = _make(0.70, func(t): return _win(t))
 	_streams["lose"] = _make(0.80, func(t): return _lose(t))
 	_streams["click"] = _make(0.06, func(t): return _click(t))
+	# Notes de piano (gamme de do majeur) pour la mélodie du saloon.
+	var scale := [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]
+	for i in scale.size():
+		_streams["piano%d" % i] = _make(0.55, _piano.bind(float(scale[i])))
 
 
 ## Crée un AudioStreamWAV mono 16 bits à partir d'une fonction échantillon f(t).
@@ -92,6 +96,14 @@ func _shot(t: float) -> float:
 	var e := _env(t, 0.002, 0.16)
 	var body := _noise() * 0.7 + _tone(t, 130.0) * 0.5
 	return body * e * e
+
+func _piano(t: float, freq: float) -> float:
+	# Note "honky-tonk" : fondamentale + harmoniques, attaque vive, déclin doux,
+	# avec une corde légèrement désaccordée (saloon).
+	var e := _env(t, 0.004, 0.5)
+	var s := _tone(t, freq) * 0.6 + _tone(t, freq * 2.0) * 0.22 + _tone(t, freq * 3.0) * 0.1
+	s += _tone(t, freq * 1.01) * 0.18   # désaccord léger
+	return s * e * e
 
 func _hit_guard(t: float) -> float:
 	var e := _env(t, 0.001, 0.13)

@@ -98,7 +98,7 @@ func _on_retry() -> void:
 
 
 func _on_shop() -> void:
-	get_tree().change_scene_to_file("res://scenes/ShopScreen.tscn")
+	GameManager.goto_shop()
 
 
 func _on_menu() -> void:

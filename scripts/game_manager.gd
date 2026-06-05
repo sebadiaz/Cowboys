@@ -9,12 +9,15 @@ const SCENE_SALOON := "res://scenes/levels/Saloon.tscn"
 const SCENE_MISSION := "res://scenes/MissionRoot.tscn"
 const SCENE_RESULT := "res://scenes/ResultScreen.tscn"
 const SCENE_LEVEL_SELECT := "res://scenes/LevelSelect.tscn"
+const SCENE_SHOP := "res://scenes/ShopScreen.tscn"
 
 const LEVEL_COUNT := 3
 ## Niveau en cours de jeu (1..LEVEL_COUNT).
 var current_level: int = 1
 ## Position de réapparition en ville (ex. en sortant du saloon). Zero = défaut.
 var town_return_pos := Vector2.ZERO
+## La boutique a-t-elle été ouverte depuis la ville (retour en ville) ?
+var shop_from_town := false
 
 ## Résultat de la dernière mission jouée, lu par ResultScreen.
 var last_result := {
@@ -37,6 +40,28 @@ func goto_level_select() -> void:
 ## Entre dans le saloon (depuis la ville).
 func goto_saloon() -> void:
 	_change_scene(SCENE_SALOON)
+
+
+## Ouvre la boutique d'upgrades (depuis le menu / l'écran de résultat).
+func goto_shop() -> void:
+	shop_from_town = false
+	_change_scene(SCENE_SHOP)
+
+
+## Ouvre la boutique depuis le Magasin de la ville (le retour ramène en ville).
+func goto_shop_from_town(pos := Vector2.ZERO) -> void:
+	shop_from_town = true
+	town_return_pos = pos
+	_change_scene(SCENE_SHOP)
+
+
+## Quitte la boutique : retour en ville si on y était entré, sinon au menu.
+func leave_shop() -> void:
+	if shop_from_town:
+		shop_from_town = false
+		_change_scene(SCENE_TOWN)
+	else:
+		_change_scene(SCENE_MAIN_MENU)
 
 
 ## Revient en ville à une position donnée (ex. devant la porte du saloon).

@@ -25,6 +25,7 @@ const DOOR_RADIUS := 95.0
 const PLAYER_RADIUS := 15.0
 const TALK_RADIUS := 95.0
 const WELL := Vector2(1100, 980)
+const TOWN_RETURN_MAGASIN := Vector2(760, 1360)   # réapparition devant le Magasin
 
 var _player_pos := Vector2(1100, 1620)
 var _facing := Vector2.UP
@@ -49,6 +50,14 @@ var _zoom := 2.0
 var _cam := Vector2.ZERO
 var _toast: Label
 var _rng := RandomNumberGenerator.new()
+
+# Diligence qui traverse la grande rue (ambiance).
+const COACH_A := Vector2(1010, 120)
+const COACH_B := Vector2(1010, 1720)
+const COACH_SPEED := 135.0
+var _coach_pos := COACH_A
+var _coach_wait := 2.5
+var _dust_t := 0.0
 
 
 func _ready() -> void:
@@ -77,7 +86,7 @@ func _build_town() -> void:
 	_add_building(R_HOUSE, Vector2(760, 900), 195.0, "HÔTEL", Color(0.92, 0.96, 1.0),
 			"Hôtel de la Frontière — chambres à l'étage, 2 $ la nuit.", Vector2(180, 120))
 	_add_building(R_SHED, Vector2(760, 1240), 185.0, "MAGASIN", Color(1.0, 0.96, 0.85),
-			"Magasin général — cartouches, cordes, conserves de haricots.", Vector2(170, 115))
+			"Magasin général — améliore ton équipement.", Vector2(170, 115), "shop")
 	_add_building(R_HOUSE, Vector2(760, 1560), 190.0, "ÉGLISE", Color(0.95, 0.95, 1.0),
 			"Petite église en bois — une prière avant le casse ?", Vector2(170, 115))
 	# Côté est de la rue (x ~ 1440).
@@ -177,6 +186,7 @@ func _process(delta: float) -> void:
 		_update_interaction()
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
+	_update_coach(delta)
 	_cam = _cam.lerp(_camera_target(), clampf(delta * 8.0, 0.0, 1.0))
 	position = _cam
 	_hint_t += delta
@@ -215,8 +225,8 @@ func _update_interaction() -> void:
 			if d < best:
 				best = d
 				_target_anchor = b["pos"] + Vector2(0, 60)
-				if b["enter"] == "saloon":
-					_target_kind = "saloon"
+				if b["enter"] != "":
+					_target_kind = b["enter"]   # "saloon" | "shop"
 					_near_label = "Entrer au %s" % b["label"]
 				else:
 					_target_kind = "flavor"
@@ -235,6 +245,7 @@ func _do_action() -> void:
 	match _target_kind:
 		"bank": _enter_bank()
 		"saloon": GameManager.goto_saloon()
+		"shop": GameManager.goto_shop_from_town(TOWN_RETURN_MAGASIN)
 		"npc": _talk(_target_npc)
 		"flavor": _show_toast(_target_flavor)
 
@@ -243,6 +254,7 @@ func _do_action() -> void:
 func _action_icon() -> String:
 	match _target_kind:
 		"bank", "saloon": return "🚪"
+		"shop": return "🛒"
 		"npc": return "💬"
 		"flavor": return "👁"
 	return ""
@@ -276,6 +288,23 @@ func _talk(npc) -> void:
 	npc["facing"] = (_player_pos - npc["pos"]).normalized()
 	_facing = (npc["pos"] - _player_pos).normalized()
 	_show_toast("%s : « %s »" % [npc["name"], lines[i]])
+
+
+## Diligence : descend la rue, attend, puis recommence. Laisse un peu de poussière.
+func _update_coach(delta: float) -> void:
+	if _coach_wait > 0.0:
+		_coach_wait -= delta
+		if _coach_wait <= 0.0:
+			_coach_pos = COACH_A
+		return
+	_coach_pos.y += COACH_SPEED * delta
+	_dust_t -= delta
+	if _coach_pos.y >= COACH_B.y:
+		_coach_wait = _rng.randf_range(5.0, 9.0)
+
+
+func _coach_active() -> bool:
+	return _coach_wait <= 0.0
 
 
 func _move(motion: Vector2) -> void:
@@ -376,12 +405,15 @@ func _draw() -> void:
 		items.append({"d": Iso.depth(p["pos"]), "k": "p", "o": p})
 	for n in _npcs:
 		items.append({"d": Iso.depth(n["pos"]), "k": "n", "o": n})
+	if _coach_active():
+		items.append({"d": Iso.depth(_coach_pos), "k": "coach", "o": null})
 	items.append({"d": Iso.depth(_player_pos), "k": "me", "o": null})
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
 		match it["k"]:
 			"b": _draw_building(it["o"])
 			"p": _billboard(it["o"]["region"], it["o"]["pos"], it["o"]["h"], Color.WHITE)
+			"coach": _draw_coach()
 			"n":
 				var n: Dictionary = it["o"]
 				var f := _screen_facing(n["pos"], n["facing"])
@@ -432,6 +464,31 @@ func _draw_well() -> void:
 	draw_colored_polygon(PackedVector2Array([
 		b + Vector2(-26, -52), b + Vector2(0, -66), b + Vector2(26, -52), b + Vector2(0, -44)]),
 		Color(0.55, 0.30, 0.18))
+
+
+## Diligence : 2 chevaux + chariot bâché + traînée de poussière.
+func _draw_coach() -> void:
+	# Poussière derrière (vers l'amont = nord).
+	for i in range(3):
+		var dp := Iso.project(_coach_pos - Vector2(0, 30.0 + i * 26.0))
+		draw_circle(dp + Vector2(_rng.randf_range(-4, 4), -6), 9.0 - i * 2.0, Color(0.72, 0.6, 0.42, 0.22))
+	# Chevaux devant (vers l'aval = sud).
+	_horse(_coach_pos + Vector2(0, 46))
+	_horse(_coach_pos + Vector2(0, 64))
+	# Chariot bâché.
+	_billboard(R_WAGON, _coach_pos, 150.0, Color.WHITE)
+
+
+func _horse(world_pos: Vector2) -> void:
+	var b := Iso.project(world_pos)
+	draw_colored_polygon(_diamond_shadow(b, 16.0), Color(0, 0, 0, 0.18))
+	var body := Color(0.34, 0.22, 0.13)
+	draw_colored_polygon(_rect_diamond(Rect2(world_pos.x - 16, world_pos.y - 8, 32, 16)), body)
+	# Pattes + tête.
+	for dx in [-12, -4, 4, 12]:
+		draw_line(b + Vector2(dx * 0.7, -2), b + Vector2(dx * 0.7, 8), body.darkened(0.2), 2.5)
+	draw_circle(b + Vector2(-14, -16), 5.0, body)          # tête
+	draw_line(b + Vector2(-10, -14), b + Vector2(-2, -22), body.darkened(0.15), 2.0)  # encolure
 
 
 func _draw_building(b: Dictionary) -> void:

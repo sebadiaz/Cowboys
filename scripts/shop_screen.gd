@@ -43,9 +43,9 @@ func _ready() -> void:
 	scroll.add_child(_rows)
 
 	var back := Button.new()
-	back.text = "← Retour au menu"
+	back.text = "← Retour à la ville" if GameManager.shop_from_town else "← Retour au menu"
 	back.custom_minimum_size = Vector2(0, 54)
-	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
+	back.pressed.connect(func(): GameManager.leave_shop())
 	col.add_child(back)
 
 	_rebuild()
