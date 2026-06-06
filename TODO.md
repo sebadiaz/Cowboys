@@ -33,6 +33,22 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       tonneaux/caisses/bureaux de couverture.
 - [x] Accessibilité vérifiée (BFS) : aucune entité dans un mur, tout atteignable.
 
+## Fait dans la passe "refonte visuelle de la banque"
+- [x] **Intérieur de banque premium** dessiné en procédural dans `iso_renderer.gd`
+      (remplace les billboards d'atlas placeholder) : parquet bicolore, murs
+      lambrissés (plinthe/corniche) vs murs brique extérieurs.
+- [x] **Comptoir de guichets** continu (base bois moulurée + cage laiton « BANK »).
+- [x] **Grande porte de coffre** : disque acier, couronne de rivets, volant à
+      rayons doré, charnières, plaque « BANQUE » — pièce maîtresse ; intérieur
+      doré révélé à l'ouverture.
+- [x] **Props cohérents cartoon** : caisses (croix + ferrures), tonneaux, bureaux
+      de banquier (feutre vert + lampe + registre), coffre secondaire (strongbox),
+      étagères à registres + sacs d'or, plantes, affiches WANTED, lampes, sacs de
+      butin dorés bien lisibles.
+- [x] **Hiérarchie lisible** entrée → hall → comptoir → coffre → sortie ; décor
+      ajouté sur les 3 niveaux **sans toucher aux collisions** (props décoratifs
+      non bloquants, patrouilles préservées).
+
 ## Fait dans la passe "arcade V2" (cf. CLAUDE.md §6 bis)
 - [x] Game juice : screen-shake, recul joueur, flash de touche des gardes.
 - [x] Particules : poussière de pas, étincelles, impact de balle, douilles,

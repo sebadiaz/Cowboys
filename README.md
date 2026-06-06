@@ -142,9 +142,12 @@ les objets bloquants. La carte complète des régions est dans
 
 **Limites actuelles :**
 - Régions d'atlas **approximatives** (cadrage à l'œil), pas encore de TileSet.
-- La mission jouable (`MissionRoot.tscn`) garde son **rendu isométrique
-  procédural** (non converti aux sprites) afin de ne pas casser le gameplay
-  validé ; `BankVisualTest` sert de vitrine d'intégration. Voir `TODO.md`.
+- La mission jouable (`MissionRoot.tscn`) utilise un **rendu isométrique
+  procédural enrichi** (dessiné dans `iso_renderer.gd`) : parquet, murs lambrissés,
+  comptoir de guichets « BANK », **grande porte de coffre** (volant à rayons,
+  rivets, or), sacs de butin, bureaux de banquier, étagères/registres, sacs d'or,
+  caisses, tonneaux, plantes, affiches WANTED, lampes. `BankVisualTest` reste une
+  vitrine d'intégration des planches PNG. Voir `TODO.md`.
 
 ## Structure du projet
 
@@ -174,5 +177,5 @@ assets/icon.svg      # icône
 - Pensé web-first : GL Compatibility, scènes compactes, peu d'IA actives,
   aucune dépendance native, rendu par formes (aucun asset image requis).
 
-**Limites connues (voir `TODO.md`) :** graphismes placeholder, pas d'occlusion
-visuelle des cônes par les murs, une seule mission, pas de son.
+**Limites connues (voir `TODO.md`) :** pas d'occlusion visuelle des cônes par les
+murs ; le rendu reste dessiné par formes (pas encore de sprites PNG animés).

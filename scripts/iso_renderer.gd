@@ -144,22 +144,17 @@ func _prop_def(t: String) -> Array:
 func _build_billboards() -> void:
 	_billboards.clear()
 	_box_walls.clear()
-	# Murs/cloisons dessinés en boîtes 3D (hauteur selon le drapeau "low").
+	# Murs/cloisons (hauteur selon le drapeau "low" = comptoir).
 	for w in walls:
 		_box_walls.append({"rect": w["rect"], "outer": w["outer"], "low": w.get("low", false)})
-
-	# Props décoratifs pilotés par les données du niveau.
+	# Props pilotés par les données du niveau (rendus en dessin procédural).
 	for p in props:
 		if not (p is Array) or p.size() < 3:
 			continue
-		var def := _prop_def(str(p[0]))
-		if def.is_empty():
-			continue
+		var t := str(p[0])
 		var pos := Vector2(float(p[1]), float(p[2]))
-		var h: float = float(p[3]) if p.size() > 3 else float(def[2])
-		_add_bb(def[0], def[1], pos, h)
-
-
+		var h: float = float(p[3]) if p.size() > 3 else _default_h(t)
+		_billboards.append({"type": t, "pos": pos, "h": h})
 func _add_bb(tex: Texture2D, region: Rect2, pos: Vector2, h: float) -> void:
 	_billboards.append({"tex": tex, "region": region, "pos": pos, "h": h})
 
@@ -196,7 +191,6 @@ func _draw() -> void:
 	for b in loot:
 		if is_instance_valid(b):
 			_shadow(b.global_position, 11.0)
-	# Corps des gardes abattus (au sol, sous les acteurs debout).
 	for c in _corpses:
 		_draw_corpse(c)
 
@@ -220,13 +214,10 @@ func _draw() -> void:
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
 		match it["kind"]:
-			"wall":
-				var wd: Dictionary = it["data"]
-				var wh: float = 16.0 if wd.get("low", false) else Iso.WALL_HEIGHT
-				_draw_box(wd["rect"], wh, wd["outer"])
+			"wall": _draw_wall(it["data"])
 			"bb":
 				var d: Dictionary = it["data"]
-				_billboard(d["tex"], d["region"], d["pos"], d["h"])
+				_draw_prop(d["type"], d["pos"], d["h"])
 			"safe": _draw_safe()
 			"loot": _draw_loot(it["node"])
 			"guard": _draw_guard(it["node"])
@@ -235,8 +226,6 @@ func _draw() -> void:
 	_draw_bullets()
 	_draw_objective_arrow()
 	_draw_vignette()
-
-
 ## Flèche d'objectif au-dessus du joueur : pointe vers le butin le plus proche,
 ## sinon le coffre, sinon la sortie. Rend l'objectif évident.
 func _draw_objective_arrow() -> void:
@@ -350,46 +339,49 @@ func _lamp(world_pos: Vector2) -> void:
 
 # --- Sol texturé (dalles iso) ---
 
+# --- Sol : parquet bois bicolore (propre, lisible) ---
 func _draw_floor() -> void:
-	var cell := 132.0
+	var cell := 116.0
 	var y := floor_rect.position.y
+	var row := 0
 	while y < floor_rect.end.y - 1.0:
 		var x := floor_rect.position.x
+		var col := 0
 		while x < floor_rect.end.x - 1.0:
 			var w: float = min(cell, floor_rect.end.x - x)
 			var h: float = min(cell, floor_rect.end.y - y)
-			_floor_tile(x, y, w, h)
+			_floor_tile(x, y, w, h, (row + col) % 2 == 0)
 			x += cell
+			col += 1
 		y += cell
-	draw_polyline(_closed(_rect_diamond(floor_rect)), Color(0.45, 0.34, 0.22), 2.0)
-
-
-func _floor_tile(x: float, y: float, w: float, h: float) -> void:
+		row += 1
+	draw_polyline(_closed(_rect_diamond(floor_rect)), Color(0.32, 0.21, 0.12), 3.0)
+func _floor_tile(x: float, y: float, w: float, h: float, even: bool) -> void:
 	var pts := PackedVector2Array([
-		Iso.project(Vector2(x, y)),
-		Iso.project(Vector2(x + w, y)),
-		Iso.project(Vector2(x + w, y + h)),
-		Iso.project(Vector2(x, y + h)),
-	])
-	var p := R_FLOOR.position
-	var s := R_FLOOR.size
-	var uvs := PackedVector2Array([
-		p / TEX,
-		Vector2(p.x + s.x, p.y) / TEX,
-		Vector2(p.x + s.x, p.y + s.y) / TEX,
-		Vector2(p.x, p.y + s.y) / TEX,
-	])
-	draw_colored_polygon(pts, Color.WHITE, uvs, SHEET_BUILD)
-
-
+		Iso.project(Vector2(x, y)), Iso.project(Vector2(x + w, y)),
+		Iso.project(Vector2(x + w, y + h)), Iso.project(Vector2(x, y + h))])
+	var base := Color(0.61, 0.45, 0.28) if even else Color(0.55, 0.39, 0.24)
+	draw_colored_polygon(pts, base)
+	# Lames : deux fentes parallèles + liseré pour lire le parquet.
+	draw_line(Iso.project(Vector2(x, y + h * 0.5)), Iso.project(Vector2(x + w, y + h * 0.5)),
+		base.darkened(0.14), 1.0)
+	draw_polyline(_closed(pts), base.darkened(0.18), 1.0)
+# --- Sortie : paillasson vert + chambranle en bois + panneau SORTIE ---
 func _draw_exit() -> void:
-	var r := Rect2(exit_zone.global_position - Vector2(46, 46), Vector2(92, 92))
+	var pos: Vector2 = exit_zone.global_position
+	var U := Vector2(0, -1)
+	var r := Rect2(pos - Vector2(48, 48), Vector2(96, 96))
 	var poly := _rect_diamond(r)
-	draw_colored_polygon(poly, Color(0.20, 0.65, 0.25, 0.85))
-	draw_polyline(_closed(poly), Color(0.15, 0.5, 0.2), 3.0)
-	_text_centered("SORTIE", Iso.project(exit_zone.global_position), 16, Color(0.95, 1, 0.9))
-
-
+	draw_colored_polygon(poly, Color(0.22, 0.55, 0.26, 0.80))
+	draw_polyline(_closed(poly), Color(0.40, 0.85, 0.42), 3.0)
+	var inner := _rect_diamond(Rect2(pos - Vector2(30, 30), Vector2(60, 60)))
+	draw_polyline(_closed(inner), Color(0.65, 0.95, 0.6, 0.7), 1.5)
+	# Flèche pulsée vers le haut.
+	var bob := sin(Time.get_ticks_msec() * 0.005) * 2.0
+	var a := Iso.project(pos) + Vector2(0, -10 + bob)
+	draw_colored_polygon(PackedVector2Array([
+		a + Vector2(-9, 0), a + Vector2(9, 0), a + Vector2(0, -12)]), Color(0.5, 1.0, 0.5))
+	_text_centered("SORTIE", Iso.project(pos) + Vector2(0, 6), 15, Color(0.92, 1.0, 0.9))
 # --- Cônes de vision ---
 
 func _draw_cones() -> void:
@@ -421,25 +413,96 @@ func _draw_cones() -> void:
 
 # --- Coffre & butin texturés ---
 
+## Porte de coffre principale : GRANDE porte ronde en acier, volant à rayons,
+## rivets, charnières, or — pièce maîtresse de la scène.
 func _draw_safe() -> void:
-	_billboard(SHEET_OBJ, R_SAFE, safe.global_position, 80.0)
-	var head := Iso.project(safe.global_position) + Vector2(0, -86.0)
-	if safe._is_open:
+	var base := Iso.project(safe.global_position)
+	var U := Vector2(0, -1)
+	var opened: bool = safe._is_open
+	var steel := Color(0.45, 0.48, 0.53)
+	var steel_d := Color(0.28, 0.31, 0.36)
+	var gold := Color(0.92, 0.78, 0.34)
+	# Encadrement (niche en pierre/béton).
+	var fw := 60.0
+	var fh := 116.0
+	var fL := base + Vector2(-fw, 0)
+	var fR := base + Vector2(fw, 0)
+	draw_colored_polygon(PackedVector2Array([fL, fR, fR + U * fh, fL + U * fh]), Color(0.50, 0.43, 0.32))
+	draw_colored_polygon(PackedVector2Array([
+		fL + U * (fh - 12), fR + U * (fh - 12), fR + U * fh, fL + U * fh]), Color(0.40, 0.34, 0.25))
+	# Renfoncement métallique sombre.
+	var iw := 48.0
+	var dL := base + Vector2(-iw, 0) + U * 8
+	var dR := base + Vector2(iw, 0) + U * 8
+	draw_colored_polygon(PackedVector2Array([dL, dR, dR + U * 96, dL + U * 96]), steel_d.darkened(0.35))
+	var c := base + U * 56.0
+	if opened:
+		# Intérieur doré révélé + porte entrebâillée.
+		for i in range(5):
+			draw_circle(c, 44.0 - i * 8, Color(1.0, 0.85, 0.40, 0.09))
+		for gx in [-22, -8, 6, 20]:
+			for gy in [0, -10, -20]:
+				draw_rect(Rect2(c + Vector2(gx - 5, gy - 3), Vector2(11, 6)), gold.darkened(0.05 + 0.02 * gy))
+		c += Vector2(34, 0)   # porte poussée sur le côté
+	# Disque de la porte.
+	draw_circle(c + Vector2(2, 2), 40.0, Color(0, 0, 0, 0.25))
+	draw_circle(c, 40.0, steel)
+	draw_arc(c, 40.0, 0, TAU, 32, steel_d, 2.5)
+	# Couronne de rivets.
+	for k in range(20):
+		var a := TAU * k / 20.0
+		draw_circle(c + Vector2(cos(a), sin(a)) * 35.0, 1.8, steel_d)
+	draw_circle(c, 30.0, steel.lightened(0.06))
+	draw_arc(c, 26.0, 0, TAU, 28, gold, 2.0)
+	draw_circle(c, 19.0, steel_d.lightened(0.05))
+	# Volant à rayons.
+	for k in range(6):
+		var d := Vector2.RIGHT.rotated(TAU * k / 6.0)
+		draw_line(c, c + d * 17.0, gold, 3.0)
+		draw_circle(c + d * 17.0, 2.4, gold.darkened(0.1))
+	draw_arc(c, 17.0, 0, TAU, 24, gold, 2.0)
+	draw_circle(c, 6.5, gold)
+	draw_circle(c, 3.0, steel_d)
+	# Charnières (côté gauche du cadre).
+	for hy in [0.3, 0.7]:
+		draw_rect(Rect2(base + Vector2(-iw - 4, 0) + U * (96 * hy + 8), Vector2(8, 14)), steel_d)
+	# Plaque-nom.
+	var plate := base + U * (fh - 6)
+	_text_centered("BANQUE", plate, 13, gold.lightened(0.15))
+	# Progression / état (au-dessus).
+	var head := Iso.project(safe.global_position) + Vector2(0, -fh - 6.0)
+	if opened:
 		_text_centered("OUVERT", head, 14, Color(0.95, 0.9, 0.4))
 	else:
 		var prog: float = safe._progress
 		if safe._player_in_range or prog > 0.0:
-			var w := 60.0
+			var w := 64.0
 			draw_rect(Rect2(head + Vector2(-w * 0.5, -4), Vector2(w, 8)), Color(0, 0, 0, 0.65))
 			draw_rect(Rect2(head + Vector2(-w * 0.5, -4), Vector2(w * prog, 8)), Color(0.95, 0.8, 0.2))
 			if prog <= 0.01:
 				_text_centered("Maintiens E", head + Vector2(0, -10), 13, Color(1, 1, 1))
-
-
+## Butin : sac de toile rebondi avec $ + pièces d'or, légère lueur et flottement.
 func _draw_loot(node: Node) -> void:
-	_billboard(SHEET_OBJ, R_LOOT, node.global_position, 52.0)
-
-
+	var base := Iso.project(node.global_position)
+	var U := Vector2(0, -1)
+	var bob := sin(Time.get_ticks_msec() * 0.004 + base.x * 0.05) * 1.5
+	var b := base + Vector2(0, bob)
+	var gold := Color(0.92, 0.78, 0.34)
+	for i in range(3):
+		draw_circle(b + U * 10, 17.0 - i * 4, Color(1.0, 0.85, 0.35, 0.10))
+	# Pièces au sol.
+	for off in [Vector2(-9, 0), Vector2(9, -1), Vector2(0, 2)]:
+		draw_colored_polygon(_ellipse(b + off, 4, 2.3), gold)
+	# Corps du sac.
+	var burlap := Color(0.80, 0.67, 0.42)
+	draw_colored_polygon(_ellipse(b + U * 9, 12, 10), burlap)
+	draw_colored_polygon(_ellipse(b + U * 7, 12, 10), burlap)
+	draw_colored_polygon(_ellipse(b + U * 17, 8, 6), burlap.lightened(0.06))
+	# Col noué.
+	draw_line(b + U * 21, b + U * 25, Color(0.40, 0.28, 0.16), 2.5)
+	draw_colored_polygon(_ellipse(b + U * 22, 5, 2.5), Color(0.55, 0.40, 0.22))
+	# Symbole $.
+	_text_centered("$", b + U * 11, 15, Color(0.45, 0.30, 0.12))
 # --- Acteurs (planche personnages si présente, sinon formes) ---
 
 func _draw_player() -> void:
@@ -523,6 +586,357 @@ func _ellipse(center: Vector2, rx: float, ry: float) -> PackedVector2Array:
 		var t := TAU * float(i) / 18.0
 		pts.append(center + Vector2(cos(t) * rx, sin(t) * ry))
 	return pts
+
+
+
+## Hauteur par défaut d'un prop selon son type.
+func _default_h(t: String) -> float:
+	match t:
+		"counter": return 34.0
+		"vault": return 96.0
+		"desk": return 30.0
+		"barrel": return 40.0
+		"crate": return 38.0
+		"shelf": return 78.0
+		"plant": return 56.0
+		"chair": return 36.0
+		"money": return 18.0
+		"poster": return 46.0
+		"lamp": return 70.0
+		_: return 40.0
+
+
+# --- Aiguillage du rendu d'un prop ---
+func _draw_prop(t: String, pos: Vector2, h: float) -> void:
+	match t:
+		"crate": _draw_crate(pos, h)
+		"barrel": _draw_barrel(pos, h)
+		"desk": _draw_desk(pos)
+		"counter": _draw_counter_cage(pos)
+		"vault": _draw_strongbox(pos)
+		"shelf": _draw_shelf(pos)
+		"plant": _draw_plant(pos)
+		"chair": _draw_chair(pos)
+		"money": _draw_money(pos)
+		"poster": _draw_poster(pos)
+		"lamp": _draw_floor_lamp(pos)
+		_: _draw_crate(pos, h)
+
+
+## Boîte iso générique : faces est/sud + dessus, contour léger.
+func _iso_box(r: Rect2, h: float, top: Color, east: Color, south: Color) -> void:
+	var b0 := Iso.project(r.position)
+	var b1 := Iso.project(Vector2(r.end.x, r.position.y))
+	var b2 := Iso.project(r.end)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
+	var up := Vector2(0, -h)
+	draw_colored_polygon(PackedVector2Array([b3, b2, b2 + up, b3 + up]), south)
+	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + up, b1 + up]), east)
+	var topq := PackedVector2Array([b0 + up, b1 + up, b2 + up, b3 + up])
+	draw_colored_polygon(topq, top)
+	draw_polyline(_closed(topq), top.darkened(0.28), 1.0)
+
+
+## Caisse en bois cartoon : planches + croix de renfort + ferrures.
+func _draw_crate(pos: Vector2, h: float) -> void:
+	var r := Rect2(pos - Vector2(17, 17), Vector2(34, 34))
+	var wood := Color(0.74, 0.55, 0.32)
+	_iso_box(r, h, wood.lightened(0.10), wood.darkened(0.20), wood)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
+	var b2 := Iso.project(r.end)
+	var up := Vector2(0, -h)
+	# Croix sur la face sud.
+	draw_line(b3, b2 + up, wood.darkened(0.30), 1.5)
+	draw_line(b2, b3 + up, wood.darkened(0.30), 1.5)
+	draw_line((b3 + b2) * 0.5, (b3 + b2) * 0.5 + up, wood.darkened(0.22), 1.0)
+	# Ferrures aux coins.
+	for cc in [b3, b2, b3 + up, b2 + up]:
+		draw_circle(cc, 1.6, Color(0.30, 0.22, 0.14))
+
+
+## Tonneau : douves galbées, cerclages, dessus elliptique.
+func _draw_barrel(pos: Vector2, h: float) -> void:
+	var base := Iso.project(pos)
+	var w := 14.0
+	var bulge := 3.0
+	var top := base + Vector2(0, -h)
+	var wood := Color(0.56, 0.37, 0.20)
+	draw_colored_polygon(PackedVector2Array([
+		base + Vector2(-w, 0), base + Vector2(-w - bulge, -h * 0.5), base + Vector2(-w, -h),
+		top, base]), wood.darkened(0.16))
+	draw_colored_polygon(PackedVector2Array([
+		base, top, base + Vector2(w, -h), base + Vector2(w + bulge, -h * 0.5), base + Vector2(w, 0)]), wood)
+	for sx in [-0.5, 0.0, 0.5]:
+		draw_line(base + Vector2(w * sx, -3), base + Vector2(w * sx, -h + 3), wood.darkened(0.28), 1.0)
+	for cy in [-4.0, -h * 0.5, -h + 4.0]:
+		var ww: float = (w + bulge) if cy == -h * 0.5 else w + 1.0
+		draw_line(base + Vector2(-ww, cy), base + Vector2(ww, cy), Color(0.32, 0.24, 0.17), 2.0)
+	var lid := PackedVector2Array()
+	for i in range(13):
+		var a := TAU * float(i) / 12.0
+		lid.append(top + Vector2(cos(a) * w, sin(a) * w * 0.42))
+	draw_colored_polygon(lid, wood.lightened(0.12))
+	draw_polyline(lid, wood.darkened(0.3), 1.0)
+
+
+## Bureau d'employé : plateau feutré, registre, lampe de banquier, tiroirs.
+func _draw_desk(pos: Vector2) -> void:
+	var r := Rect2(pos - Vector2(35, 21), Vector2(70, 42))
+	var wood := Color(0.46, 0.31, 0.17)
+	var hh := 30.0
+	_iso_box(r, hh, wood.lightened(0.06), wood.darkened(0.2), wood)
+	var b0 := Iso.project(r.position)
+	var b1 := Iso.project(Vector2(r.end.x, r.position.y))
+	var b2 := Iso.project(r.end)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
+	var up := Vector2(0, -hh)
+	# Plateau feutré vert.
+	var topq := PackedVector2Array([b0 + up, b1 + up, b2 + up, b3 + up])
+	var felt := PackedVector2Array()
+	var ctr := (b0 + b1 + b2 + b3) * 0.25 + up
+	for q in topq:
+		felt.append(ctr.lerp(q, 0.72))
+	draw_colored_polygon(felt, Color(0.20, 0.42, 0.28))
+	# Registre + parchemin.
+	draw_colored_polygon(_ellipse(ctr + Vector2(-6, -1), 6, 4), Color(0.85, 0.80, 0.66))
+	draw_colored_polygon(_ellipse(ctr + Vector2(5, 1), 5, 3.5), Color(0.55, 0.18, 0.14))
+	# Lampe de banquier (abat-jour vert + lueur).
+	var lp := ctr + Vector2(9, -5)
+	draw_circle(lp, 9.0, Color(1.0, 0.85, 0.45, 0.10))
+	draw_line(lp, lp + Vector2(0, 6), Color(0.85, 0.7, 0.3), 1.5)
+	draw_colored_polygon(_ellipse(lp + Vector2(0, -3), 5, 3), Color(0.16, 0.42, 0.24))
+	draw_circle(lp + Vector2(0, -1), 1.6, Color(1.0, 0.92, 0.6))
+	# Tiroirs (face sud) + poignées.
+	draw_line((b3 + b2) * 0.5, (b3 + b2) * 0.5 + up, wood.darkened(0.3), 1.0)
+	for v in [0.35, 0.7]:
+		draw_circle((b3.lerp(b2, 0.25)) + up * (hh * v), 1.4, Color(0.9, 0.8, 0.4))
+		draw_circle((b3.lerp(b2, 0.75)) + up * (hh * v), 1.4, Color(0.9, 0.8, 0.4))
+
+
+## Cage de guichet (laiton) + plaque BANK, posée sur le comptoir.
+func _draw_counter_cage(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	var U := Vector2(0, -1)
+	var brass := Color(0.85, 0.68, 0.28)
+	var top := 34.0       # hauteur du comptoir
+	var cageh := 30.0
+	var hw := 30.0
+	var L := base + Vector2(-hw, 0) + U * top
+	var R := base + Vector2(hw, 0) + U * top
+	# Montants + traverse.
+	draw_line(L, L + U * cageh, brass.darkened(0.2), 3.0)
+	draw_line(R, R + U * cageh, brass.darkened(0.2), 3.0)
+	draw_line(L + U * cageh, R + U * cageh, brass.darkened(0.2), 3.0)
+	# Barreaux.
+	for i in range(1, 7):
+		var u := float(i) / 7.0
+		draw_line(L.lerp(R, u), L.lerp(R, u) + U * cageh, brass, 1.5)
+	# Guichet (ouverture basse).
+	draw_colored_polygon(PackedVector2Array([
+		L.lerp(R, 0.32), L.lerp(R, 0.68), L.lerp(R, 0.68) + U * 10, L.lerp(R, 0.32) + U * 10]),
+		Color(0.10, 0.08, 0.06, 0.5))
+	# Plaque BANK dorée.
+	var plate := base + U * (top + cageh + 7)
+	draw_rect(Rect2(plate + Vector2(-26, -8), Vector2(52, 16)), Color(0.30, 0.20, 0.10))
+	draw_rect(Rect2(plate + Vector2(-26, -8), Vector2(52, 16)), brass, false, 1.5)
+	_text_centered("BANK", plate + Vector2(0, 5), 13, brass.lightened(0.2))
+
+
+## Coffre-fort secondaire (strongbox) : caisson métallique à petite porte ronde.
+func _draw_strongbox(pos: Vector2) -> void:
+	var r := Rect2(pos - Vector2(26, 18), Vector2(52, 36))
+	var steel := Color(0.40, 0.43, 0.48)
+	var hh := 56.0
+	_iso_box(r, hh, steel.lightened(0.08), steel.darkened(0.22), steel)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
+	var b2 := Iso.project(r.end)
+	var up := Vector2(0, -hh)
+	var c := (b3 + b2) * 0.5 + up * 0.55
+	draw_circle(c, 11.0, steel.darkened(0.18))
+	draw_circle(c, 8.0, steel.lightened(0.05))
+	var gold := Color(0.90, 0.76, 0.32)
+	for k in range(4):
+		var d := Vector2.RIGHT.rotated(TAU * k / 4.0 + 0.4)
+		draw_line(c, c + d * 7.0, gold, 1.5)
+	draw_circle(c, 2.6, gold)
+	# Rivets.
+	for cc in [b3 + up, b2 + up]:
+		draw_circle(cc + Vector2(0, 3), 1.4, steel.darkened(0.3))
+
+
+## Étagère / registres : meuble haut avec rayonnages, livres et sacs d'or.
+func _draw_shelf(pos: Vector2) -> void:
+	var r := Rect2(pos - Vector2(34, 12), Vector2(68, 24))
+	var wood := Color(0.42, 0.28, 0.16)
+	var hh := 78.0
+	_iso_box(r, hh, wood.lightened(0.05), wood.darkened(0.22), wood)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
+	var b2 := Iso.project(r.end)
+	var up := Vector2(0, -hh)
+	# Rayonnages + livres colorés.
+	var books := [Color(0.70, 0.25, 0.20), Color(0.25, 0.45, 0.55), Color(0.80, 0.62, 0.25),
+		Color(0.35, 0.50, 0.32), Color(0.55, 0.30, 0.45)]
+	for s in [0.32, 0.62, 0.9]:
+		var sf := float(s)
+		var sl: Vector2 = b3 + up * (hh * sf)
+		var sr: Vector2 = b2 + up * (hh * sf)
+		draw_line(sl, sr, wood.darkened(0.3), 2.0)
+		for i in range(6):
+			var u := (float(i) + 0.5) / 6.0
+			var bp: Vector2 = sl.lerp(sr, u)
+			draw_rect(Rect2(bp + Vector2(-2.5, -10), Vector2(5, 10)), books[(i + int(sf * 10)) % books.size()])
+	# Sacs d'or sur l'étagère du bas.
+	for u in [0.25, 0.75]:
+		var gp := b3.lerp(b2, u) + up * (hh * 0.16)
+		draw_colored_polygon(_ellipse(gp, 6, 4.5), Color(0.80, 0.66, 0.40))
+		_text_centered("$", gp + Vector2(0, 3), 10, Color(0.5, 0.34, 0.14))
+
+
+## Plante en pot (cactus/fougère décorative).
+func _draw_plant(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	var U := Vector2(0, -1)
+	# Pot.
+	var pot := Color(0.66, 0.36, 0.22)
+	draw_colored_polygon(PackedVector2Array([
+		base + Vector2(-9, 0), base + Vector2(9, 0), base + Vector2(7, -14), base + Vector2(-7, -14)]), pot)
+	draw_colored_polygon(_ellipse(base + U * 14, 8, 3), pot.lightened(0.1))
+	# Feuillage (plusieurs lobes verts).
+	var green := Color(0.28, 0.5, 0.28)
+	for ang in [-0.6, -0.2, 0.2, 0.6]:
+		var tip := base + U * 14 + Vector2(sin(ang) * 16, -1) + U * (26.0 * cos(ang))
+		draw_line(base + U * 14, tip, green.darkened(0.1), 3.0)
+		draw_colored_polygon(_ellipse(tip, 4, 6), green)
+	draw_colored_polygon(_ellipse(base + U * 30, 6, 7), green.lightened(0.05))
+
+
+## Chaise en bois (dossier + assise).
+func _draw_chair(pos: Vector2) -> void:
+	var r := Rect2(pos - Vector2(11, 11), Vector2(22, 22))
+	var wood := Color(0.50, 0.33, 0.18)
+	_iso_box(r, 16.0, wood.lightened(0.05), wood.darkened(0.2), wood)
+	var b0 := Iso.project(r.position)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
+	var up := Vector2(0, -16)
+	# Dossier (au fond).
+	draw_colored_polygon(PackedVector2Array([
+		b0 + up, b0 + up + Vector2(0, -16),
+		(b3 + up).lerp(b0 + up, 0.0) + Vector2(0, 0)]), wood)
+	draw_line(b0 + up, b0 + up + Vector2(0, -16), wood.darkened(0.2), 3.0)
+
+
+## Pile de billets / sacs d'or (butin décoratif derrière le comptoir).
+func _draw_money(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	var gold := Color(0.92, 0.78, 0.34)
+	# Lueur dorée.
+	for i in range(3):
+		draw_circle(base + Vector2(0, -6), 14.0 - i * 4, Color(1.0, 0.85, 0.35, 0.08))
+	# Liasses empilées.
+	for i in range(3):
+		var y := -i * 5.0
+		draw_colored_polygon(_ellipse(base + Vector2(-5, y), 7, 3.5), Color(0.55, 0.72, 0.45))
+		draw_line(base + Vector2(-12, y), base + Vector2(2, y), Color(0.35, 0.5, 0.3), 1.0)
+	# Pièces d'or.
+	for off in [Vector2(7, -1), Vector2(11, -3), Vector2(8, -5)]:
+		draw_colored_polygon(_ellipse(base + off, 4, 2.4), gold)
+		draw_polyline(_closed(_ellipse(base + off, 4, 2.4)), gold.darkened(0.25), 1.0)
+
+
+## Affiche WANTED debout (panneau cloué).
+func _draw_poster(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	var U := Vector2(0, -1)
+	var paper := Color(0.86, 0.78, 0.58)
+	var w := 22.0
+	var top := 46.0
+	var bot := 16.0
+	var L := base + Vector2(-w * 0.5, 0)
+	var Rr := base + Vector2(w * 0.5, 0)
+	draw_colored_polygon(PackedVector2Array([
+		L + U * bot, Rr + U * bot, Rr + U * top, L + U * top]), paper)
+	draw_polyline(_closed(PackedVector2Array([
+		L + U * bot, Rr + U * bot, Rr + U * top, L + U * top])), Color(0.45, 0.32, 0.18), 1.5)
+	_text_centered("WANTED", base + U * (top - 6), 9, Color(0.35, 0.20, 0.12))
+	draw_colored_polygon(_ellipse(base + U * ((top + bot) * 0.5), 6, 7), Color(0.55, 0.40, 0.26))
+	_text_centered("$$$", base + U * (bot + 6), 9, Color(0.4, 0.25, 0.12))
+
+
+## Lampadaire / lampe à pétrole sur pied (lueur chaude).
+func _draw_floor_lamp(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	var U := Vector2(0, -1)
+	draw_line(base, base + U * 56, Color(0.25, 0.18, 0.10), 3.0)
+	var head := base + U * 58
+	for i in range(4):
+		draw_circle(head, 22.0 - i * 5, Color(1.0, 0.84, 0.42, 0.07))
+	draw_colored_polygon(_ellipse(head, 6, 7), Color(0.85, 0.7, 0.35))
+	draw_circle(head, 3.0, Color(1.0, 0.92, 0.6))
+
+
+## Mur : intérieur en plâtre + plinthe/corniche bois, ou extérieur en brique.
+## Les murs "low" (drapeau) deviennent un vrai comptoir bois avec plateau verni.
+func _draw_wall(wd: Dictionary) -> void:
+	var r: Rect2 = wd["rect"]
+	if wd.get("low", false):
+		_draw_counter_base(r)
+		return
+	var outer: bool = wd.get("outer", false)
+	var h := Iso.WALL_HEIGHT
+	var b0 := Iso.project(r.position)
+	var b1 := Iso.project(Vector2(r.end.x, r.position.y))
+	var b2 := Iso.project(r.end)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
+	var up := Vector2(0, -h)
+	var face := Color(0.50, 0.30, 0.22) if outer else Color(0.82, 0.74, 0.60)
+	var faceE := face.darkened(0.12)
+	# Faces.
+	draw_colored_polygon(PackedVector2Array([b3, b2, b2 + up, b3 + up]), face)
+	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + up, b1 + up]), faceE)
+	if outer:
+		# Assises de brique.
+		for k in range(1, 4):
+			var vy := -h * float(k) / 4.0
+			draw_line(b3 + Vector2(0, vy), b2 + Vector2(0, vy), face.darkened(0.18), 1.0)
+			draw_line(b1 + Vector2(0, vy), b2 + Vector2(0, vy), face.darkened(0.18), 1.0)
+	else:
+		# Plinthe bois en bas + liseré bois en haut (lambris de banque).
+		var base_col := Color(0.42, 0.28, 0.16)
+		draw_colored_polygon(PackedVector2Array([b3, b2, b2 + Vector2(0, -7), b3 + Vector2(0, -7)]), base_col)
+		draw_colored_polygon(PackedVector2Array([b1, b2, b2 + Vector2(0, -7), b1 + Vector2(0, -7)]), base_col.darkened(0.1))
+		draw_line(b3 + up + Vector2(0, 5), b2 + up + Vector2(0, 5), base_col, 2.0)
+		draw_line(b1 + up + Vector2(0, 5), b2 + up + Vector2(0, 5), base_col.darkened(0.1), 2.0)
+	# Dessus + arête.
+	var topq := PackedVector2Array([b0 + up, b1 + up, b2 + up, b3 + up])
+	draw_colored_polygon(topq, face.lightened(0.10) if not outer else Color(0.60, 0.40, 0.30))
+	draw_polyline(_closed(topq), face.darkened(0.30), 1.0)
+
+
+## Comptoir de guichets (base des murs "low") : meuble bois à plateau verni.
+func _draw_counter_base(r: Rect2) -> void:
+	var hh := 32.0
+	var wood := Color(0.52, 0.34, 0.18)
+	var b0 := Iso.project(r.position)
+	var b1 := Iso.project(Vector2(r.end.x, r.position.y))
+	var b2 := Iso.project(r.end)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
+	var up := Vector2(0, -hh)
+	# Corps.
+	draw_colored_polygon(PackedVector2Array([b3, b2, b2 + up, b3 + up]), wood)
+	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + up, b1 + up]), wood.darkened(0.16))
+	# Panneaux moulurés (face sud).
+	var segs := maxi(2, int(b3.distance_to(b2) / 26.0))
+	for i in range(segs):
+		var u0 := (float(i) + 0.16) / segs
+		var u1 := (float(i) + 0.84) / segs
+		draw_polyline(_closed(PackedVector2Array([
+			b3.lerp(b2, u0) + up * 0.3, b3.lerp(b2, u1) + up * 0.3,
+			b3.lerp(b2, u1) + up * 0.85, b3.lerp(b2, u0) + up * 0.85])), wood.darkened(0.28), 1.0)
+	# Plateau verni qui déborde un peu (overhang).
+	var ov := Vector2(0, 4)
+	var topq := PackedVector2Array([b0 + up, b1 + up, b2 + up + ov, b3 + up + ov])
+	draw_colored_polygon(topq, Color(0.62, 0.42, 0.22))
+	draw_polyline(_closed(topq), Color(0.78, 0.60, 0.34), 1.5)
 
 
 # --- Primitives ---
