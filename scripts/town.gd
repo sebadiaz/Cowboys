@@ -619,53 +619,82 @@ func _horse(world_pos: Vector2) -> void:
 	draw_circle(head + Vector2(-2, -1), 1.0, Color(0.05, 0.04, 0.03))   # œil
 
 
-## Bâtiment dessiné en VOLUME iso (boîte 3D) : sa base = exactement l'empreinte
-## de collision. Murs + planches + porte + fenêtres + toit en pointe + enseigne.
+## Bâtiment western "false front" (devanture plate haute typique du Far West) :
+## corps en volume + fausse façade + bardage + fenêtres à carreaux + porte +
+## auvent sur poteaux + enseigne. Base = empreinte de collision exacte.
 func _draw_building(b: Dictionary) -> void:
 	var fr: Rect2 = b["foot"]
 	var tint: Color = b["tint"]
-	var wall := _tinted(Color(0.55, 0.38, 0.21), tint)
-	var wall_h: float = clampf(float(b["h"]) * 0.58, 95.0, 175.0)
-	var roof_h: float = wall_h * 0.55
-	var up := Vector2(0, -wall_h)
+	var wood := _tinted(Color(0.60, 0.43, 0.25), tint)
+	var wood_d := wood.darkened(0.24)
+	var U := Vector2(0, -1)                         # vecteur "vers le haut" (1 px)
+	var wall_h: float = clampf(float(b["h"]) * 0.5, 82.0, 130.0)
+	var false_h: float = wall_h + 46.0
 	var b0 := Iso.project(fr.position)
 	var b1 := Iso.project(Vector2(fr.end.x, fr.position.y))
 	var b2 := Iso.project(fr.end)
 	var b3 := Iso.project(Vector2(fr.position.x, fr.end.y))
-	# Ombre au sol sur l'empreinte.
-	draw_colored_polygon(PackedVector2Array([b0, b1, b2, b3]), Color(0, 0, 0, 0.14))
-	# Faces visibles (est = b1-b2, sud = b3-b2).
-	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + up, b1 + up]), wall.darkened(0.22))
-	draw_colored_polygon(PackedVector2Array([b3, b2, b2 + up, b3 + up]), wall)
-	# Planches verticales (texture) sur la façade sud.
-	for u in [0.2, 0.4, 0.6, 0.8]:
-		var pl := b3.lerp(b2, u)
-		draw_line(pl, pl + up, wall.darkened(0.3), 1.0)
-	# Porte (façade sud) — plus chaude si le bâtiment est entrable.
-	var door := Color(0.30, 0.17, 0.07) if b["enter"] != "" else Color(0.16, 0.09, 0.05)
-	_face_quad(b3, b2, up, 0.41, 0.59, 0.0, 0.48, door)
-	_face_quad(b3, b2, up, 0.44, 0.56, 0.46, 0.5, Color(0.5, 0.35, 0.18))  # linteau
-	# Fenêtres éclairées.
-	for wx in [0.16, 0.84]:
-		_face_quad(b3, b2, up, wx - 0.07, wx + 0.07, 0.52, 0.74, Color(0.95, 0.85, 0.45))
-		_face_quad(b3, b2, up, wx - 0.07, wx + 0.07, 0.52, 0.74, Color(0.3, 0.2, 0.1), false)
-	# Toit en pointe (hip roof) vers un apex central.
-	var t0 := b0 + up
-	var t1 := b1 + up
-	var t2 := b2 + up
-	var t3 := b3 + up
-	var apex := (t0 + t1 + t2 + t3) * 0.25 + Vector2(0, -roof_h)
-	var roof := _tinted(Color(0.46, 0.22, 0.14), tint)
-	draw_colored_polygon(PackedVector2Array([t0, t1, apex]), roof.darkened(0.3))   # nord
-	draw_colored_polygon(PackedVector2Array([t0, t3, apex]), roof.darkened(0.18))  # ouest
-	draw_colored_polygon(PackedVector2Array([t1, t2, apex]), roof.darkened(0.1))   # est
-	draw_colored_polygon(PackedVector2Array([t3, t2, apex]), roof)                 # sud
-	# Enseigne au-dessus du toit.
-	_sign(apex + Vector2(0, -12), b["label"])
+	var fL := b3                                    # façade sud (face caméra)
+	var fR := b2
+	# Ombre.
+	draw_colored_polygon(PackedVector2Array([b0, b1, b2, b3]), Color(0, 0, 0, 0.16))
+	# Corps : côté est + toit plat (vus derrière la fausse façade).
+	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + U * wall_h, b1 + U * wall_h]), wood_d)
+	draw_colored_polygon(PackedVector2Array([
+		b0 + U * wall_h, b1 + U * wall_h, b2 + U * wall_h, b3 + U * wall_h]),
+		_tinted(Color(0.42, 0.30, 0.20), tint))
+	# Fausse façade plate (le look western).
+	draw_colored_polygon(PackedVector2Array([fL, fR, fR + U * false_h, fL + U * false_h]), wood)
+	# Corniche en haut.
+	draw_colored_polygon(PackedVector2Array([
+		fL + U * (false_h - 9), fR + U * (false_h - 9), fR + U * false_h, fL + U * false_h]), wood_d)
+	draw_line(fL + U * (false_h - 9), fR + U * (false_h - 9), wood.lightened(0.12), 1.5)
+	# Bardage horizontal.
+	for k in range(1, 8):
+		var yy := false_h * float(k) / 8.0
+		draw_line(fL + U * yy, fR + U * yy, wood_d, 1.0)
+	# Fenêtres à carreaux, éclairées.
+	for wx in [0.2, 0.8]:
+		_window(fL, fR, U, wx, wall_h * 0.34, wall_h * 0.62, wood_d)
+	# Porte (battante si le bâtiment est entrable).
+	_door(fL, fR, U, wall_h, wood_d, b["enter"] != "")
+	# Auvent sur 2 poteaux.
+	var av := wall_h * 0.64
+	var out := Vector2(0, 17)
+	draw_colored_polygon(PackedVector2Array([
+		fL + U * av, fR + U * av, fR + U * av + out, fL + U * av + out]), wood_d.darkened(0.12))
+	draw_line(fL + U * av + out, fR + U * av + out, Color(0.2, 0.12, 0.06), 2.0)
+	for pu in [0.08, 0.92]:
+		var pf := fL.lerp(fR, pu)
+		draw_line(pf + U * av + out, pf + out + Vector2(0, -2), wood_d, 3.0)
+	# Enseigne sur la fausse façade, au-dessus de l'auvent.
+	_sign((fL + fR) * 0.5 + U * (av + (false_h - av) * 0.55), b["label"])
 
 
-## Dessine un quad sur une face verticale paramétrée (L,R = base, up = montée).
-## u: position horizontale 0..1 ; v: hauteur 0..1. `filled` false = contour.
+## Fenêtre à 4 carreaux (cadre + vitre + meneaux).
+func _window(L: Vector2, R: Vector2, U: Vector2, u: float, v0: float, v1: float, frame: Color) -> void:
+	_face_quad(L, R, U, u - 0.095, u + 0.095, v0 - 3, v1 + 3, frame)
+	_face_quad(L, R, U, u - 0.075, u + 0.075, v0, v1, Color(0.97, 0.86, 0.45))
+	var mv := (v0 + v1) * 0.5
+	draw_line(L.lerp(R, u) + U * v0, L.lerp(R, u) + U * v1, frame, 1.0)
+	draw_line(L.lerp(R, u - 0.075) + U * mv, L.lerp(R, u + 0.075) + U * mv, frame, 1.0)
+
+
+## Porte (cadre + vantail). Si entrable : double porte battante de saloon.
+func _door(L: Vector2, R: Vector2, U: Vector2, wall_h: float, frame: Color, swing: bool) -> void:
+	var dv := wall_h * 0.5
+	_face_quad(L, R, U, 0.39, 0.61, 0.0, dv + 2, frame)
+	var col := Color(0.34, 0.20, 0.09) if swing else Color(0.14, 0.08, 0.05)
+	_face_quad(L, R, U, 0.42, 0.58, 0.0, dv, col)
+	if swing:
+		draw_line(L.lerp(R, 0.5) + U * (dv * 0.18), L.lerp(R, 0.5) + U * dv, frame.lightened(0.1), 1.5)
+		_face_quad(L, R, U, 0.42, 0.58, 0.0, dv * 0.16, frame)  # battant bas
+	else:
+		draw_circle(L.lerp(R, 0.55) + U * (dv * 0.5), 1.6, Color(0.85, 0.72, 0.3))
+
+
+## Dessine un quad sur une face verticale paramétrée (L,R = base, up unitaire).
+## u: position horizontale 0..1 ; v: hauteur en pixels. `filled` false = contour.
 func _face_quad(L: Vector2, R: Vector2, up: Vector2, u0: float, u1: float,
 		v0: float, v1: float, col: Color, filled := true) -> void:
 	var q := PackedVector2Array([
