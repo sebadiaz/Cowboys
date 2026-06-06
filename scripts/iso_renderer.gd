@@ -55,6 +55,11 @@ var _cam_pos := Vector2.ZERO   # position de caméra lissée (sans le shake)
 func setup() -> void:
 	if ResourceLoader.exists(CHAR_SHEET_PATH):
 		_char_tex = load(CHAR_SHEET_PATH)
+	if not has_node("WarmTint"):
+		var warm := CanvasModulate.new()
+		warm.name = "WarmTint"
+		warm.color = Color(1.0, 0.97, 0.90)
+		add_child(warm)
 	_build_billboards()
 	_apply_zoom()
 	_cam_pos = _camera_target()
@@ -126,7 +131,7 @@ func _level_screen_bounds() -> Rect2:
 		mn = mn.min(p)
 		mx = mx.max(p)
 	# Marge verticale en haut pour la tête/chapeau des personnages (~40 px).
-	mn.y -= 40.0
+	mn.y -= 60.0
 	return Rect2(mn, mx - mn)
 
 
@@ -305,19 +310,37 @@ func _draw_bullets() -> void:
 ## Tapis western et lampes : posés à plat sur le sol (sous les acteurs/props).
 ## Générique : s'adapte à la taille du niveau et à la position du coffre.
 func _draw_decor() -> void:
-	# Tapis prestige devant le coffre.
-	if is_instance_valid(safe):
-		_rug(safe.global_position + Vector2(0, 90), 150, 150,
-				Color(0.55, 0.14, 0.12), Color(0.85, 0.68, 0.25))
-	# Grand tapis au centre du niveau (sous le lustre).
-	_rug(floor_rect.get_center(), 230, 200, Color(0.40, 0.20, 0.30), Color(0.80, 0.62, 0.30))
-	# Lampes d'ambiance réparties le long du bord haut du niveau + côtés.
 	var fr := floor_rect
+	var cx := fr.get_center().x
+	# Tapis rouge d'apparat : long chemin central qui mène à la salle des coffres.
+	if is_instance_valid(safe):
+		var ry0 := fr.position.y + 40.0
+		var ry1 := fr.end.y - 30.0
+		_runner(Vector2(cx, (ry0 + ry1) * 0.5), 150.0, ry1 - ry0,
+				Color(0.58, 0.14, 0.13), Color(0.88, 0.70, 0.28))
+		# Tapis prestige sous la porte du coffre.
+		_rug(safe.global_position + Vector2(0, 96), 200, 150,
+				Color(0.50, 0.12, 0.12), Color(0.90, 0.74, 0.30))
+	else:
+		_rug(fr.get_center(), 230, 200, Color(0.40, 0.20, 0.30), Color(0.80, 0.62, 0.30))
+	# Lampes d'ambiance le long des murs (haut + côtés).
 	var n := maxi(3, int(fr.size.x / 360.0))
 	for i in range(n + 1):
 		_lamp(Vector2(lerpf(fr.position.x + 60.0, fr.end.x - 60.0, float(i) / n), fr.position.y + 8.0))
-	_lamp(Vector2(fr.position.x + 8.0, fr.get_center().y))
-	_lamp(Vector2(fr.end.x - 8.0, fr.get_center().y))
+	for j in range(3):
+		var yy := lerpf(fr.position.y + 120.0, fr.end.y - 80.0, float(j) / 2.0)
+		_lamp(Vector2(fr.position.x + 8.0, yy))
+		_lamp(Vector2(fr.end.x - 8.0, yy))
+
+
+## Long tapis rectangulaire (chemin de coffre) avec bordure et liseré central.
+func _runner(center: Vector2, w: float, h: float, col: Color, accent: Color) -> void:
+	var r := Rect2(center - Vector2(w * 0.5, h * 0.5), Vector2(w, h))
+	var poly := _rect_diamond(r)
+	draw_colored_polygon(poly, col)
+	draw_polyline(_closed(poly), accent, 3.0)
+	var inner := Rect2(center - Vector2(w * 0.5 - 12, h * 0.5 - 12), Vector2(w - 24, h - 24))
+	draw_polyline(_closed(_rect_diamond(inner)), accent.darkened(0.15), 1.5)
 
 
 func _rug(center: Vector2, w: float, h: float, col: Color, accent: Color) -> void:
@@ -339,9 +362,10 @@ func _lamp(world_pos: Vector2) -> void:
 
 # --- Sol texturé (dalles iso) ---
 
-# --- Sol : parquet bois bicolore (propre, lisible) ---
+# --- Sol : marbre clair (salle des coffres) + parquet chaud (hall) ---
 func _draw_floor() -> void:
-	var cell := 116.0
+	var cell := 110.0
+	var split := floor_rect.position.y + floor_rect.size.y * 0.46   # marbre derrière
 	var y := floor_rect.position.y
 	var row := 0
 	while y < floor_rect.end.y - 1.0:
@@ -350,22 +374,33 @@ func _draw_floor() -> void:
 		while x < floor_rect.end.x - 1.0:
 			var w: float = min(cell, floor_rect.end.x - x)
 			var h: float = min(cell, floor_rect.end.y - y)
-			_floor_tile(x, y, w, h, (row + col) % 2 == 0)
+			var marble := (y + h * 0.5) < split
+			_floor_tile(x, y, w, h, (row + col) % 2 == 0, marble)
 			x += cell
 			col += 1
 		y += cell
 		row += 1
-	draw_polyline(_closed(_rect_diamond(floor_rect)), Color(0.32, 0.21, 0.12), 3.0)
-func _floor_tile(x: float, y: float, w: float, h: float, even: bool) -> void:
+	draw_polyline(_closed(_rect_diamond(floor_rect)), Color(0.30, 0.20, 0.12), 3.0)
+
+
+func _floor_tile(x: float, y: float, w: float, h: float, even: bool, marble: bool) -> void:
 	var pts := PackedVector2Array([
 		Iso.project(Vector2(x, y)), Iso.project(Vector2(x + w, y)),
 		Iso.project(Vector2(x + w, y + h)), Iso.project(Vector2(x, y + h))])
-	var base := Color(0.61, 0.45, 0.28) if even else Color(0.55, 0.39, 0.24)
-	draw_colored_polygon(pts, base)
-	# Lames : deux fentes parallèles + liseré pour lire le parquet.
-	draw_line(Iso.project(Vector2(x, y + h * 0.5)), Iso.project(Vector2(x + w, y + h * 0.5)),
-		base.darkened(0.14), 1.0)
-	draw_polyline(_closed(pts), base.darkened(0.18), 1.0)
+	var base: Color
+	if marble:
+		base = Color(0.88, 0.84, 0.76) if even else Color(0.76, 0.72, 0.66)
+		draw_colored_polygon(pts, base)
+		draw_polyline(_closed(pts), Color(0.62, 0.60, 0.56), 1.0)
+		# veinage discret.
+		draw_line(Iso.project(Vector2(x + w * 0.2, y)), Iso.project(Vector2(x + w * 0.7, y + h)),
+			base.darkened(0.07), 1.0)
+	else:
+		base = Color(0.64, 0.47, 0.29) if even else Color(0.57, 0.41, 0.25)
+		draw_colored_polygon(pts, base)
+		draw_line(Iso.project(Vector2(x, y + h * 0.5)), Iso.project(Vector2(x + w, y + h * 0.5)),
+			base.darkened(0.13), 1.0)
+		draw_polyline(_closed(pts), base.darkened(0.18), 1.0)
 # --- Sortie : paillasson vert + chambranle en bois + panneau SORTIE ---
 func _draw_exit() -> void:
 	var pos: Vector2 = exit_zone.global_position
@@ -882,34 +917,39 @@ func _draw_wall(wd: Dictionary) -> void:
 		_draw_counter_base(r)
 		return
 	var outer: bool = wd.get("outer", false)
-	var h := Iso.WALL_HEIGHT
+	var h := 50.0                                   # murs hauts = vraie pièce fermée
 	var b0 := Iso.project(r.position)
 	var b1 := Iso.project(Vector2(r.end.x, r.position.y))
 	var b2 := Iso.project(r.end)
 	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
 	var up := Vector2(0, -h)
-	var face := Color(0.50, 0.30, 0.22) if outer else Color(0.82, 0.74, 0.60)
-	var faceE := face.darkened(0.12)
-	# Faces.
+	# Palette CONTRASTÉE : plâtre crème clair (intérieur) / adobe chaud (extérieur),
+	# bien plus clairs que le sol pour que la salle se "lise".
+	var face: Color = Color(0.80, 0.64, 0.45) if outer else Color(0.91, 0.85, 0.72)
+	var faceE := face.darkened(0.14)
 	draw_colored_polygon(PackedVector2Array([b3, b2, b2 + up, b3 + up]), face)
 	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + up, b1 + up]), faceE)
 	if outer:
-		# Assises de brique.
-		for k in range(1, 4):
-			var vy := -h * float(k) / 4.0
-			draw_line(b3 + Vector2(0, vy), b2 + Vector2(0, vy), face.darkened(0.18), 1.0)
-			draw_line(b1 + Vector2(0, vy), b2 + Vector2(0, vy), face.darkened(0.18), 1.0)
+		# Assises de brique adobe.
+		for k in range(1, 5):
+			var vy := -h * float(k) / 5.0
+			draw_line(b3 + Vector2(0, vy), b2 + Vector2(0, vy), face.darkened(0.16), 1.0)
+			draw_line(b1 + Vector2(0, vy), b2 + Vector2(0, vy), face.darkened(0.16), 1.0)
 	else:
-		# Plinthe bois en bas + liseré bois en haut (lambris de banque).
-		var base_col := Color(0.42, 0.28, 0.16)
-		draw_colored_polygon(PackedVector2Array([b3, b2, b2 + Vector2(0, -7), b3 + Vector2(0, -7)]), base_col)
-		draw_colored_polygon(PackedVector2Array([b1, b2, b2 + Vector2(0, -7), b1 + Vector2(0, -7)]), base_col.darkened(0.1))
-		draw_line(b3 + up + Vector2(0, 5), b2 + up + Vector2(0, 5), base_col, 2.0)
-		draw_line(b1 + up + Vector2(0, 5), b2 + up + Vector2(0, 5), base_col.darkened(0.1), 2.0)
-	# Dessus + arête.
+		# Lambris bois en bas (plinthe haute ~18 px) + cimaise.
+		var wood := Color(0.46, 0.31, 0.18)
+		var wsh := 18.0
+		draw_colored_polygon(PackedVector2Array([b3, b2, b2 + Vector2(0, -wsh), b3 + Vector2(0, -wsh)]), wood)
+		draw_colored_polygon(PackedVector2Array([b1, b2, b2 + Vector2(0, -wsh), b1 + Vector2(0, -wsh)]), wood.darkened(0.12))
+		draw_line(b3 + Vector2(0, -wsh), b2 + Vector2(0, -wsh), wood.lightened(0.15), 1.5)
+		draw_line(b1 + Vector2(0, -wsh), b2 + Vector2(0, -wsh), wood.lightened(0.15), 1.5)
+		# Cimaise sous la corniche.
+		draw_line(b3 + up + Vector2(0, 8), b2 + up + Vector2(0, 8), wood, 2.0)
+		draw_line(b1 + up + Vector2(0, 8), b2 + up + Vector2(0, 8), wood.darkened(0.12), 2.0)
+	# Corniche (dessus) + arête sombre pour détacher du fond.
 	var topq := PackedVector2Array([b0 + up, b1 + up, b2 + up, b3 + up])
-	draw_colored_polygon(topq, face.lightened(0.10) if not outer else Color(0.60, 0.40, 0.30))
-	draw_polyline(_closed(topq), face.darkened(0.30), 1.0)
+	draw_colored_polygon(topq, Color(0.66, 0.46, 0.32) if outer else Color(0.97, 0.92, 0.82))
+	draw_polyline(_closed(topq), face.darkened(0.32), 1.5)
 
 
 ## Comptoir de guichets (base des murs "low") : meuble bois à plateau verni.
