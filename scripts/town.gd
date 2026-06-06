@@ -85,11 +85,21 @@ func _ready() -> void:
 	_setup_atmosphere()
 
 
+## Teinte d'ambiance propre à chaque ville (désert, canyon rouge, neige, nuit…).
+func _town_tint() -> Color:
+	match str(GameManager.current_town_def().get("theme", "desert")):
+		"canyon": return Color(1.12, 0.74, 0.55)
+		"snow": return Color(0.80, 0.90, 1.14)
+		"night": return Color(0.40, 0.46, 0.82)
+		"sunset": return Color(1.14, 0.68, 0.46)
+		_: return Color(1.04, 0.96, 0.80)
+
+
 ## Ambiance "golden hour" : teinte chaude globale + voile vignette doux sur les
 ## bords (rapproche le rendu de l'illustration western de référence).
 func _setup_atmosphere() -> void:
 	var warm := CanvasModulate.new()
-	warm.color = Color(1.0, 0.95, 0.86)
+	warm.color = _town_tint()
 	add_child(warm)
 	var layer := CanvasLayer.new()
 	layer.layer = 1
@@ -1182,7 +1192,7 @@ func _build_ui() -> void:
 	get_viewport().size_changed.connect(_on_viewport_resized)
 
 	var title := Label.new()
-	title.text = "EL DORADO — explore la ville · clique le logo près des portes/gens (ou E)"
+	title.text = "%s — explore la ville · clique le logo près des portes/gens (ou E)" % str(GameManager.current_town_def().get("name", "EL DORADO"))
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", Color(1, 1, 1))
 	title.add_theme_color_override("font_outline_color", Color(0, 0, 0))
@@ -1191,12 +1201,12 @@ func _build_ui() -> void:
 	layer.add_child(title)
 
 	var back := Button.new()
-	back.text = "← Menu"
+	back.text = "← Carte"
 	back.add_theme_font_size_override("font_size", 20)
 	back.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	back.position = Vector2(-150, 12)
 	back.custom_minimum_size = Vector2(130, 44)
-	back.pressed.connect(func() -> void: GameManager.goto_main_menu())
+	back.pressed.connect(func() -> void: GameManager.goto_world_map())
 	layer.add_child(back)
 
 	# Boutons de rotation de la vue (desktop + mobile) : tournent le décor de 45°.

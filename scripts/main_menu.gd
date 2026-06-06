@@ -32,13 +32,13 @@ func _ready() -> void:
 	box.add_child(_spacer(20))
 
 	var play := Button.new()
-	play.text = "JOUER LE BRAQUAGE"
+	play.text = "🗺 JOUER — CARTE DU MONDE"
 	play.custom_minimum_size = Vector2(460, 60)
 	play.pressed.connect(_on_play)
 	box.add_child(play)
 
 	var levels := Button.new()
-	levels.text = "🗺 CHOISIR LE NIVEAU"
+	levels.text = "⚡ NIVEAU RAPIDE"
 	levels.custom_minimum_size = Vector2(460, 50)
 	levels.pressed.connect(func(): GameManager.goto_level_select())
 	box.add_child(levels)

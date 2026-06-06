@@ -33,6 +33,21 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       tonneaux/caisses/bureaux de couverture.
 - [x] Accessibilité vérifiée (BFS) : aucune entité dans un mur, tout atteignable.
 
+## Fait dans la passe "carte du monde + villes"
+- [x] **Carte du monde** (`WorldMap.tscn`/`world_map.gd`) façon parchemin western :
+      reliefs, rivière, cactus, rose des vents, **piste en pointillés** reliant
+      plusieurs **villes** (pastilles cliquables, desktop + mobile).
+- [x] **Plusieurs villes** (`GameManager.TOWNS`) avec **ambiances distinctes**
+      (désert doré, canyon rouge, neige argentée…), chacune liée à **sa banque**.
+- [x] **Déblocage progressif** des villes (selon `levels_unlocked`) + villes
+      « à venir » en teaser ; pulse « tu es ici » sur la ville courante.
+- [x] Flux : Menu → **Carte** → Ville (thématisée) → Banque → mission.
+
+## Carte du monde — pistes suivantes
+- [ ] **Layouts de ville uniques** par biome (pas seulement la teinte).
+- [ ] Déplacement animé d'un **pion** le long de la piste entre deux villes.
+- [ ] Plus de villes + nouvelles banques (étendre `data/mission_0N.json`).
+
 ## Fait dans la passe "refonte visuelle de la banque"
 - [x] **Intérieur de banque premium** dessiné en procédural dans `iso_renderer.gd`
       (remplace les billboards d'atlas placeholder) : parquet bicolore, murs

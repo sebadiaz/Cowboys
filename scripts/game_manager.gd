@@ -11,10 +11,29 @@ const SCENE_RESULT := "res://scenes/ResultScreen.tscn"
 const SCENE_LEVEL_SELECT := "res://scenes/LevelSelect.tscn"
 const SCENE_SHOP := "res://scenes/ShopScreen.tscn"
 const SCENE_SETTINGS := "res://scenes/SettingsScreen.tscn"
+const SCENE_WORLD_MAP := "res://scenes/WorldMap.tscn"
+
+## Villes du territoire (carte du monde). `level` = banque associée (1..LEVEL_COUNT) ;
+## `level` = 0 => ville "à venir" (verrouillée en permanence, teaser). `pos` est
+## normalisé (0..1) sur la carte ; `theme` pilote l'ambiance de la ville.
+const TOWNS := [
+	{"name": "EL DORADO", "level": 1, "theme": "desert", "pos": [0.17, 0.60],
+		"tag": "Première frontière"},
+	{"name": "RIO SECO", "level": 2, "theme": "canyon", "pos": [0.39, 0.39],
+		"tag": "Gorge du désert"},
+	{"name": "SILVERPEAK", "level": 3, "theme": "snow", "pos": [0.60, 0.56],
+		"tag": "Hold-up de légende"},
+	{"name": "PERDITION", "level": 0, "theme": "night", "pos": [0.79, 0.34],
+		"tag": "Bientôt disponible"},
+	{"name": "SANTA FORTUNA", "level": 0, "theme": "sunset", "pos": [0.88, 0.64],
+		"tag": "Bientôt disponible"},
+]
 
 const LEVEL_COUNT := 3
 ## Niveau en cours de jeu (1..LEVEL_COUNT).
 var current_level: int = 1
+## Ville courante (index 1-based dans TOWNS).
+var current_town: int = 1
 ## Position de réapparition en ville (ex. en sortant du saloon). Zero = défaut.
 var town_return_pos := Vector2.ZERO
 ## La boutique a-t-elle été ouverte depuis la ville (retour en ville) ?
@@ -117,10 +136,42 @@ func return_to_town(pos := Vector2.ZERO) -> void:
 	_change_scene(SCENE_TOWN)
 
 
-## Le bouton "Jouer" amène d'abord en ville (on rejoint la banque à pied).
-## On (re)prend le dernier niveau débloqué par défaut.
+## Le bouton "Jouer" amène à la CARTE DU MONDE : on choisit sa ville, on y rejoint
+## la banque à pied.
 func start_town() -> void:
-	current_level = clampi(SaveManager.levels_unlocked, 1, LEVEL_COUNT)
+	goto_world_map()
+
+
+## Ouvre la carte du monde (choix de la ville).
+func goto_world_map() -> void:
+	_change_scene(SCENE_WORLD_MAP)
+
+
+## Définition d'une ville (index 1-based, borné).
+func town_def(idx: int) -> Dictionary:
+	return TOWNS[clampi(idx - 1, 0, TOWNS.size() - 1)]
+
+
+func current_town_def() -> Dictionary:
+	return town_def(current_town)
+
+
+## Une ville est jouable si elle a une banque débloquée.
+func town_unlocked(idx: int) -> bool:
+	var t := town_def(idx)
+	var lvl := int(t.get("level", 0))
+	return lvl >= 1 and SaveManager.is_level_unlocked(lvl)
+
+
+## Voyage vers une ville : règle ville + niveau, puis charge la scène de ville.
+func travel_to_town(idx: int) -> void:
+	var t := town_def(idx)
+	var lvl := int(t.get("level", 0))
+	if lvl < 1:
+		return
+	current_town = idx
+	current_level = clampi(lvl, 1, LEVEL_COUNT)
+	town_return_pos = Vector2.ZERO
 	_change_scene(SCENE_TOWN)
 
 
