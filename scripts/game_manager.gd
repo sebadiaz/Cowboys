@@ -13,21 +13,13 @@ const SCENE_SHOP := "res://scenes/ShopScreen.tscn"
 const SCENE_SETTINGS := "res://scenes/SettingsScreen.tscn"
 const SCENE_WORLD_MAP := "res://scenes/WorldMap.tscn"
 
-## Villes du territoire (carte du monde). `level` = banque associée (1..LEVEL_COUNT) ;
-## `level` = 0 => ville "à venir" (verrouillée en permanence, teaser). `pos` est
-## normalisé (0..1) sur la carte ; `theme` pilote l'ambiance de la ville.
-const TOWNS := [
-	{"name": "EL DORADO", "level": 1, "theme": "desert", "pos": [0.17, 0.60],
-		"tag": "Première frontière"},
-	{"name": "RIO SECO", "level": 2, "theme": "canyon", "pos": [0.39, 0.39],
-		"tag": "Gorge du désert"},
-	{"name": "SILVERPEAK", "level": 3, "theme": "snow", "pos": [0.60, 0.56],
-		"tag": "Hold-up de légende"},
-	{"name": "PERDITION", "level": 0, "theme": "night", "pos": [0.79, 0.34],
-		"tag": "Bientôt disponible"},
-	{"name": "SANTA FORTUNA", "level": 0, "theme": "sunset", "pos": [0.88, 0.64],
-		"tag": "Bientôt disponible"},
-]
+## Villes du territoire — GÉNÉRÉES PROCÉDURALEMENT (déterministe, même carte à
+## chaque lancement). ~20 villes le long d'une piste sinueuse traversant des
+## biomes (désert → canyon → plaines → neige). Chaque ville a sa banque (mission),
+## sa difficulté croissante et son ambiance. Rempli par `_generate_towns()`.
+const TOWN_COUNT := 20
+const TOWN_SEED := 0xC0FFEE
+var TOWNS: Array = []
 
 const LEVEL_COUNT := 3
 ## Niveau en cours de jeu (1..LEVEL_COUNT).
@@ -55,6 +47,61 @@ const _SKY := [
 	[0.79, Color(0.97, 0.60, 0.42)], [0.88, Color(0.50, 0.40, 0.58)],
 	[1.00, Color(0.30, 0.32, 0.58)],
 ]
+
+
+func _ready() -> void:
+	_generate_towns()
+
+
+## Génère ~20 villes de façon DÉTERMINISTE (même carte à chaque lancement) le long
+## d'une piste sinueuse, à travers des biomes, difficulté croissante.
+func _generate_towns() -> void:
+	TOWNS.clear()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = TOWN_SEED
+	var pre := ["Red", "Dry", "Dead", "Silver", "Gold", "Dusty", "Coyote", "Snake",
+		"Black", "Lone", "Broken", "Boot", "Iron", "Buzzard", "Cactus", "Sage",
+		"Rattlesnake", "Bone", "Crooked", "Hangman", "Tumble", "Copper", "Ghost", "Lost"]
+	var suf := ["Gulch", "Creek", "Rock", "Springs", "Flats", "Ridge", "Hollow", "Mesa",
+		"Bend", "Canyon", "Wells", "City", "Junction", "Crossing", "Fork", "Butte",
+		"Hill", "Camp", "Ford", "Pass", "Gap", "Bluff"]
+	var tier_name := {1: "Petite banque", 2: "Banque de comté", 3: "Grande banque"}
+	var used := {}
+	for i in range(TOWN_COUNT):
+		var t := float(i) / float(TOWN_COUNT - 1)
+		var x := lerpf(0.07, 0.93, t)
+		var y := 0.50 + 0.30 * sin(t * PI * 3.2 + 0.6) + rng.randf_range(-0.045, 0.045)
+		y = clampf(y, 0.18, 0.84)
+		var lvl := clampi(1 + int(t * 2.999), 1, LEVEL_COUNT)
+		var theme := _biome_for(t)
+		# Nom procédural unique.
+		var nm := "Ville %d" % (i + 1)
+		for _a in range(40):
+			var cand := "%s %s" % [pre[rng.randi() % pre.size()], suf[rng.randi() % suf.size()]]
+			if not used.has(cand):
+				used[cand] = true
+				nm = cand
+				break
+		var stars := ""
+		for _k in range(lvl):
+			stars += "★"
+		TOWNS.append({
+			"name": nm, "level": lvl, "theme": theme, "pos": [x, y],
+			"tag": "%s %s" % [stars, tier_name[lvl]],
+		})
+
+
+## Biome (ambiance) selon l'avancée sur la piste — aligné sur les régions de la carte.
+func _biome_for(t: float) -> String:
+	if t < 0.22:
+		return "desert"
+	elif t < 0.42:
+		return "canyon"
+	elif t < 0.60:
+		return "plains"
+	elif t < 0.80:
+		return "snow"
+	return "night"
 
 
 func _process(delta: float) -> void:
@@ -158,9 +205,7 @@ func current_town_def() -> Dictionary:
 
 ## Une ville est jouable si elle a une banque débloquée.
 func town_unlocked(idx: int) -> bool:
-	var t := town_def(idx)
-	var lvl := int(t.get("level", 0))
-	return lvl >= 1 and SaveManager.is_level_unlocked(lvl)
+	return idx >= 1 and idx <= TOWNS.size() and SaveManager.is_town_unlocked(idx)
 
 
 ## Voyage vers une ville : règle ville + niveau, puis charge la scène de ville.
@@ -203,6 +248,9 @@ func finish_mission(success: bool, loot_value: int, loot_bags: int, score: Dicti
 		# Débloque le niveau suivant.
 		if current_level < LEVEL_COUNT:
 			SaveManager.unlock_level(current_level + 1)
+		# Débloque la ville suivante sur la carte du monde.
+		if current_town < TOWNS.size():
+			SaveManager.unlock_town(current_town + 1)
 	_change_scene(SCENE_RESULT)
 
 

@@ -37,16 +37,17 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [x] **Carte du monde** (`WorldMap.tscn`/`world_map.gd`) façon parchemin western :
       reliefs, rivière, cactus, rose des vents, **piste en pointillés** reliant
       plusieurs **villes** (pastilles cliquables, desktop + mobile).
-- [x] **Plusieurs villes** (`GameManager.TOWNS`) avec **ambiances distinctes**
-      (désert doré, canyon rouge, neige argentée…), chacune liée à **sa banque**.
-- [x] **Déblocage progressif** des villes (selon `levels_unlocked`) + villes
-      « à venir » en teaser ; pulse « tu es ici » sur la ville courante.
+- [x] **~20 villes générées PROCÉDURALEMENT** (`GameManager._generate_towns`,
+      seed déterministe) : noms western, biomes par région (désert → canyon →
+      plaines → neige → nuit), difficulté croissante, chacune liée à **sa banque**.
+- [x] **Déblocage séquentiel persistant** (`SaveManager.towns_unlocked`) :
+      villes conquises (✓), frontière pulsée « à conquérir », suivantes verrouillées.
 - [x] Flux : Menu → **Carte** → Ville (thématisée) → Banque → mission.
 
 ## Carte du monde — pistes suivantes
 - [ ] **Layouts de ville uniques** par biome (pas seulement la teinte).
 - [ ] Déplacement animé d'un **pion** le long de la piste entre deux villes.
-- [ ] Plus de villes + nouvelles banques (étendre `data/mission_0N.json`).
+- [ ] Plus de **gabarits de banque** (varier le rendu mission selon le biome).
 
 ## Fait dans la passe "refonte visuelle de la banque"
 - [x] **Intérieur de banque premium** dessiné en procédural dans `iso_renderer.gd`

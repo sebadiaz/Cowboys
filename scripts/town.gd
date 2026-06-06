@@ -89,6 +89,7 @@ func _ready() -> void:
 func _town_tint() -> Color:
 	match str(GameManager.current_town_def().get("theme", "desert")):
 		"canyon": return Color(1.12, 0.74, 0.55)
+		"plains": return Color(0.92, 1.02, 0.80)
 		"snow": return Color(0.80, 0.90, 1.14)
 		"night": return Color(0.40, 0.46, 0.82)
 		"sunset": return Color(1.14, 0.68, 0.46)

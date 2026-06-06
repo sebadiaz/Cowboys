@@ -49,9 +49,10 @@ Ces préférences sont sauvegardées dans `user://save.json` avec le reste de la
 
 ## Boucle de jeu
 
-0. **Carte du monde** : choisis ta **ville** parmi le territoire (chaque ville a
-   son ambiance — désert, canyon rouge, neige — et **sa banque**). Les villes se
-   débloquent au fil des réussites.
+0. **Carte du monde** : un territoire **généré procéduralement** (~20 villes le
+   long d'une piste sinueuse à travers les biomes : désert, canyon, plaines,
+   neige, nuit). Chaque ville a **sa banque** ; on les débloque l'une après
+   l'autre au fil des réussites.
 0bis. **Ville** : on arrive dans le village western, on rejoint la **banque** à
    pied (dirige-toi vers la porte « BANQUE ») → le braquage démarre.
 1. Récupère du butin (3 sacs **$**).

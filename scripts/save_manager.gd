@@ -24,6 +24,7 @@ var missions_completed: int = 0
 var upgrades: Dictionary = {}
 var settings: Dictionary = {}
 var levels_unlocked: int = 1   # niveaux débloqués (1 = seul le 1er)
+var towns_unlocked: int = 1    # villes débloquées sur la carte du monde
 
 
 func _ready() -> void:
@@ -38,6 +39,7 @@ func load_game() -> void:
 	upgrades = _default_upgrades()
 	settings = _default_settings()
 	levels_unlocked = 1
+	towns_unlocked = 1
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
@@ -51,6 +53,7 @@ func load_game() -> void:
 	total_money = int(data.get("total_money", 0))
 	missions_completed = int(data.get("missions_completed", 0))
 	levels_unlocked = maxi(1, int(data.get("levels_unlocked", 1)))
+	towns_unlocked = maxi(1, int(data.get("towns_unlocked", 1)))
 	# Upgrades : on ne lit que les clés connues, bornées à leur max.
 	var saved: Variant = data.get("upgrades", {})
 	if typeof(saved) == TYPE_DICTIONARY:
@@ -94,6 +97,7 @@ func save_game() -> void:
 		"upgrades": upgrades,
 		"settings": settings,
 		"levels_unlocked": levels_unlocked,
+		"towns_unlocked": towns_unlocked,
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
@@ -119,6 +123,17 @@ func unlock_level(level: int) -> void:
 
 func is_level_unlocked(level: int) -> bool:
 	return level <= levels_unlocked
+
+
+## Débloque (au moins) jusqu'à la ville donnée (carte du monde).
+func unlock_town(town: int) -> void:
+	if town > towns_unlocked:
+		towns_unlocked = town
+		save_game()
+
+
+func is_town_unlocked(town: int) -> bool:
+	return town <= towns_unlocked
 
 
 # --- Upgrades ---

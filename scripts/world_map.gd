@@ -1,53 +1,62 @@
 extends Control
 ## world_map.gd
-## Carte du monde "parchemin" du Far West : plusieurs villes reliées par une piste
-## en pointillés. Chaque ville mène à sa banque (mission). Les villes se débloquent
-## au fil des réussites. UI construite en code (desktop + mobile tactile).
+## Carte du monde "parchemin" du Far West, PROCÉDURALE : ~20 villes (générées par
+## GameManager) réparties le long d'une piste sinueuse à travers des biomes
+## (désert → canyon → plaines → neige → nuit). Marqueurs cliquables, déblocage
+## séquentiel. UI construite en code (desktop + mobile tactile).
 
-const MARGIN := Vector2(0.10, 0.16)     # marges normalisées autour de la zone carte
-const PIN := Vector2(196.0, 66.0)
+const MARGIN := Vector2(0.055, 0.165)    # marges normalisées autour de la zone carte
+const TAP := Vector2(48.0, 48.0)         # cible tactile par ville
 
-var _pins: Array[Dictionary] = []        # { "idx": int, "btn": Button }
 var _t := 0.0
+var _btns: Array[Dictionary] = []        # { "idx", "btn" }
 
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	# Titre.
-	var title := _label("CARTE DU TERRITOIRE", 34, Color(0.36, 0.20, 0.10))
-	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	title.position = Vector2(0, 14)
+	var done: int = SaveManager.towns_unlocked - 1
+	var total: int = GameManager.TOWNS.size()
+	# Titre + progression.
+	var title := _label("CARTE DU TERRITOIRE", 32, Color(0.36, 0.20, 0.10))
+	title.set_anchors_preset(Control.PRESET_TOP_WIDE); title.position = Vector2(0, 10)
 	add_child(title)
-	var sub := _label("Choisis ta ville — chaque banque est un braquage", 18, Color(0.42, 0.28, 0.16))
-	sub.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	sub.position = Vector2(0, 56)
+	var sub := _label("%d villes à dévaliser — suis la piste, dévalise chaque banque" % total,
+			17, Color(0.42, 0.28, 0.16))
+	sub.set_anchors_preset(Control.PRESET_TOP_WIDE); sub.position = Vector2(0, 48)
 	add_child(sub)
-	# Magot.
-	var magot := _label("Magot : %d $" % SaveManager.total_money, 18, Color(0.30, 0.20, 0.12))
-	magot.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	magot.position = Vector2(0, 84)
-	add_child(magot)
-	# Pastilles de ville.
-	for i in range(1, GameManager.TOWNS.size() + 1):
-		var b := _make_pin(i)
+	var prog := _label("Villes conquises : %d / %d   ·   Magot : %d $" % [
+			maxi(0, done), total, SaveManager.total_money], 17, Color(0.30, 0.20, 0.12))
+	prog.set_anchors_preset(Control.PRESET_TOP_WIDE); prog.position = Vector2(0, 74)
+	add_child(prog)
+	# Cibles tactiles invisibles sur chaque ville débloquée (marqueurs dessinés en _draw).
+	for i in range(1, total + 1):
+		if not GameManager.town_unlocked(i):
+			continue
+		var b := Button.new()
+		b.custom_minimum_size = TAP
+		b.size = TAP
+		b.focus_mode = Control.FOCUS_NONE
+		b.tooltip_text = str(GameManager.town_def(i)["name"])
+		var sb := StyleBoxEmpty.new()
+		b.add_theme_stylebox_override("normal", sb)
+		b.add_theme_stylebox_override("hover", sb)
+		b.add_theme_stylebox_override("pressed", sb)
+		b.add_theme_stylebox_override("focus", sb)
+		var idx := i
+		b.pressed.connect(func() -> void: GameManager.travel_to_town(idx))
 		add_child(b)
-		_pins.append({"idx": i, "btn": b})
+		_btns.append({"idx": i, "btn": b})
 	# Boutons bas.
 	var back := Button.new()
-	back.text = "← Menu"
-	back.add_theme_font_size_override("font_size", 20)
-	back.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	back.position = Vector2(20, -64)
-	back.custom_minimum_size = Vector2(150, 48)
+	back.text = "← Menu"; back.add_theme_font_size_override("font_size", 20)
+	back.set_anchors_preset(Control.PRESET_BOTTOM_LEFT); back.position = Vector2(20, -62)
+	back.custom_minimum_size = Vector2(150, 46)
 	back.pressed.connect(func() -> void: GameManager.goto_main_menu())
 	add_child(back)
-
 	var quick := Button.new()
-	quick.text = "⚡ Niveau rapide"
-	quick.add_theme_font_size_override("font_size", 18)
-	quick.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	quick.position = Vector2(-220, -64)
-	quick.custom_minimum_size = Vector2(200, 48)
+	quick.text = "⚡ Niveau rapide"; quick.add_theme_font_size_override("font_size", 18)
+	quick.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT); quick.position = Vector2(-210, -62)
+	quick.custom_minimum_size = Vector2(190, 46)
 	quick.pressed.connect(func() -> void: GameManager.goto_level_select())
 	add_child(quick)
 
@@ -58,102 +67,186 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	# Pulse de la ville courante (repère "tu es ici").
-	for pd in _pins:
-		var b: Button = pd["btn"]
-		if pd["idx"] == GameManager.current_town and GameManager.town_unlocked(pd["idx"]):
-			b.modulate = Color(1, 1, 1).lerp(Color(1.0, 0.95, 0.6), 0.5 + 0.5 * sin(_t * 4.0))
-		else:
-			b.modulate = Color.WHITE
 	queue_redraw()
 
 
-# --- Placement (recalculé à chaque redimensionnement) ---
+# --- Géométrie ---
 
 func _inner() -> Rect2:
 	var m := Vector2(size.x * MARGIN.x, size.y * MARGIN.y)
 	return Rect2(m, size - m * 2.0)
 
 
-func _map_point(p: Array) -> Vector2:
+func _pt(idx: int) -> Vector2:
+	var p: Array = GameManager.town_def(idx)["pos"]
 	var r := _inner()
 	return r.position + Vector2(float(p[0]) * r.size.x, float(p[1]) * r.size.y)
 
 
 func _layout() -> void:
-	for pd in _pins:
-		var t := GameManager.town_def(pd["idx"])
-		var c := _map_point(t["pos"])
-		(pd["btn"] as Button).position = c - PIN * 0.5
+	for d in _btns:
+		(d["btn"] as Button).position = _pt(d["idx"]) - TAP * 0.5
 	queue_redraw()
 
 
-# --- Rendu de la carte (parchemin + reliefs + piste) ---
+# --- Rendu ---
 
 func _draw() -> void:
+	var inner := _inner()
 	# Fond parchemin.
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.86, 0.76, 0.55))
-	# Taches d'usure.
-	for s in [[0.2, 0.3, 70.0], [0.7, 0.25, 90.0], [0.5, 0.8, 110.0], [0.85, 0.7, 60.0]]:
-		draw_circle(Vector2(float(s[0]) * size.x, float(s[1]) * size.y), float(s[2]),
-				Color(0.62, 0.50, 0.32, 0.10))
-	# Cadre "brûlé".
+	# Régions de biome (bandes verticales teintées) qui suivent la piste.
+	_biome_bands(inner)
+	# Voile parchemin pour unifier.
+	draw_rect(inner, Color(0.86, 0.76, 0.52, 0.18))
+	# Reliefs : montagnes enneigées dans la région froide (droite).
+	for k in range(5):
+		var mx := lerpf(inner.position.x + inner.size.x * 0.78, inner.end.x - 20, float(k) / 4.0)
+		_mountain(Vector2(mx, inner.position.y + 60.0 + (k % 2) * 22.0), 60.0)
+	# Sapins (région neige).
+	for k in range(4):
+		_pine(Vector2(lerpf(inner.position.x + inner.size.x * 0.80, inner.end.x - 30, float(k) / 3.0),
+				inner.get_center().y + 40.0 + (k % 2) * 30.0))
+	# Cactus (désert, gauche) + rochers (canyon).
+	for cp in [[0.05, 0.30], [0.10, 0.78], [0.20, 0.55]]:
+		_cactus(_inner_pt(cp))
+	for rp in [[0.34, 0.30], [0.40, 0.80]]:
+		_rock(_inner_pt(rp))
+	# Rivière dans les plaines.
+	var river := PackedVector2Array()
+	for k in range(13):
+		var u := float(k) / 12.0
+		river.append(Vector2(lerpf(inner.position.x + inner.size.x * 0.46, inner.position.x + inner.size.x * 0.66, u),
+				inner.end.y - 40.0 + sin(u * 6.0) * 22.0))
+	draw_polyline(river, Color(0.45, 0.60, 0.70, 0.7), 5.0)
+	# Cadre brûlé.
 	for i in range(3):
 		var inset := 6.0 + i * 5.0
 		draw_rect(Rect2(Vector2(inset, inset), size - Vector2(inset, inset) * 2.0),
 				Color(0.40, 0.27, 0.14, 0.5 - i * 0.12), false, 3.0)
 
-	var inner := _inner()
-	# Reliefs : chaîne de montagnes en haut.
-	var ridge := inner.position.y + 6.0
-	for k in range(7):
-		var bx := lerpf(inner.position.x, inner.end.x, float(k) / 6.0)
-		var pk := Vector2(bx, ridge + (10.0 if k % 2 == 0 else 26.0))
-		var bw := inner.size.x / 9.0
-		draw_colored_polygon(PackedVector2Array([
-			pk + Vector2(-bw, 50), pk, pk + Vector2(bw, 50)]), Color(0.66, 0.56, 0.40))
-		draw_colored_polygon(PackedVector2Array([
-			pk + Vector2(-9, 14), pk, pk + Vector2(9, 14)]), Color(0.93, 0.92, 0.88))
-	# Rivière sinueuse (bleu pâle).
-	var river := PackedVector2Array()
-	for k in range(17):
-		var u := float(k) / 16.0
-		river.append(Vector2(lerpf(inner.position.x + 30, inner.end.x - 30, u),
-				inner.end.y - 40 + sin(u * 7.0) * 26.0))
-	draw_polyline(river, Color(0.50, 0.62, 0.70, 0.7), 5.0)
-	# Cactus décoratifs.
-	for cp in [[0.06, 0.5], [0.95, 0.45], [0.5, 0.95]]:
-		_cactus(_map_point(cp))
+	# Piste sinueuse reliant toutes les villes.
+	var n := GameManager.TOWNS.size()
+	var pts := PackedVector2Array()
+	for i in range(1, n + 1):
+		pts.append(_pt(i))
+	# Tracé large (terre battue) puis pointillés.
+	if pts.size() >= 2:
+		draw_polyline(pts, Color(0.66, 0.52, 0.34, 0.55), 9.0)
+		for i in range(pts.size() - 1):
+			var unlocked := (i + 2) <= SaveManager.towns_unlocked
+			_dashed(pts[i], pts[i + 1],
+					Color(0.45, 0.30, 0.16, 0.95) if unlocked else Color(0.45, 0.30, 0.16, 0.45),
+					3.0, 11.0)
 
-	# Piste en pointillés reliant les villes dans l'ordre.
-	for i in range(1, GameManager.TOWNS.size()):
-		var a := _map_point(GameManager.town_def(i)["pos"])
-		var b := _map_point(GameManager.town_def(i + 1)["pos"])
-		_dashed(a, b, Color(0.42, 0.28, 0.15, 0.9), 3.0, 12.0)
+	# Marqueurs de ville + noms.
+	for i in range(1, n + 1):
+		_marker(i)
 
-	# Rose des vents (bas-droite).
-	_compass(Vector2(inner.end.x - 46, inner.position.y + 60))
+	# Rose des vents.
+	_compass(Vector2(inner.end.x - 44, inner.position.y + 54))
+
+
+func _inner_pt(p: Array) -> Vector2:
+	var r := _inner()
+	return r.position + Vector2(float(p[0]) * r.size.x, float(p[1]) * r.size.y)
+
+
+## Marqueur d'une ville (état : conquise / frontière / verrouillée) + nom.
+func _marker(idx: int) -> void:
+	var c := _pt(idx)
+	var unlocked := GameManager.town_unlocked(idx)
+	var done := idx < SaveManager.towns_unlocked
+	var frontier := idx == SaveManager.towns_unlocked
+	var col: Color
+	var rad := 11.0
+	if done:
+		col = Color(0.28, 0.55, 0.28)
+	elif frontier:
+		col = Color(0.95, 0.78, 0.28)
+		rad = 12.0 + sin(_t * 4.0) * 2.0
+		# Halo pulsé "tu es ici / à conquérir".
+		draw_circle(c, rad + 9.0, Color(1.0, 0.85, 0.35, 0.18))
+	elif unlocked:
+		col = Color(0.70, 0.45, 0.22)
+	else:
+		col = Color(0.46, 0.44, 0.42)
+		rad = 8.0
+	draw_circle(c + Vector2(1, 2), rad, Color(0, 0, 0, 0.20))     # ombre
+	draw_circle(c, rad, col)
+	draw_arc(c, rad, 0, TAU, 20, col.darkened(0.35), 2.0)
+	draw_circle(c, rad * 0.45, Color(1, 1, 1, 0.85))
+	if done:
+		# Petit check.
+		draw_line(c + Vector2(-4, 0), c + Vector2(-1, 4), Color(0.15, 0.35, 0.15), 2.0)
+		draw_line(c + Vector2(-1, 4), c + Vector2(5, -4), Color(0.15, 0.35, 0.15), 2.0)
+	elif not unlocked:
+		_text_c("🔒", c + Vector2(0, 4), 12, Color(0.9, 0.9, 0.9))
+	# Nom (alterné au-dessus/au-dessous pour limiter les chevauchements).
+	var t := GameManager.town_def(idx)
+	var below := (idx % 2 == 0)
+	var off := Vector2(0, 26.0 if below else -16.0)
+	var nm_col: Color = Color(0.25, 0.16, 0.08) if unlocked else Color(0.40, 0.36, 0.32)
+	_text_c(str(t["name"]), c + off, 12, nm_col)
+	if frontier:
+		_text_c(str(t["tag"]), c + off + Vector2(0, 13.0 if below else -13.0), 10,
+				Color(0.55, 0.36, 0.12))
+
+
+# --- Décor de carte ---
+
+func _biome_bands(inner: Rect2) -> void:
+	# x-fractions des frontières (alignées sur GameManager._biome_for via x≈t).
+	var cols := [Color(0.88, 0.78, 0.55), Color(0.84, 0.60, 0.44), Color(0.79, 0.82, 0.56),
+			Color(0.86, 0.90, 0.95), Color(0.60, 0.60, 0.74)]
+	var bounds := [0.0, 0.26, 0.43, 0.59, 0.76, 1.0]
+	for i in range(cols.size()):
+		var x0 := inner.position.x + inner.size.x * float(bounds[i])
+		var x1 := inner.position.x + inner.size.x * float(bounds[i + 1])
+		draw_rect(Rect2(Vector2(x0, inner.position.y), Vector2(x1 - x0, inner.size.y)), cols[i])
+
+
+func _mountain(p: Vector2, w: float) -> void:
+	draw_colored_polygon(PackedVector2Array([
+		p + Vector2(-w, w), p, p + Vector2(w, w)]), Color(0.62, 0.62, 0.66))
+	draw_colored_polygon(PackedVector2Array([
+		p + Vector2(-12, 14), p, p + Vector2(12, 14)]), Color(0.96, 0.97, 1.0))
+
+
+func _pine(p: Vector2) -> void:
+	draw_line(p, p + Vector2(0, -6), Color(0.35, 0.24, 0.14), 3.0)
+	for k in range(3):
+		var yy := -6.0 - k * 7.0
+		var ww := 9.0 - k * 2.5
+		draw_colored_polygon(PackedVector2Array([
+			p + Vector2(-ww, yy), p + Vector2(0, yy - 10), p + Vector2(ww, yy)]),
+			Color(0.20, 0.42, 0.26))
 
 
 func _cactus(p: Vector2) -> void:
 	var g := Color(0.34, 0.5, 0.30)
-	draw_line(p, p + Vector2(0, -34), g, 6.0)
-	draw_line(p + Vector2(0, -14), p + Vector2(-10, -14), g, 4.0)
-	draw_line(p + Vector2(-10, -14), p + Vector2(-10, -24), g, 4.0)
-	draw_line(p + Vector2(0, -22), p + Vector2(9, -22), g, 4.0)
-	draw_line(p + Vector2(9, -22), p + Vector2(9, -30), g, 4.0)
+	draw_line(p, p + Vector2(0, -30), g, 6.0)
+	draw_line(p + Vector2(0, -12), p + Vector2(-9, -12), g, 4.0)
+	draw_line(p + Vector2(-9, -12), p + Vector2(-9, -21), g, 4.0)
+	draw_line(p + Vector2(0, -20), p + Vector2(8, -20), g, 4.0)
+	draw_line(p + Vector2(8, -20), p + Vector2(8, -27), g, 4.0)
+
+
+func _rock(p: Vector2) -> void:
+	draw_colored_polygon(_ellipse(p, 16, 9), Color(0.62, 0.42, 0.30))
+	draw_colored_polygon(_ellipse(p + Vector2(8, -5), 10, 7), Color(0.70, 0.48, 0.34))
 
 
 func _compass(c: Vector2) -> void:
 	draw_circle(c, 22.0, Color(0.80, 0.70, 0.48))
 	draw_arc(c, 22.0, 0, TAU, 28, Color(0.40, 0.27, 0.14), 2.0)
 	for a in [0.0, PI * 0.5, PI, PI * 1.5]:
-		draw_line(c, c + Vector2.RIGHT.rotated(a - PI * 0.5) * 18.0, Color(0.40, 0.27, 0.14), 1.0)
+		draw_line(c, c + Vector2.RIGHT.rotated(a) * 18.0, Color(0.40, 0.27, 0.14), 1.0)
 	draw_colored_polygon(PackedVector2Array([
 		c + Vector2(0, -20), c + Vector2(-5, 0), c + Vector2(5, 0)]), Color(0.70, 0.22, 0.16))
 	draw_colored_polygon(PackedVector2Array([
 		c + Vector2(0, 20), c + Vector2(-5, 0), c + Vector2(5, 0)]), Color(0.30, 0.22, 0.14))
-	_text(c + Vector2(-4, -24), "N", 14, Color(0.35, 0.20, 0.10))
+	_text_c("N", c + Vector2(0, -26), 13, Color(0.35, 0.20, 0.10))
 
 
 func _dashed(a: Vector2, b: Vector2, col: Color, w: float, dash: float) -> void:
@@ -168,60 +261,15 @@ func _dashed(a: Vector2, b: Vector2, col: Color, w: float, dash: float) -> void:
 		t += dash * 2.0
 
 
-# --- Pastilles de ville (boutons) ---
-
-func _make_pin(idx: int) -> Button:
-	var t := GameManager.town_def(idx)
-	var lvl := int(t.get("level", 0))
-	var unlocked := GameManager.town_unlocked(idx)
-	var done := lvl >= 1 and SaveManager.levels_unlocked > lvl
-	var b := Button.new()
-	b.custom_minimum_size = PIN
-	b.size = PIN
-	b.clip_text = true
-	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 17)
-	b.add_theme_color_override("font_color", Color(1, 1, 0.92))
-	b.add_theme_color_override("font_outline_color", Color(0.10, 0.06, 0.03))
-	b.add_theme_constant_override("outline_size", 4)
-	var bg: Color
-	var border: Color
-	var status: String
-	if lvl < 1:
-		bg = Color(0.40, 0.38, 0.36, 0.95); border = Color(0.6, 0.58, 0.55); status = "🔒 " + str(t["tag"])
-	elif not unlocked:
-		bg = Color(0.38, 0.30, 0.24, 0.95); border = Color(0.6, 0.5, 0.4)
-		status = "🔒 Réussis la ville précédente"
-	elif done:
-		bg = Color(0.22, 0.42, 0.22, 0.96); border = Color(0.5, 0.85, 0.45); status = "✓ Banque dévalisée"
-	else:
-		bg = Color(0.46, 0.26, 0.12, 0.96); border = Color(0.95, 0.78, 0.30); status = "▶ " + str(t["tag"])
-	b.text = "%s\n%s" % [str(t["name"]), status]
-	_style(b, bg, border)
-	if unlocked:
-		b.pressed.connect(func() -> void: GameManager.travel_to_town(idx))
-	else:
-		b.disabled = true
-	return b
+func _ellipse(c: Vector2, rx: float, ry: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in range(16):
+		var a := TAU * float(i) / 16.0
+		pts.append(c + Vector2(cos(a) * rx, sin(a) * ry))
+	return pts
 
 
-func _style(b: Button, bg: Color, border: Color) -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.set_corner_radius_all(12)
-	sb.set_border_width_all(3)
-	sb.border_color = border
-	sb.content_margin_left = 10
-	sb.content_margin_right = 10
-	b.add_theme_stylebox_override("normal", sb)
-	b.add_theme_stylebox_override("disabled", sb)
-	var hb: StyleBoxFlat = sb.duplicate()
-	hb.bg_color = bg.lightened(0.10)
-	b.add_theme_stylebox_override("hover", hb)
-	b.add_theme_stylebox_override("pressed", hb)
-
-
-# --- Petits utilitaires ---
+# --- Texte / labels ---
 
 func _label(text: String, font_size: int, color: Color) -> Label:
 	var l := Label.new()
@@ -233,5 +281,7 @@ func _label(text: String, font_size: int, color: Color) -> Label:
 	return l
 
 
-func _text(pos: Vector2, s: String, size: int, color: Color) -> void:
-	draw_string(ThemeDB.fallback_font, pos, s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
+func _text_c(s: String, center: Vector2, size: int, color: Color) -> void:
+	var font := ThemeDB.fallback_font
+	var w := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	draw_string(font, center - Vector2(w * 0.5, 0), s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
