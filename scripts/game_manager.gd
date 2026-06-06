@@ -10,6 +10,7 @@ const SCENE_MISSION := "res://scenes/MissionRoot.tscn"
 const SCENE_RESULT := "res://scenes/ResultScreen.tscn"
 const SCENE_LEVEL_SELECT := "res://scenes/LevelSelect.tscn"
 const SCENE_SHOP := "res://scenes/ShopScreen.tscn"
+const SCENE_SETTINGS := "res://scenes/SettingsScreen.tscn"
 
 const LEVEL_COUNT := 3
 ## Niveau en cours de jeu (1..LEVEL_COUNT).
@@ -77,6 +78,10 @@ func goto_main_menu() -> void:
 
 func goto_level_select() -> void:
 	_change_scene(SCENE_LEVEL_SELECT)
+
+
+func goto_settings() -> void:
+	_change_scene(SCENE_SETTINGS)
 
 
 ## Entre dans le saloon (depuis la ville).

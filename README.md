@@ -20,6 +20,17 @@ mobile), développé avec **Godot 4** en **GDScript** uniquement.
 - La scène principale est `scenes/Boot.tscn` (déjà configurée). Elle affiche un
   splash puis le **menu principal** → bouton **Jouer le braquage**.
 
+
+## Réglages
+
+Le menu principal contient maintenant un écran **Réglages** :
+
+- activation / désactivation de l'audio ;
+- volume des effets sonores synthétisés ;
+- taille des contrôles tactiles pour améliorer la jouabilité sur téléphone.
+
+Ces préférences sont sauvegardées dans `user://save.json` avec le reste de la progression.
+
 ## Contrôles
 
 ### Desktop (clavier)

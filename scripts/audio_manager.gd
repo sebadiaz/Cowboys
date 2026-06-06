@@ -30,10 +30,15 @@ func _ready() -> void:
 func play(name: String, volume_db: float = 0.0, pitch_var := 0.06) -> void:
 	if muted or not _streams.has(name):
 		return
+	if SaveManager.has_method("audio_enabled") and not SaveManager.audio_enabled():
+		return
 	var p := _players[_next]
 	_next = (_next + 1) % _players.size()
 	p.stream = _streams[name]
-	p.volume_db = volume_db
+	var saved_volume_db := 0.0
+	if SaveManager.has_method("sfx_volume_db"):
+		saved_volume_db = SaveManager.sfx_volume_db()
+	p.volume_db = volume_db + saved_volume_db
 	p.pitch_scale = 1.0 + _rng.randf_range(-pitch_var, pitch_var)
 	p.play()
 

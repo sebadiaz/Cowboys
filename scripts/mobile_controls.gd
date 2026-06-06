@@ -22,18 +22,20 @@ var _knob := Vector2.ZERO
 var _interact_btn: Button
 var _fire_btn: Button
 var _reload_btn: Button
+var _ui_scale := 1.0
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui_scale = SaveManager.touch_scale() if SaveManager.has_method("touch_scale") else 1.0
 	if not combat_buttons and not interact_only:
 		return  # déplacement seul : joystick uniquement
 	_interact_btn = Button.new()
 	_interact_btn.text = "E"
-	_interact_btn.add_theme_font_size_override("font_size", 28)
-	_interact_btn.custom_minimum_size = Vector2(120, 120)
+	_interact_btn.add_theme_font_size_override("font_size", int(round(28 * _ui_scale)))
+	_interact_btn.custom_minimum_size = Vector2(120, 120) * _ui_scale
 	_interact_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_interact_btn.position = Vector2(-150, -150)
+	_interact_btn.position = Vector2(-150, -150) * _ui_scale
 	_interact_btn.modulate = Color(1, 1, 1, 0.85)
 	_interact_btn.button_down.connect(func() -> void: InputManager.set_touch_interact_held(true))
 	_interact_btn.button_up.connect(func() -> void: InputManager.set_touch_interact_held(false))
@@ -44,10 +46,10 @@ func _ready() -> void:
 
 	_fire_btn = Button.new()
 	_fire_btn.text = "TIR"
-	_fire_btn.add_theme_font_size_override("font_size", 26)
-	_fire_btn.custom_minimum_size = Vector2(130, 130)
+	_fire_btn.add_theme_font_size_override("font_size", int(round(26 * _ui_scale)))
+	_fire_btn.custom_minimum_size = Vector2(130, 130) * _ui_scale
 	_fire_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_fire_btn.position = Vector2(-160, -300)
+	_fire_btn.position = Vector2(-160, -300) * _ui_scale
 	_fire_btn.modulate = Color(1, 0.85, 0.8, 0.9)
 	_fire_btn.button_down.connect(func() -> void: InputManager.set_touch_fire_held(true))
 	_fire_btn.button_up.connect(func() -> void: InputManager.set_touch_fire_held(false))
@@ -55,10 +57,10 @@ func _ready() -> void:
 
 	_reload_btn = Button.new()
 	_reload_btn.text = "RECH"
-	_reload_btn.add_theme_font_size_override("font_size", 20)
-	_reload_btn.custom_minimum_size = Vector2(96, 70)
+	_reload_btn.add_theme_font_size_override("font_size", int(round(20 * _ui_scale)))
+	_reload_btn.custom_minimum_size = Vector2(96, 70) * _ui_scale
 	_reload_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_reload_btn.position = Vector2(-160, -380)
+	_reload_btn.position = Vector2(-160, -380) * _ui_scale
 	_reload_btn.modulate = Color(1, 0.95, 0.7, 0.9)
 	_reload_btn.pressed.connect(func() -> void: InputManager.trigger_touch_reload())
 	add_child(_reload_btn)
@@ -94,10 +96,11 @@ func _input(event: InputEvent) -> void:
 			_reset_joystick()
 	elif event is InputEventScreenDrag and _active and event.index == _touch_index:
 		var offset: Vector2 = event.position - _base
-		if offset.length() > JOY_RADIUS:
-			offset = offset.normalized() * JOY_RADIUS
+		var joy_radius := _joy_radius()
+		if offset.length() > joy_radius:
+			offset = offset.normalized() * joy_radius
 		_knob = _base + offset
-		var v: Vector2 = offset / JOY_RADIUS
+		var v: Vector2 = offset / joy_radius
 		if v.length() < DEADZONE:
 			v = Vector2.ZERO
 		InputManager.set_touch_move(v)
@@ -111,9 +114,18 @@ func _reset_joystick() -> void:
 	queue_redraw()
 
 
+func _joy_radius() -> float:
+	return JOY_RADIUS * _ui_scale
+
+
+func _knob_radius() -> float:
+	return KNOB_RADIUS * _ui_scale
+
+
 func _draw() -> void:
 	if not _active:
 		return
-	draw_circle(_base, JOY_RADIUS, Color(1, 1, 1, 0.12))
-	draw_arc(_base, JOY_RADIUS, 0, TAU, 48, Color(1, 1, 1, 0.35), 2.0)
-	draw_circle(_knob, KNOB_RADIUS, Color(1, 1, 1, 0.30))
+	var joy_radius := _joy_radius()
+	draw_circle(_base, joy_radius, Color(1, 1, 1, 0.12))
+	draw_arc(_base, joy_radius, 0, TAU, 48, Color(1, 1, 1, 0.35), 2.0)
+	draw_circle(_knob, _knob_radius(), Color(1, 1, 1, 0.30))

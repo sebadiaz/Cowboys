@@ -49,6 +49,12 @@ func _ready() -> void:
 	shop.pressed.connect(_on_shop)
 	box.add_child(shop)
 
+	var settings := Button.new()
+	settings.text = "⚙ RÉGLAGES"
+	settings.custom_minimum_size = Vector2(460, 46)
+	settings.pressed.connect(func() -> void: GameManager.goto_settings())
+	box.add_child(settings)
+
 	# Mode assist (prototype facile) : basculable.
 	_assist_btn = Button.new()
 	_assist_btn.custom_minimum_size = Vector2(460, 46)
@@ -105,6 +111,7 @@ func _on_reset_save() -> void:
 	SaveManager.missions_completed = 0
 	SaveManager.levels_unlocked = 1
 	SaveManager.upgrades = SaveManager._default_upgrades()
+	# On garde les réglages de confort (audio / contrôles tactiles).
 	SaveManager.save_game()
 	if _magot_label:
 		_magot_label.text = "Sauvegarde réinitialisée."

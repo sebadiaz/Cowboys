@@ -1,10 +1,13 @@
 extends Node
 ## SaveManager (autoload)
 ## Sauvegarde locale simple dans user://save.json.
-## Persiste l'argent total, les missions réussies et les upgrades achetés.
-## Rétrocompatible : une vieille save sans "upgrades" se charge sans planter.
+## Persiste l'argent total, les missions réussies, les upgrades achetés
+## et les réglages de confort.
+## Rétrocompatible : une vieille save sans "upgrades" / "settings" se charge sans planter.
 
 const SAVE_PATH := "user://save.json"
+
+signal settings_changed(new_settings: Dictionary)
 
 ## Définition des upgrades : nom, description, coûts par niveau (taille = max).
 const UPGRADE_DEFS := {
@@ -19,6 +22,7 @@ const UPGRADE_ORDER := ["speed", "reload", "safe", "stealth"]
 var total_money: int = 0
 var missions_completed: int = 0
 var upgrades: Dictionary = {}
+var settings: Dictionary = {}
 var levels_unlocked: int = 1   # niveaux débloqués (1 = seul le 1er)
 
 
@@ -32,6 +36,7 @@ func load_game() -> void:
 	total_money = 0
 	missions_completed = 0
 	upgrades = _default_upgrades()
+	settings = _default_settings()
 	levels_unlocked = 1
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
@@ -52,6 +57,13 @@ func load_game() -> void:
 		for key in UPGRADE_DEFS.keys():
 			upgrades[key] = clampi(int(saved.get(key, 0)), 0, max_level(key))
 
+	# Réglages : on fusionne avec les défauts pour rester rétrocompatible.
+	var saved_settings: Variant = data.get("settings", {})
+	if typeof(saved_settings) == TYPE_DICTIONARY:
+		for key in settings.keys():
+			settings[key] = saved_settings.get(key, settings[key])
+	_normalize_settings()
+
 
 func _default_upgrades() -> Dictionary:
 	var d := {}
@@ -60,12 +72,27 @@ func _default_upgrades() -> Dictionary:
 	return d
 
 
+func _default_settings() -> Dictionary:
+	return {
+		"audio_enabled": true,
+		"sfx_volume": 0.85,      # 0..1, converti en dB dans AudioManager
+		"touch_scale": 1.0,      # taille joystick / boutons mobile
+	}
+
+
+func _normalize_settings() -> void:
+	settings["audio_enabled"] = bool(settings.get("audio_enabled", true))
+	settings["sfx_volume"] = clampf(float(settings.get("sfx_volume", 0.85)), 0.0, 1.0)
+	settings["touch_scale"] = clampf(float(settings.get("touch_scale", 1.0)), 0.75, 1.35)
+
+
 ## Écrit la sauvegarde sur disque.
 func save_game() -> void:
 	var data := {
 		"total_money": total_money,
 		"missions_completed": missions_completed,
 		"upgrades": upgrades,
+		"settings": settings,
 		"levels_unlocked": levels_unlocked,
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -140,3 +167,33 @@ func safe_mult() -> float:
 
 func stealth_mult() -> float:
 	return maxf(0.3, 1.0 - 0.15 * get_level("stealth"))
+
+
+# --- Réglages persistants ---
+
+func set_setting(key: String, value: Variant) -> void:
+	if not settings.has(key):
+		return
+	settings[key] = value
+	_normalize_settings()
+	save_game()
+	settings_changed.emit(settings.duplicate(true))
+
+
+func audio_enabled() -> bool:
+	return bool(settings.get("audio_enabled", true))
+
+
+func sfx_volume() -> float:
+	return clampf(float(settings.get("sfx_volume", 0.85)), 0.0, 1.0)
+
+
+func sfx_volume_db() -> float:
+	var v := sfx_volume()
+	if v <= 0.001:
+		return -80.0
+	return linear_to_db(v)
+
+
+func touch_scale() -> float:
+	return clampf(float(settings.get("touch_scale", 1.0)), 0.75, 1.35)
