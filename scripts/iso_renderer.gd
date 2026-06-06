@@ -182,6 +182,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	Iso.yaw = 0.0          # la mission se joue toujours en vue iso fixe
 	_draw_floor()
 	_draw_decor()
 	if is_instance_valid(exit_zone):

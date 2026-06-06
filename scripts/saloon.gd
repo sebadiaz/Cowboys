@@ -40,6 +40,7 @@ var _beat_i := 0
 
 
 func _ready() -> void:
+	Iso.yaw = 0.0          # le saloon se joue en vue iso fixe
 	_rng.randomize()
 	_build()
 	_build_physics()

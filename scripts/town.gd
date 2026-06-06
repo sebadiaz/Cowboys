@@ -54,6 +54,7 @@ var _world: Node2D                        # sous-arbre physique (espace monde, s
 
 var _zoom := 2.0
 var _cam := Vector2.ZERO
+var _yaw_target := 0.0      # angle de vue visé (la vue s'y rend en douceur)
 var _toast: Label
 var _rng := RandomNumberGenerator.new()
 
@@ -68,6 +69,8 @@ var _dust_t := 0.0
 
 func _ready() -> void:
 	_rng.randomize()
+	Iso.yaw = 0.0
+	_yaw_target = 0.0
 	# Réapparition à la sortie du saloon (sinon, entrée du village).
 	if GameManager.town_return_pos != Vector2.ZERO:
 		_player_pos = GameManager.town_return_pos
@@ -281,10 +284,18 @@ func _process(delta: float) -> void:
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
 	_update_coach(delta)
+	# Rotation douce de la vue vers l'angle visé (pivote tout le décor).
+	if absf(angle_difference(Iso.yaw, _yaw_target)) > 0.0005:
+		Iso.yaw = lerp_angle(Iso.yaw, _yaw_target, clampf(delta * 9.0, 0.0, 1.0))
 	_cam = _cam.lerp(_camera_target(), clampf(delta * 8.0, 0.0, 1.0))
 	position = _cam
 	_hint_t += delta
 	queue_redraw()
+
+
+## Fait pivoter la vue par pas de 45° (la simulation reste inchangée).
+func _rotate_view(steps: int) -> void:
+	_yaw_target += float(steps) * PI / 4.0
 
 
 ## Choisit l'interaction la plus proche (banque, saloon, PNJ, commerce) et gère E.
@@ -428,6 +439,11 @@ func _enter_bank() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		GameManager.goto_main_menu()
+	elif event is InputEventKey and event.pressed and not event.echo:
+		# Pivoter la vue par pas de 45° (touches sans conflit avec le déplacement).
+		match event.keycode:
+			KEY_BRACKETLEFT, KEY_COMMA: _rotate_view(-1)
+			KEY_BRACKETRIGHT, KEY_PERIOD: _rotate_view(1)
 
 
 # --- Caméra qui suit le cowboy (bornée à la carte) ---
@@ -999,6 +1015,22 @@ func _build_ui() -> void:
 	back.custom_minimum_size = Vector2(130, 44)
 	back.pressed.connect(func() -> void: GameManager.goto_main_menu())
 	layer.add_child(back)
+
+	# Boutons de rotation de la vue (desktop + mobile) : tournent le décor de 45°.
+	var rot := HBoxContainer.new()
+	rot.add_theme_constant_override("separation", 8)
+	rot.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	rot.position = Vector2(-150, 64)
+	for spec in [["⟲", -1], ["⟳", 1]]:
+		var rb := Button.new()
+		rb.text = str(spec[0])
+		rb.add_theme_font_size_override("font_size", 24)
+		rb.custom_minimum_size = Vector2(61, 44)
+		rb.focus_mode = Control.FOCUS_NONE
+		var st: int = spec[1]
+		rb.pressed.connect(func() -> void: _rotate_view(st))
+		rot.add_child(rb)
+	layer.add_child(rot)
 
 	# Bandeau d'ambiance (texte affiché en bas quand on observe un lieu).
 	_toast = Label.new()
