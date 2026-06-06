@@ -79,6 +79,34 @@ func _ready() -> void:
 	_cam = _camera_target()
 	position = _cam
 	_build_ui()
+	_setup_atmosphere()
+
+
+## Ambiance "golden hour" : teinte chaude globale + voile vignette doux sur les
+## bords (rapproche le rendu de l'illustration western de référence).
+func _setup_atmosphere() -> void:
+	var warm := CanvasModulate.new()
+	warm.color = Color(1.0, 0.95, 0.86)
+	add_child(warm)
+	var layer := CanvasLayer.new()
+	layer.layer = 1
+	var rect := ColorRect.new()
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sh := Shader.new()
+	sh.code = "shader_type canvas_item;\n" + \
+		"void fragment() {\n" + \
+		"  vec2 d = UV - vec2(0.5);\n" + \
+		"  float r = length(d * vec2(1.05, 1.35));\n" + \
+		"  float vig = smoothstep(0.42, 0.95, r);\n" + \
+		"  vec3 tint = mix(vec3(0.55, 0.30, 0.12), vec3(0.04, 0.02, 0.05), 0.35);\n" + \
+		"  COLOR = vec4(tint, vig * 0.5);\n" + \
+		"}\n"
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	rect.material = mat
+	layer.add_child(rect)
+	add_child(layer)
 
 
 ## Crée le VRAI moteur de collision : un corps pour le joueur + un StaticBody2D
@@ -694,7 +722,7 @@ func _horse(world_pos: Vector2) -> void:
 func _building_style(label: String) -> Dictionary:
 	match label:
 		"★ BANQUE ★": return {"wall": Color(0.90, 0.86, 0.74), "trim": Color(0.45, 0.30, 0.16),
-			"door": Color(0.20, 0.13, 0.08), "shutter": Color(0.30, 0.40, 0.55), "stories": 2}
+			"door": Color(0.20, 0.13, 0.08), "shutter": Color(0.30, 0.40, 0.55), "stories": 2, "plaster": true}
 		"SALOON": return {"wall": Color(0.86, 0.50, 0.42), "trim": Color(0.40, 0.18, 0.12),
 			"door": Color(0.30, 0.18, 0.10), "shutter": Color(0.85, 0.80, 0.70), "stories": 2}
 		"HÔTEL": return {"wall": Color(0.84, 0.82, 0.76), "trim": Color(0.42, 0.28, 0.16),
@@ -702,7 +730,7 @@ func _building_style(label: String) -> Dictionary:
 		"MAGASIN": return {"wall": Color(0.74, 0.55, 0.34), "trim": Color(0.40, 0.26, 0.14),
 			"door": Color(0.30, 0.45, 0.35), "shutter": Color(0.55, 0.40, 0.22), "stories": 1}
 		"ÉGLISE": return {"wall": Color(0.92, 0.90, 0.84), "trim": Color(0.40, 0.27, 0.15),
-			"door": Color(0.30, 0.20, 0.10), "shutter": Color(0.6, 0.5, 0.35), "stories": 1, "cross": true}
+			"door": Color(0.30, 0.20, 0.10), "shutter": Color(0.6, 0.5, 0.35), "stories": 1, "cross": true, "plaster": true}
 		"SHÉRIF": return {"wall": Color(0.78, 0.80, 0.82), "trim": Color(0.35, 0.30, 0.26),
 			"door": Color(0.22, 0.16, 0.12), "shutter": Color(0.35, 0.42, 0.50), "stories": 1, "star": true}
 		"ÉCURIE": return {"wall": Color(0.55, 0.40, 0.24), "trim": Color(0.32, 0.21, 0.11),
@@ -712,7 +740,7 @@ func _building_style(label: String) -> Dictionary:
 		"FORGE": return {"wall": Color(0.50, 0.45, 0.42), "trim": Color(0.28, 0.24, 0.22),
 			"door": Color(0.12, 0.10, 0.10), "shutter": Color(0.45, 0.35, 0.25), "stories": 1, "bigdoor": true}
 		"DOCTEUR": return {"wall": Color(0.90, 0.89, 0.85), "trim": Color(0.42, 0.28, 0.16),
-			"door": Color(0.55, 0.22, 0.18), "shutter": Color(0.70, 0.25, 0.22), "stories": 1, "redcross": true}
+			"door": Color(0.55, 0.22, 0.18), "shutter": Color(0.70, 0.25, 0.22), "stories": 1, "redcross": true, "plaster": true}
 		_: return {"wall": Color(0.82, 0.78, 0.70), "trim": Color(0.42, 0.28, 0.16),
 			"door": Color(0.24, 0.16, 0.10), "shutter": Color(0.45, 0.40, 0.30), "stories": 1}
 
@@ -726,6 +754,7 @@ func _draw_building(b: Dictionary) -> void:
 	var side := wall.darkened(0.24)
 	var trim: Color = s["trim"]
 	var two: bool = int(s.get("stories", 1)) >= 2
+	var plaster: bool = bool(s.get("plaster", false))
 	var U := Vector2(0, -1)
 	var gh := 84.0                                   # rez-de-chaussée
 	var uh := 74.0 if two else 0.0                   # étage
@@ -745,8 +774,9 @@ func _draw_building(b: Dictionary) -> void:
 	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + U * total, b1 + U * total]), side)
 	draw_colored_polygon(PackedVector2Array([
 		b0 + U * body, b1 + U * body, b2 + U * body, b3 + U * body]), wall.darkened(0.32))
-	# Façade.
+	# Façade + texture (bardage bois ou crépi).
 	draw_colored_polygon(PackedVector2Array([fL, fR, fR + U * total, fL + U * total]), wall)
+	_siding(fL, fR, U, 0.0, total, wall, plaster)
 	# Parapet (corniche) + ligne.
 	draw_colored_polygon(PackedVector2Array([
 		fL + U * body, fR + U * body, fR + U * total, fL + U * total]), wall.darkened(0.12))
@@ -780,6 +810,7 @@ func _draw_building(b: Dictionary) -> void:
 		for pu in [0.07, 0.5, 0.93]:
 			var pf := fL.lerp(fR, pu) + out
 			draw_line(pf, pf + U * av, trim.darkened(0.1), 3.5)
+		_lantern(fL.lerp(fR, 0.07) + out + U * (av - 12.0))
 	else:
 		# 1 étage : auvent sur poteaux.
 		var av := gh * 0.86
@@ -789,6 +820,7 @@ func _draw_building(b: Dictionary) -> void:
 		for pu in [0.08, 0.92]:
 			var pf := fL.lerp(fR, pu) + out
 			draw_line(pf, pf + U * av, trim.darkened(0.1), 3.0)
+		_lantern(fL.lerp(fR, 0.08) + out + U * (av - 10.0))
 
 	# --- Rez-de-chaussée : porte + fenêtres/volets ---
 	if s.get("bigdoor", false):
@@ -809,16 +841,49 @@ func _draw_building(b: Dictionary) -> void:
 	_sign((fL + fR) * 0.5 + out + U * (sy - 6.0), b["label"])
 
 
-## Fenêtre à carreaux + 2 volets colorés.
+## Fenêtre à carreaux éclairée (halo chaud) + 2 volets ouverts.
 func _win2(L: Vector2, R: Vector2, U: Vector2, u: float, v0: float, v1: float,
 		frame: Color, shutter: Color) -> void:
+	var c := L.lerp(R, u) + U * ((v0 + v1) * 0.5)
+	# Lueur chaude derrière la vitre (vie + ambiance crépusculaire).
+	draw_circle(c, 12.0, Color(1.0, 0.78, 0.38, 0.10))
+	draw_circle(c, 7.5, Color(1.0, 0.82, 0.42, 0.16))
 	_facequad(L, R, U, u - 0.13, u - 0.075, v0, v1, shutter)              # volet gauche
 	_facequad(L, R, U, u + 0.075, u + 0.13, v0, v1, shutter)             # volet droit
 	_facequad(L, R, U, u - 0.075, u + 0.075, v0 - 2, v1 + 2, frame)      # cadre
-	_facequad(L, R, U, u - 0.06, u + 0.06, v0, v1, Color(0.97, 0.87, 0.5))  # vitre
+	_facequad(L, R, U, u - 0.06, u + 0.06, v0, v1, Color(1.0, 0.86, 0.52))  # vitre éclairée
 	var mv := (v0 + v1) * 0.5
 	draw_line(L.lerp(R, u) + U * v0, L.lerp(R, u) + U * v1, frame, 1.0)
 	draw_line(L.lerp(R, u - 0.06) + U * mv, L.lerp(R, u + 0.06) + U * mv, frame, 1.0)
+
+
+## Bardage : planches verticales nuancées (bois) ou crépi lisse (plâtre).
+func _siding(L: Vector2, R: Vector2, U: Vector2, v0: float, v1: float,
+		base: Color, plaster: bool) -> void:
+	if plaster:
+		for k in range(1, 4):
+			var vy := lerpf(v0, v1, float(k) / 4.0)
+			draw_line(L + U * vy, R + U * vy, base.darkened(0.06), 1.0)
+		return
+	var n := 9
+	for i in range(n):
+		var u0 := float(i) / n
+		var u1 := float(i + 1) / n
+		var shade := base.darkened(0.04) if i % 2 == 0 else base.darkened(0.12)
+		_facequad(L, R, U, u0, u1, v0, v1, shade)
+		draw_line(L.lerp(R, u1) + U * v0, L.lerp(R, u1) + U * v1, base.darkened(0.30), 1.0)
+	for f in [0.34, 0.67]:
+		var vy := lerpf(v0, v1, f)
+		draw_line(L + U * vy, R + U * vy, base.darkened(0.20), 1.0)
+
+
+## Lanterne chaude accrochée à un poteau du porche.
+func _lantern(pos: Vector2) -> void:
+	draw_circle(pos, 9.0, Color(1.0, 0.74, 0.30, 0.10))
+	draw_circle(pos, 5.5, Color(1.0, 0.80, 0.36, 0.16))
+	draw_line(pos + Vector2(0, -10), pos + Vector2(0, -5), Color(0.18, 0.12, 0.07), 1.5)
+	draw_rect(Rect2(pos - Vector2(2.5, 4.5), Vector2(5, 9)), Color(0.22, 0.14, 0.07))
+	draw_circle(pos, 2.4, Color(1.0, 0.9, 0.55))
 
 
 ## Quad sur une face verticale (L,R base ; up unitaire ; v en pixels).
@@ -835,11 +900,19 @@ func _tinted(base: Color, tint: Color) -> Color:
 
 func _sign(center: Vector2, label: String) -> void:
 	var font := ThemeDB.fallback_font
-	var w: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 14
-	draw_rect(Rect2(center - Vector2(w * 0.5, 12), Vector2(w, 22)), Color(0.32, 0.20, 0.10))
-	draw_rect(Rect2(center - Vector2(w * 0.5, 12), Vector2(w, 22)), Color(0.6, 0.45, 0.25), false, 2.0)
-	draw_string(font, center - Vector2(w * 0.5 - 7, -3), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 16,
-			Color(0.98, 0.92, 0.7))
+	var w: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 16
+	var r := Rect2(center - Vector2(w * 0.5, 11), Vector2(w, 22))
+	# Chaînes de suspension.
+	draw_line(Vector2(r.position.x + 5, r.position.y), Vector2(r.position.x + 5, r.position.y - 8),
+			Color(0.14, 0.10, 0.06), 1.5)
+	draw_line(Vector2(r.end.x - 5, r.position.y), Vector2(r.end.x - 5, r.position.y - 8),
+			Color(0.14, 0.10, 0.06), 1.5)
+	# Plaque en bois.
+	draw_rect(r, Color(0.28, 0.18, 0.09))
+	draw_rect(Rect2(r.position + Vector2(2, 2), r.size - Vector2(4, 4)), Color(0.40, 0.26, 0.13), false, 1.0)
+	draw_rect(r, Color(0.62, 0.46, 0.26), false, 2.0)
+	draw_string(font, center - Vector2(w * 0.5 - 8, -4), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 16,
+			Color(0.99, 0.93, 0.72))
 
 
 func _sand_tile(x: float, y: float, w: float, h: float) -> void:
@@ -905,6 +978,7 @@ func _text(pos: Vector2, s: String, size: int, col: Color) -> void:
 
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
+	layer.layer = 2                  # au-dessus du voile d'ambiance (vignette = 1)
 	add_child(layer)
 	get_viewport().size_changed.connect(_on_viewport_resized)
 
