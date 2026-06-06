@@ -26,6 +26,10 @@ const LEVEL_COUNT := 3
 var current_level: int = 1
 ## Ville courante (index 1-based dans TOWNS).
 var current_town: int = 1
+## Mission procédurale (banque générée pour la ville) vs mission JSON (niveau rapide).
+var procedural := false
+var mission_seed := 0
+var mission_biome := "desert"
 ## Position de réapparition en ville (ex. en sortant du saloon). Zero = défaut.
 var town_return_pos := Vector2.ZERO
 ## La boutique a-t-elle été ouverte depuis la ville (retour en ville) ?
@@ -217,12 +221,17 @@ func travel_to_town(idx: int) -> void:
 	current_town = idx
 	current_level = clampi(lvl, 1, LEVEL_COUNT)
 	town_return_pos = Vector2.ZERO
+	# Banque PROCÉDURALE propre à cette ville (graine déterministe + biome).
+	procedural = true
+	mission_seed = idx * 1009 + 7
+	mission_biome = str(t.get("theme", "desert"))
 	_change_scene(SCENE_TOWN)
 
 
 ## Lance directement un niveau (depuis la sélection de niveaux ou "suivant").
 func play_level(level: int) -> void:
 	current_level = clampi(level, 1, LEVEL_COUNT)
+	procedural = false      # niveau rapide = mission JSON figée
 	_change_scene(SCENE_MISSION)
 
 

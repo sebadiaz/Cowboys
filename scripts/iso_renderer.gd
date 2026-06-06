@@ -15,6 +15,8 @@ var loot: Array = []
 var safe: Node = null
 var exit_zone: Node = null
 var bullets: Node = null
+var biome: String = "desert"
+var _pal: Dictionary = {}
 
 # Planches d'assets.
 const SHEET_BUILD := preload("res://assets/source_sheets/bank_props_sheet.png")     # sol, murs, comptoir
@@ -60,6 +62,7 @@ func setup() -> void:
 		warm.name = "WarmTint"
 		warm.color = Color(1.0, 0.97, 0.90)
 		add_child(warm)
+	_pal = _biome_palette()
 	_build_billboards()
 	_apply_zoom()
 	_cam_pos = _camera_target()
@@ -389,14 +392,14 @@ func _floor_tile(x: float, y: float, w: float, h: float, even: bool, marble: boo
 		Iso.project(Vector2(x + w, y + h)), Iso.project(Vector2(x, y + h))])
 	var base: Color
 	if marble:
-		base = Color(0.88, 0.84, 0.76) if even else Color(0.76, 0.72, 0.66)
+		base = _pal["marble_a"] if even else _pal["marble_b"]
 		draw_colored_polygon(pts, base)
 		draw_polyline(_closed(pts), Color(0.62, 0.60, 0.56), 1.0)
 		# veinage discret.
 		draw_line(Iso.project(Vector2(x + w * 0.2, y)), Iso.project(Vector2(x + w * 0.7, y + h)),
 			base.darkened(0.07), 1.0)
 	else:
-		base = Color(0.64, 0.47, 0.29) if even else Color(0.57, 0.41, 0.25)
+		base = _pal["wood_a"] if even else _pal["wood_b"]
 		draw_colored_polygon(pts, base)
 		draw_line(Iso.project(Vector2(x, y + h * 0.5)), Iso.project(Vector2(x + w, y + h * 0.5)),
 			base.darkened(0.13), 1.0)
@@ -925,7 +928,7 @@ func _draw_wall(wd: Dictionary) -> void:
 	var up := Vector2(0, -h)
 	# Palette CONTRASTÉE : plâtre crème clair (intérieur) / adobe chaud (extérieur),
 	# bien plus clairs que le sol pour que la salle se "lise".
-	var face: Color = Color(0.80, 0.64, 0.45) if outer else Color(0.91, 0.85, 0.72)
+	var face: Color = _pal["outer"] if outer else _pal["wall"]
 	var faceE := face.darkened(0.14)
 	draw_colored_polygon(PackedVector2Array([b3, b2, b2 + up, b3 + up]), face)
 	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + up, b1 + up]), faceE)
@@ -937,7 +940,7 @@ func _draw_wall(wd: Dictionary) -> void:
 			draw_line(b1 + Vector2(0, vy), b2 + Vector2(0, vy), face.darkened(0.16), 1.0)
 	else:
 		# Lambris bois en bas (plinthe haute ~18 px) + cimaise.
-		var wood := Color(0.46, 0.31, 0.18)
+		var wood: Color = _pal["trim"]
 		var wsh := 18.0
 		draw_colored_polygon(PackedVector2Array([b3, b2, b2 + Vector2(0, -wsh), b3 + Vector2(0, -wsh)]), wood)
 		draw_colored_polygon(PackedVector2Array([b1, b2, b2 + Vector2(0, -wsh), b1 + Vector2(0, -wsh)]), wood.darkened(0.12))
@@ -948,7 +951,7 @@ func _draw_wall(wd: Dictionary) -> void:
 		draw_line(b1 + up + Vector2(0, 8), b2 + up + Vector2(0, 8), wood.darkened(0.12), 2.0)
 	# Corniche (dessus) + arête sombre pour détacher du fond.
 	var topq := PackedVector2Array([b0 + up, b1 + up, b2 + up, b3 + up])
-	draw_colored_polygon(topq, Color(0.66, 0.46, 0.32) if outer else Color(0.97, 0.92, 0.82))
+	draw_colored_polygon(topq, face.darkened(0.10) if outer else face.lightened(0.12))
 	draw_polyline(_closed(topq), face.darkened(0.32), 1.5)
 
 
@@ -977,6 +980,37 @@ func _draw_counter_base(r: Rect2) -> void:
 	var topq := PackedVector2Array([b0 + up, b1 + up, b2 + up + ov, b3 + up + ov])
 	draw_colored_polygon(topq, Color(0.62, 0.42, 0.22))
 	draw_polyline(_closed(topq), Color(0.78, 0.60, 0.34), 1.5)
+
+
+
+## Palette d'intérieur selon le biome de la ville (sol + murs).
+func _biome_palette() -> Dictionary:
+	match biome:
+		"canyon":
+			return {"wood_a": Color(0.62, 0.40, 0.26), "wood_b": Color(0.54, 0.34, 0.22),
+				"marble_a": Color(0.82, 0.60, 0.46), "marble_b": Color(0.72, 0.50, 0.38),
+				"wall": Color(0.85, 0.62, 0.46), "outer": Color(0.66, 0.40, 0.30),
+				"trim": Color(0.45, 0.26, 0.16)}
+		"plains":
+			return {"wood_a": Color(0.60, 0.46, 0.28), "wood_b": Color(0.53, 0.40, 0.24),
+				"marble_a": Color(0.85, 0.85, 0.74), "marble_b": Color(0.73, 0.76, 0.62),
+				"wall": Color(0.86, 0.86, 0.70), "outer": Color(0.66, 0.66, 0.46),
+				"trim": Color(0.42, 0.35, 0.18)}
+		"snow":
+			return {"wood_a": Color(0.58, 0.52, 0.48), "wood_b": Color(0.51, 0.46, 0.43),
+				"marble_a": Color(0.91, 0.94, 0.98), "marble_b": Color(0.79, 0.84, 0.91),
+				"wall": Color(0.90, 0.94, 0.99), "outer": Color(0.70, 0.78, 0.86),
+				"trim": Color(0.46, 0.46, 0.54)}
+		"night":
+			return {"wood_a": Color(0.36, 0.32, 0.32), "wood_b": Color(0.31, 0.28, 0.28),
+				"marble_a": Color(0.44, 0.46, 0.56), "marble_b": Color(0.36, 0.38, 0.48),
+				"wall": Color(0.48, 0.50, 0.62), "outer": Color(0.33, 0.35, 0.45),
+				"trim": Color(0.27, 0.27, 0.33)}
+		_:
+			return {"wood_a": Color(0.64, 0.47, 0.29), "wood_b": Color(0.57, 0.41, 0.25),
+				"marble_a": Color(0.88, 0.84, 0.76), "marble_b": Color(0.76, 0.72, 0.66),
+				"wall": Color(0.91, 0.85, 0.72), "outer": Color(0.80, 0.64, 0.45),
+				"trim": Color(0.46, 0.31, 0.18)}
 
 
 # --- Primitives ---

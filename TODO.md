@@ -43,6 +43,10 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [x] **Déblocage séquentiel persistant** (`SaveManager.towns_unlocked`) :
       villes conquises (✓), frontière pulsée « à conquérir », suivantes verrouillées.
 - [x] Flux : Menu → **Carte** → Ville (thématisée) → Banque → mission.
+- [x] **Banque PROCÉDURALE par ville** (`mission_manager._generate_bank_cfg`) :
+      gabarit jouable (hall fermé → comptoir → coffre → sortie), taille/gardes/
+      butin/valeur selon la difficulté, **décor thématisé par biome** (sol + murs).
+      Les 3 banques JSON restent pour le « Niveau rapide ».
 
 ## Carte du monde — pistes suivantes
 - [ ] **Layouts de ville uniques** par biome (pas seulement la teinte).

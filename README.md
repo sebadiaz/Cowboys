@@ -54,7 +54,10 @@ Ces préférences sont sauvegardées dans `user://save.json` avec le reste de la
    neige, nuit). Chaque ville a **sa banque** ; on les débloque l'une après
    l'autre au fil des réussites.
 0bis. **Ville** : on arrive dans le village western, on rejoint la **banque** à
-   pied (dirige-toi vers la porte « BANQUE ») → le braquage démarre.
+   pied (dirige-toi vers la porte « BANQUE ») → le braquage démarre. **Chaque ville
+   a sa propre banque générée procéduralement** (taille, gardes, butin selon la
+   difficulté ; décor thématisé par le biome). Le « Niveau rapide » garde 3 banques
+   fixes (JSON).
 1. Récupère du butin (3 sacs **$**).
 2. Ouvre le **coffre** (reste à côté, maintiens **E** → barre de progression).
 3. Surveille la **jauge d'alarme** : les gardes qui te voient la font monter.

@@ -137,6 +137,7 @@ func _build_iso_renderer() -> void:
 	_renderer.floor_rect = _floor_rect
 	_renderer.walls = _walls
 	_renderer.props = _cfg.get("props", [])
+	_renderer.biome = str(_cfg.get("biome", "desert"))
 	_renderer.player = player
 	_renderer.guards = _guards
 	_renderer.loot = _loot_nodes
@@ -160,6 +161,11 @@ func _config_path() -> String:
 
 ## Charge le niveau courant. Retombe sur DEFAULT_CFG si absent/invalide.
 func _load_config() -> Dictionary:
+	# Banque PROCÉDURALE propre à la ville (depuis la carte du monde).
+	if GameManager.procedural:
+		var tier := clampi(GameManager.current_level, 1, 3)
+		var tname := str(GameManager.current_town_def().get("name", "Banque"))
+		return _generate_bank_cfg(GameManager.mission_seed, tier, GameManager.mission_biome, tname)
 	var path := _config_path()
 	if not FileAccess.file_exists(path):
 		return DEFAULT_CFG.duplicate(true)
@@ -176,6 +182,103 @@ func _load_config() -> Dictionary:
 	for key in data.keys():
 		cfg[key] = data[key]
 	return cfg
+
+
+## Génère une banque JOUABLE et VARIÉE (gabarit éprouvé : hall fermé → comptoir →
+## coffre → sortie), paramétrée par la graine, le palier (tier 1..3) et le biome.
+## Schéma identique aux fichiers JSON, donc tout le reste fonctionne sans changement.
+func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: String) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_val
+	var ox := 40.0
+	var oy := 40.0
+	var W: float = [0.0, 1180.0, 1380.0, 1560.0][tier]
+	var H: float = [0.0, 820.0, 900.0, 980.0][tier]
+	var cx := ox + W * 0.5
+	var cyc := oy + H * 0.50          # ligne de comptoir
+	var gap := 200.0                  # ouverture centrale (entrée + passage comptoir)
+	var th := 24.0
+	var nhw := 150.0                  # demi-largeur de la niche du coffre
+	var nh := 150.0                   # hauteur des cloisons de niche
+	var walls := []
+	walls.append([ox, oy, W, th, 1])
+	walls.append([ox, oy, th, H, 1])
+	walls.append([ox + W - th, oy, th, H, 1])
+	walls.append([ox, oy + H - th, (cx - gap * 0.5) - ox, th, 1])
+	walls.append([cx + gap * 0.5, oy + H - th, (ox + W) - (cx + gap * 0.5), th, 1])
+	walls.append([ox + 80.0, cyc, (cx - gap * 0.5) - (ox + 80.0), th, 0, 1])
+	walls.append([cx + gap * 0.5, cyc, (ox + W - 80.0) - (cx + gap * 0.5), th, 0, 1])
+	walls.append([cx - nhw - 12.0, oy + th, th, nh])
+	walls.append([cx + nhw - 12.0, oy + th, th, nh])
+
+	var safe_y := oy + th + 86.0
+	var safe_val := 450 + tier * 200 + rng.randi_range(0, 150)
+	var safe := {"pos": [cx, safe_y], "value": safe_val, "open_time": 2.3 + tier * 0.2}
+
+	var lobby_y := (cyc + (oy + H - th)) * 0.5
+	var staff_y := ((oy + th + nh) + cyc) * 0.5
+
+	var loot := []
+	loot.append({"pos": [cx - 200.0 + rng.randf_range(-20, 20), cyc + 70.0], "value": 200})
+	loot.append({"pos": [cx + 200.0 + rng.randf_range(-20, 20), cyc + 70.0], "value": 200})
+	loot.append({"pos": [cx - 64.0, safe_y + 36.0], "value": 300})
+	loot.append({"pos": [cx + 64.0, safe_y + 36.0], "value": 300})
+	if tier >= 2:
+		loot.append({"pos": [ox + 150.0, staff_y], "value": 150})
+		loot.append({"pos": [ox + W - 150.0, staff_y], "value": 150})
+	if tier >= 3:
+		loot.append({"pos": [cx, lobby_y + 30.0], "value": 200})
+
+	var guards := []
+	guards.append({"route": [[ox + 120, lobby_y], [ox + W - 120, lobby_y],
+		[ox + W - 120, lobby_y + 40], [ox + 120, lobby_y + 40]]})
+	guards.append({"route": [[ox + 160, staff_y], [ox + W - 160, staff_y],
+		[ox + W - 160, staff_y + 36], [ox + 160, staff_y + 36]]})
+	if tier >= 2:
+		guards.append({"route": [[cx - 90, cyc - 70], [cx + 90, cyc - 70],
+			[cx + 90, cyc - 34], [cx - 90, cyc - 34]]})
+	if tier >= 3:
+		guards.append({"route": [[ox + 220, lobby_y + 90], [ox + W - 220, lobby_y + 90]]})
+
+	var props := []
+	for sgn in [-1.0, 1.0]:
+		var cages := 2 if tier == 1 else 3
+		for k in range(cages):
+			props.append(["counter", cx + sgn * (gap * 0.5 + 105.0 + 70.0 * k), cyc - 10.0])
+	props.append(["desk", ox + 160.0, oy + H * 0.30])
+	props.append(["chair", ox + 160.0, oy + H * 0.30 + 46.0])
+	props.append(["desk", ox + W - 160.0, oy + H * 0.30])
+	props.append(["chair", ox + W - 160.0, oy + H * 0.30 + 46.0])
+	props.append(["shelf", cx - nhw + 30.0, oy + 60.0])
+	props.append(["shelf", cx + nhw - 30.0, oy + 60.0])
+	props.append(["money", cx - 70.0, safe_y - 30.0])
+	props.append(["money", cx + 70.0, safe_y - 30.0])
+	props.append(["money", cx - 220.0, cyc - 40.0])
+	props.append(["money", cx + 220.0, cyc - 40.0])
+	props.append(["plant", ox + 120.0, oy + H - 120.0])
+	props.append(["plant", ox + W - 120.0, oy + H - 120.0])
+	props.append(["poster", ox + 54.0, lobby_y - 60.0])
+	props.append(["poster", ox + W - 54.0, lobby_y + 60.0])
+	# Solides UNIQUEMENT aux 4 coins (hors passage et hors rondes).
+	props.append(["barrel", ox + 110.0, oy + H - 110.0])
+	props.append(["crate", ox + W - 110.0, oy + H - 110.0])
+	props.append(["crate", ox + 110.0, oy + 120.0])
+	props.append(["barrel", ox + W - 110.0, oy + 120.0])
+
+	var diff: String = ["", "Petite banque", "Banque de comté", "Grande banque"][tier]
+	return {
+		"name": town_name,
+		"difficulty": diff,
+		"biome": biome,
+		"floor": [ox, oy, W, H],
+		"walls": walls,
+		"props": props,
+		"player_start": [cx, oy + H - 70.0],
+		"exit": [cx, oy + H - 34.0],
+		"safe": safe,
+		"loot": loot,
+		"guards": guards,
+	}
 
 
 func _to_vec(a: Variant) -> Vector2:
