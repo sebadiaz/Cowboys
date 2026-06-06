@@ -212,9 +212,10 @@ func _build_town() -> void:
 
 func _add_building(region: Rect2, pos: Vector2, h: float, label: String, tint: Color,
 		flavor: String, foot: Vector2, enter := "") -> void:
+	var foot_rect := Rect2(pos - Vector2(foot.x * 0.5, foot.y * 0.6), foot)
 	_buildings.append({"region": region, "pos": pos, "h": h, "label": label,
-			"tint": tint, "flavor": flavor, "enter": enter})
-	_foots.append(Rect2(pos - Vector2(foot.x * 0.5, foot.y * 0.6), foot))
+			"tint": tint, "flavor": flavor, "enter": enter, "foot": foot_rect})
+	_foots.append(foot_rect)
 
 
 func _add_prop(region: Rect2, pos: Vector2, h: float) -> void:
@@ -478,7 +479,11 @@ func _draw() -> void:
 	for it in items:
 		match it["k"]:
 			"b": _draw_building(it["o"])
-			"p": _billboard(it["o"]["region"], it["o"]["pos"], it["o"]["h"], Color.WHITE)
+			"p":
+				if it["o"]["region"] == R_WAGON:
+					_draw_wagon(it["o"]["pos"])   # chariots garés en volume
+				else:
+					_billboard(it["o"]["region"], it["o"]["pos"], it["o"]["h"], Color.WHITE)
 			"coach": _draw_coach()
 			"horse": _horse(it["o"])
 			"n":
@@ -539,11 +544,40 @@ func _draw_coach() -> void:
 	for i in range(3):
 		var dp := Iso.project(_coach_pos - Vector2(0, 30.0 + i * 26.0))
 		draw_circle(dp + Vector2(_rng.randf_range(-4, 4), -6), 9.0 - i * 2.0, Color(0.72, 0.6, 0.42, 0.22))
-	# Chevaux devant (vers l'aval = sud).
-	_horse(_coach_pos + Vector2(0, 46))
-	_horse(_coach_pos + Vector2(0, 64))
-	# Chariot bâché.
-	_billboard(R_WAGON, _coach_pos, 150.0, Color.WHITE)
+	# Attelage de 2 chevaux devant (vers l'aval = sud).
+	_horse(_coach_pos + Vector2(-9, 44))
+	_horse(_coach_pos + Vector2(10, 52))
+	# Chariot bâché dessiné en volume.
+	_draw_wagon(_coach_pos)
+
+
+## Chariot bâché iso : caisse en bois (volume) + bâche en demi-cylindre + roues.
+func _draw_wagon(pos: Vector2) -> void:
+	draw_colored_polygon(_diamond_shadow(Iso.project(pos), 30.0), Color(0, 0, 0, 0.18))
+	var fr := Rect2(pos.x - 24, pos.y - 16, 48, 32)
+	var b0 := Iso.project(fr.position)
+	var b1 := Iso.project(Vector2(fr.end.x, fr.position.y))
+	var b2 := Iso.project(fr.end)
+	var b3 := Iso.project(Vector2(fr.position.x, fr.end.y))
+	var up := Vector2(0, -20)
+	var wood := Color(0.45, 0.30, 0.16)
+	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + up, b1 + up]), wood.darkened(0.2))
+	draw_colored_polygon(PackedVector2Array([b3, b2, b2 + up, b3 + up]), wood)
+	# Bâche (demi-cylindre beige) posée sur le dessus.
+	var canvas := Color(0.88, 0.82, 0.68)
+	var c0 := b3 + up
+	var c1 := b2 + up
+	var arch := PackedVector2Array([c0])
+	for i in range(9):
+		var u := float(i) / 8.0
+		arch.append(c0.lerp(c1, u) + Vector2(0, -sin(u * PI) * 24.0))
+	arch.append(c1)
+	draw_colored_polygon(arch, canvas)
+	draw_polyline(arch, canvas.darkened(0.18), 1.5)
+	# Roues sur la face sud.
+	for wp in [b3 + Vector2(7, -1), b2 + Vector2(-7, -1)]:
+		draw_circle(wp, 7.0, Color(0.14, 0.09, 0.06))
+		draw_circle(wp, 3.0, wood.lightened(0.1))
 
 
 ## Barre d'attache (poteaux + traverse) derrière les chevaux de l'écurie.
@@ -556,22 +590,95 @@ func _draw_hitch() -> void:
 	draw_line(a + Vector2(0, -22), b + Vector2(0, -22), wood, 4.0)
 
 
+## Cheval vu de profil (regarde vers la gauche) : corps, pattes, queue, encolure,
+## tête, crinière. Dessiné proprement (plus de "patate").
 func _horse(world_pos: Vector2) -> void:
-	var b := Iso.project(world_pos)
-	draw_colored_polygon(_diamond_shadow(b, 16.0), Color(0, 0, 0, 0.18))
-	var body := Color(0.34, 0.22, 0.13)
-	draw_colored_polygon(_rect_diamond(Rect2(world_pos.x - 16, world_pos.y - 8, 32, 16)), body)
-	# Pattes + tête.
-	for dx in [-12, -4, 4, 12]:
-		draw_line(b + Vector2(dx * 0.7, -2), b + Vector2(dx * 0.7, 8), body.darkened(0.2), 2.5)
-	draw_circle(b + Vector2(-14, -16), 5.0, body)          # tête
-	draw_line(b + Vector2(-10, -14), b + Vector2(-2, -22), body.darkened(0.15), 2.0)  # encolure
+	var base := Iso.project(world_pos)
+	draw_colored_polygon(_diamond_shadow(base, 18.0), Color(0, 0, 0, 0.18))
+	var body := Color(0.36, 0.23, 0.13)
+	var dark := body.darkened(0.28)
+	# Pattes (4) — dessinées avant le corps.
+	for dx in [-9.0, -3.0, 4.0, 10.0]:
+		draw_line(base + Vector2(dx, -12), base + Vector2(dx + 1.0, 2), dark, 3.0)
+	# Corps (capsule horizontale).
+	var bl := base + Vector2(-12, -16)
+	var brr := base + Vector2(12, -16)
+	draw_line(bl, brr, body, 14.0)
+	draw_circle(bl, 7.0, body)
+	draw_circle(brr, 7.0, body)
+	# Queue.
+	draw_line(brr + Vector2(3, -3), base + Vector2(18, 3), dark, 3.0)
+	# Encolure + tête (vers la gauche).
+	var neck := bl + Vector2(1, -3)
+	var head := bl + Vector2(-11, -16)
+	draw_line(neck, head, body, 7.0)
+	draw_circle(head, 4.5, body)
+	draw_line(head, head + Vector2(-5, 2), body, 5.0)        # museau
+	draw_line(head + Vector2(1, -3), head + Vector2(3, -7), body, 2.0)  # oreille
+	draw_line(neck + Vector2(-1, -3), head + Vector2(3, 3), dark, 3.0)  # crinière
+	draw_circle(head + Vector2(-2, -1), 1.0, Color(0.05, 0.04, 0.03))   # œil
 
 
+## Bâtiment dessiné en VOLUME iso (boîte 3D) : sa base = exactement l'empreinte
+## de collision. Murs + planches + porte + fenêtres + toit en pointe + enseigne.
 func _draw_building(b: Dictionary) -> void:
-	_billboard(b["region"], b["pos"], b["h"], b["tint"])
-	var top := Iso.project(b["pos"]) + Vector2(0, -b["h"] - 10)
-	_sign(top, b["label"])
+	var fr: Rect2 = b["foot"]
+	var tint: Color = b["tint"]
+	var wall := _tinted(Color(0.55, 0.38, 0.21), tint)
+	var wall_h: float = clampf(float(b["h"]) * 0.58, 95.0, 175.0)
+	var roof_h: float = wall_h * 0.55
+	var up := Vector2(0, -wall_h)
+	var b0 := Iso.project(fr.position)
+	var b1 := Iso.project(Vector2(fr.end.x, fr.position.y))
+	var b2 := Iso.project(fr.end)
+	var b3 := Iso.project(Vector2(fr.position.x, fr.end.y))
+	# Ombre au sol sur l'empreinte.
+	draw_colored_polygon(PackedVector2Array([b0, b1, b2, b3]), Color(0, 0, 0, 0.14))
+	# Faces visibles (est = b1-b2, sud = b3-b2).
+	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + up, b1 + up]), wall.darkened(0.22))
+	draw_colored_polygon(PackedVector2Array([b3, b2, b2 + up, b3 + up]), wall)
+	# Planches verticales (texture) sur la façade sud.
+	for u in [0.2, 0.4, 0.6, 0.8]:
+		var pl := b3.lerp(b2, u)
+		draw_line(pl, pl + up, wall.darkened(0.3), 1.0)
+	# Porte (façade sud) — plus chaude si le bâtiment est entrable.
+	var door := Color(0.30, 0.17, 0.07) if b["enter"] != "" else Color(0.16, 0.09, 0.05)
+	_face_quad(b3, b2, up, 0.41, 0.59, 0.0, 0.48, door)
+	_face_quad(b3, b2, up, 0.44, 0.56, 0.46, 0.5, Color(0.5, 0.35, 0.18))  # linteau
+	# Fenêtres éclairées.
+	for wx in [0.16, 0.84]:
+		_face_quad(b3, b2, up, wx - 0.07, wx + 0.07, 0.52, 0.74, Color(0.95, 0.85, 0.45))
+		_face_quad(b3, b2, up, wx - 0.07, wx + 0.07, 0.52, 0.74, Color(0.3, 0.2, 0.1), false)
+	# Toit en pointe (hip roof) vers un apex central.
+	var t0 := b0 + up
+	var t1 := b1 + up
+	var t2 := b2 + up
+	var t3 := b3 + up
+	var apex := (t0 + t1 + t2 + t3) * 0.25 + Vector2(0, -roof_h)
+	var roof := _tinted(Color(0.46, 0.22, 0.14), tint)
+	draw_colored_polygon(PackedVector2Array([t0, t1, apex]), roof.darkened(0.3))   # nord
+	draw_colored_polygon(PackedVector2Array([t0, t3, apex]), roof.darkened(0.18))  # ouest
+	draw_colored_polygon(PackedVector2Array([t1, t2, apex]), roof.darkened(0.1))   # est
+	draw_colored_polygon(PackedVector2Array([t3, t2, apex]), roof)                 # sud
+	# Enseigne au-dessus du toit.
+	_sign(apex + Vector2(0, -12), b["label"])
+
+
+## Dessine un quad sur une face verticale paramétrée (L,R = base, up = montée).
+## u: position horizontale 0..1 ; v: hauteur 0..1. `filled` false = contour.
+func _face_quad(L: Vector2, R: Vector2, up: Vector2, u0: float, u1: float,
+		v0: float, v1: float, col: Color, filled := true) -> void:
+	var q := PackedVector2Array([
+		L.lerp(R, u0) + up * v0, L.lerp(R, u1) + up * v0,
+		L.lerp(R, u1) + up * v1, L.lerp(R, u0) + up * v1])
+	if filled:
+		draw_colored_polygon(q, col)
+	else:
+		draw_polyline(_closed(q), col, 1.0)
+
+
+func _tinted(base: Color, tint: Color) -> Color:
+	return Color(base.r * tint.r, base.g * tint.g, base.b * tint.b)
 
 
 func _sign(center: Vector2, label: String) -> void:
