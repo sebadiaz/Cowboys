@@ -169,7 +169,7 @@ func _physics_process(delta: float) -> void:
 func _build_town() -> void:
 	# Bâtiment cible, au fond de la grand-rue.
 	_add_building(R_BANK, Vector2(1100, 230), 250.0, "★ BANQUE ★", Color(1, 1, 1),
-			"", Vector2(210, 150))
+			"", Vector2(256, 168))
 	# Côté ouest de la rue (x ~ 760). Le SALOON est ENTRABLE.
 	_add_building(R_SALOON, Vector2(760, 560), 210.0, "SALOON", Color(1.0, 0.92, 0.9),
 			"Saloon Le Cactus — pousse les portes battantes.", Vector2(180, 120), "saloon")
@@ -761,9 +761,192 @@ func _building_style(label: String) -> Dictionary:
 			"door": Color(0.24, 0.16, 0.10), "shutter": Color(0.45, 0.40, 0.30), "stories": 1}
 
 
+## Banque du Far West "grandeur nature" : façade en pierre de taille, deux
+## pilastres cannelés, perron, double porte à imposte, fronton triangulaire avec
+## horloge, corniche à denticules, fenêtres hautes à barreaux et nom doré gravé.
+func _draw_bank(b: Dictionary) -> void:
+	var fr: Rect2 = b["foot"]
+	var U := Vector2(0, -1)
+	var stone := Color(0.82, 0.74, 0.57)
+	var side := stone.darkened(0.24)
+	var roof := stone.darkened(0.34)
+	var trim := Color(0.54, 0.43, 0.29)
+	var gold := Color(0.95, 0.80, 0.34)
+	var door := Color(0.24, 0.14, 0.08)
+	var glass := Color(0.58, 0.73, 0.80)
+	var gh := 92.0           # rez-de-chaussée
+	var uh := 74.0           # étage
+	var corn := 26.0         # entablement / corniche
+	var body := gh + uh
+	var total := body + corn
+	var b0 := Iso.project(fr.position)
+	var b1 := Iso.project(Vector2(fr.end.x, fr.position.y))
+	var b2 := Iso.project(fr.end)
+	var b3 := Iso.project(Vector2(fr.position.x, fr.end.y))
+	var fL := b3
+	var fR := b2
+	var ax := fR - fL        # vecteur façade (gauche->droite), suit la rotation
+	# Ombre portée.
+	draw_colored_polygon(PackedVector2Array([b0 + Vector2(4, 4), b1 + Vector2(4, 4),
+		b2 + Vector2(4, 4), b3 + Vector2(4, 4)]), Color(0, 0, 0, 0.20))
+	# Volume : côté est + toit plat.
+	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + U * total, b1 + U * total]), side)
+	_stone_courses(b1, b2, U, 0.0, body, side)
+	# Détail du flanc est (visible quand on pivote la vue) : fenêtres à barreaux.
+	var sx := b2 - b1
+	var sglass := glass.darkened(0.12)
+	_facequad(b1, b2, U, 0.0, 1.0, body, body + 16.0, trim.darkened(0.12))   # frise latérale
+	for swu in [0.22, 0.5, 0.78]:
+		_bank_win(b1, b2, sx, U, swu, 0.06, gh + 18.0, body - 16.0, sglass, trim, gold, false)
+	_bank_win(b1, b2, sx, U, 0.30, 0.075, gh * 0.30, gh * 0.74, sglass, trim, gold, true)
+	_bank_win(b1, b2, sx, U, 0.70, 0.075, gh * 0.30, gh * 0.74, sglass, trim, gold, true)
+	var r0 := b0 + U * body
+	var r1 := b1 + U * body
+	var r2 := b2 + U * body
+	var r3 := b3 + U * body
+	draw_colored_polygon(PackedVector2Array([r0, r1, r2, r3]), roof)
+	# Toiture habillée (visible en vue pivotée) : voliges + parapet.
+	for t in [0.25, 0.5, 0.75]:
+		draw_line(r0.lerp(r1, t), r3.lerp(r2, t), roof.darkened(0.10), 1.0)
+		draw_line(r0.lerp(r3, t), r1.lerp(r2, t), roof.lightened(0.04), 1.0)
+	draw_polyline(PackedVector2Array([r0, r1, r2, r3, r0]), roof.darkened(0.22), 2.0)
+	# Petite verrière de toit (lanterneau).
+	var lc := (r0 + r1 + r2 + r3) * 0.25
+	draw_colored_polygon(PackedVector2Array([
+		lc + Vector2(-12, -2), lc + Vector2(12, -2), lc + Vector2(12, -16), lc + Vector2(-12, -16)]),
+		glass.darkened(0.05))
+	draw_rect(Rect2(lc + Vector2(-12, -16), Vector2(24, 14)), trim, false, 1.5)
+	draw_line(lc + Vector2(0, -2), lc + Vector2(0, -16), trim, 1.0)
+	# Façade pierre + appareillage.
+	draw_colored_polygon(PackedVector2Array([fL, fR, fR + U * total, fL + U * total]), stone)
+	_stone_courses(fL, fR, U, 0.0, body, stone)
+	# Soubassement plus sombre.
+	_facequad(fL, fR, U, 0.0, 1.0, 0.0, 15.0, stone.darkened(0.18))
+	# Bandeau d'étage.
+	_facequad(fL, fR, U, 0.0, 1.0, gh - 6.0, gh, trim)
+
+	# Deux pilastres encadrant l'entrée.
+	for cu in [0.30, 0.70]:
+		_facequad(fL, fR, U, cu - 0.035, cu + 0.035, 0.0, body, stone.lightened(0.05))
+		draw_line(fL.lerp(fR, cu + 0.035), fL.lerp(fR, cu + 0.035) + U * body, stone.darkened(0.22), 1.0)
+		draw_line(fL.lerp(fR, cu - 0.035), fL.lerp(fR, cu - 0.035) + U * body, stone.darkened(0.08), 1.0)
+		for fu in [-0.014, 0.0, 0.014]:                       # cannelures
+			draw_line(fL.lerp(fR, cu + fu) + U * 16, fL.lerp(fR, cu + fu) + U * (gh - 14), stone.darkened(0.13), 1.0)
+		_facequad(fL, fR, U, cu - 0.05, cu + 0.05, gh - 16, gh - 4, trim)   # chapiteau
+		_facequad(fL, fR, U, cu - 0.05, cu + 0.05, 2.0, 14.0, trim)          # base
+
+	# Fenêtres hautes à barreaux (rez-de-chaussée).
+	_bank_win(fL, fR, ax, U, 0.155, 0.085, gh * 0.30, gh * 0.74, glass, trim, gold, true)
+	_bank_win(fL, fR, ax, U, 0.845, 0.085, gh * 0.30, gh * 0.74, glass, trim, gold, true)
+	# Fenêtres de l'étage.
+	for wu in [0.20, 0.5, 0.80]:
+		_bank_win(fL, fR, ax, U, wu, 0.065, gh + 18.0, body - 16.0, glass, trim, gold, false)
+
+	# Entrée : encadrement + double porte + imposte en éventail.
+	_facequad(fL, fR, U, 0.40, 0.60, 0.0, gh * 0.70, trim)
+	_facequad(fL, fR, U, 0.415, 0.585, 0.0, gh * 0.64, door)
+	draw_line(fL.lerp(fR, 0.5), fL.lerp(fR, 0.5) + U * (gh * 0.62), trim.darkened(0.2), 1.5)
+	for pv in [0.16, 0.40, 0.62]:                             # panneaux dorés
+		draw_line(fL.lerp(fR, 0.43) + U * (gh * pv), fL.lerp(fR, 0.57) + U * (gh * pv), gold.darkened(0.1), 1.0)
+	draw_circle(fL.lerp(fR, 0.47) + U * (gh * 0.34), 1.6, gold)
+	draw_circle(fL.lerp(fR, 0.53) + U * (gh * 0.34), 1.6, gold)
+	# Imposte en éventail au-dessus de la porte.
+	var fan := fL.lerp(fR, 0.5) + U * (gh * 0.70)
+	var fanpts := PackedVector2Array([fL.lerp(fR, 0.41) + U * (gh * 0.70)])
+	for i in range(11):
+		var a := PI * float(i) / 10.0
+		fanpts.append(fan + ax * 0.09 * cos(a) + U * (22.0 * sin(a)))
+	fanpts.append(fL.lerp(fR, 0.59) + U * (gh * 0.70))
+	draw_colored_polygon(fanpts, glass.lightened(0.05))
+	for i in range(1, 6):
+		var a2 := PI * float(i) / 6.0
+		draw_line(fan, fan + ax * 0.09 * cos(a2) + U * (22.0 * sin(a2)), trim, 1.0)
+
+	# Petit auvent (portique) au-dessus de l'entrée, posé sur les pilastres.
+	var pout := Vector2(0, 16)
+	var pL := fL.lerp(fR, 0.27) + U * (gh * 0.86)
+	var pR := fL.lerp(fR, 0.73) + U * (gh * 0.86)
+	draw_colored_polygon(PackedVector2Array([pL, pR, pR + pout, pL + pout]), trim.darkened(0.06))
+	draw_line(pL + pout, pR + pout, trim.darkened(0.3), 2.0)
+
+	# Perron : deux marches de pierre devant la porte.
+	for i in range(2):
+		var w := 0.13 + i * 0.035
+		var off := Vector2(0, 6.0 + i * 6.0)
+		var sa := fL.lerp(fR, 0.5 - w) + off
+		var sc := fL.lerp(fR, 0.5 + w) + off
+		draw_colored_polygon(PackedVector2Array([sa, sc, sc + Vector2(0, 6), sa + Vector2(0, 6)]),
+			stone.darkened(0.06 + i * 0.06))
+
+	# Entablement : architrave + frise (nom gravé) + corniche à denticules.
+	draw_line(fL + U * body, fR + U * body, trim, 2.0)
+	_facequad(fL, fR, U, 0.0, 1.0, body, body + 16.0, trim.darkened(0.06))
+	for i in range(1, 22):                                    # denticules
+		var du := float(i) / 22.0
+		_facequad(fL, fR, U, du - 0.012, du + 0.012, body + 16.0, body + 22.0, stone.lightened(0.04))
+	_facequad(fL, fR, U, 0.0, 1.0, body + 22.0, total, stone.darkened(0.04))
+	var name_c := (fL.lerp(fR, 0.5)) + U * (body + 5.0)
+	var font := ThemeDB.fallback_font
+	draw_string_outline(font, name_c - Vector2(38, 0), "BANQUE", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, 4, Color(0, 0, 0))
+	draw_string(font, name_c - Vector2(38, 0), "BANQUE", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, gold)
+
+	# Fronton triangulaire avec horloge.
+	var apex := fL.lerp(fR, 0.5) + U * (total + 34.0)
+	var pedL := fL.lerp(fR, 0.18) + U * total
+	var pedR := fL.lerp(fR, 0.82) + U * total
+	draw_colored_polygon(PackedVector2Array([pedL, pedR, apex]), stone.lightened(0.04))
+	draw_polyline(PackedVector2Array([pedL, apex, pedR]), trim.darkened(0.1), 2.0)
+	var clock := fL.lerp(fR, 0.5) + U * (total + 13.0)
+	draw_circle(clock, 8.5, Color(0.95, 0.92, 0.82))
+	draw_arc(clock, 8.5, 0, TAU, 18, trim, 1.5)
+	draw_line(clock, clock + Vector2(0, -5), trim.darkened(0.3), 1.5)
+	draw_line(clock, clock + Vector2(4, 1), trim.darkened(0.3), 1.5)
+
+	# Lanternes de part et d'autre de la porte.
+	_lantern(fL.lerp(fR, 0.355) + U * (gh * 0.62))
+	_lantern(fL.lerp(fR, 0.645) + U * (gh * 0.62))
+
+
+## Appareillage en pierre de taille (assises + joints décalés).
+func _stone_courses(L: Vector2, R: Vector2, U: Vector2, v0: float, v1: float, base: Color) -> void:
+	var rows := 8
+	for i in range(1, rows):
+		var vy := lerpf(v0, v1, float(i) / rows)
+		draw_line(L + U * vy, R + U * vy, base.darkened(0.16), 1.0)
+	for i in range(rows):
+		var a := lerpf(v0, v1, float(i) / rows)
+		var c := lerpf(v0, v1, float(i + 1) / rows)
+		var u := 0.07 if i % 2 == 0 else 0.14
+		while u < 0.94:
+			draw_line(L.lerp(R, u) + U * a, L.lerp(R, u) + U * c, base.darkened(0.12), 1.0)
+			u += 0.14
+
+
+## Fenêtre de banque : encadrement de pierre, vitre froide, clé de voûte, barreaux.
+func _bank_win(L: Vector2, R: Vector2, ax: Vector2, U: Vector2, u: float, half: float,
+		v0: float, v1: float, glass: Color, trim: Color, gold: Color, bars: bool) -> void:
+	var c := L.lerp(R, u) + U * ((v0 + v1) * 0.5)
+	draw_circle(c, 13.0, Color(0.80, 0.86, 0.95, 0.10))            # léger reflet
+	_facequad(L, R, U, u - half - 0.012, u + half + 0.012, v0 - 3, v1 + 2, trim)  # cadre
+	_facequad(L, R, U, u - half, u + half, v0, v1, glass)
+	# Meneaux (4 carreaux).
+	draw_line(L.lerp(R, u) + U * v0, L.lerp(R, u) + U * v1, trim.darkened(0.1), 1.0)
+	draw_line(L.lerp(R, u - half) + U * ((v0 + v1) * 0.5), L.lerp(R, u + half) + U * ((v0 + v1) * 0.5), trim.darkened(0.1), 1.0)
+	# Barreaux dorés.
+	if bars:
+		for k in [-0.5, 0.0, 0.5]:
+			draw_line(L.lerp(R, u + half * k) + U * (v0 + 2), L.lerp(R, u + half * k) + U * (v1 - 2), gold.darkened(0.15), 1.0)
+	# Clé de voûte + linteau.
+	_facequad(L, R, U, u - half - 0.012, u + half + 0.012, v1 + 2, v1 + 8, trim.lightened(0.06))
+	_facequad(L, R, U, u - 0.016, u + 0.016, v1 + 2, v1 + 11, trim.lightened(0.12))
+
+
 ## Bâtiment style "Almería" : murs plâtre/bois, étage + galerie sur poteaux,
 ## volets colorés, parapet, enseigne. Base = empreinte de collision exacte.
 func _draw_building(b: Dictionary) -> void:
+	if str(b["label"]) == "★ BANQUE ★":
+		_draw_bank(b)
+		return
 	var fr: Rect2 = b["foot"]
 	var s := _building_style(str(b["label"]))
 	var wall: Color = s["wall"]
