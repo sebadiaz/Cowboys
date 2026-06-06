@@ -480,10 +480,15 @@ func _draw() -> void:
 		match it["k"]:
 			"b": _draw_building(it["o"])
 			"p":
-				if it["o"]["region"] == R_WAGON:
+				var reg: Rect2 = it["o"]["region"]
+				if reg == R_WAGON:
 					_draw_wagon(it["o"]["pos"])   # chariots garés en volume
+				elif reg == R_BARREL:
+					_draw_barrel(it["o"]["pos"])
+				elif reg == R_CACTUS:
+					_draw_cactus(it["o"]["pos"])
 				else:
-					_billboard(it["o"]["region"], it["o"]["pos"], it["o"]["h"], Color.WHITE)
+					_billboard(reg, it["o"]["pos"], it["o"]["h"], Color.WHITE)
 			"coach": _draw_coach()
 			"horse": _horse(it["o"])
 			"n":
@@ -580,6 +585,71 @@ func _draw_wagon(pos: Vector2) -> void:
 		draw_circle(wp, 3.0, wood.lightened(0.1))
 
 
+## Tonneau en bois : douves galbées, cerclages, dessus elliptique (volume iso).
+func _draw_barrel(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	draw_colored_polygon(_diamond_shadow(base, 14.0), Color(0, 0, 0, 0.18))
+	var h := 34.0
+	var w := 13.0
+	var bulge := 3.0
+	var top := base + Vector2(0, -h)
+	var wood := Color(0.52, 0.34, 0.18)
+	# Corps galbé (gauche sombre, droite claire).
+	var bodyL := PackedVector2Array([
+		base + Vector2(-w, 0), base + Vector2(-w - bulge, -h * 0.5), base + Vector2(-w, -h),
+		top, base + Vector2(0, 0)])
+	draw_colored_polygon(bodyL, wood.darkened(0.18))
+	var bodyR := PackedVector2Array([
+		base + Vector2(0, 0), top, base + Vector2(w, -h),
+		base + Vector2(w + bulge, -h * 0.5), base + Vector2(w, 0)])
+	draw_colored_polygon(bodyR, wood)
+	# Douves verticales.
+	for sx in [-0.5, 0.0, 0.5]:
+		draw_line(base + Vector2(w * sx, -2), base + Vector2(w * sx, -h + 2), wood.darkened(0.3), 1.0)
+	# Cerclages métalliques.
+	for cy in [-3.0, -h * 0.5, -h + 3.0]:
+		var ww: float = w + bulge * (1.0 - abs((cy + h * 0.5) / (h * 0.5))) if cy != -h * 0.5 else w + bulge
+		draw_line(base + Vector2(-ww, cy), base + Vector2(ww, cy), Color(0.30, 0.22, 0.16), 2.0)
+	# Dessus (ellipse) + planches.
+	draw_circle(top, 1.0, wood)
+	var lid := PackedVector2Array()
+	for i in range(13):
+		var a := TAU * float(i) / 12.0
+		lid.append(top + Vector2(cos(a) * w, sin(a) * w * 0.42))
+	draw_colored_polygon(lid, wood.lightened(0.12))
+	draw_polyline(lid, wood.darkened(0.3), 1.0)
+	draw_line(top + Vector2(-w, 0), top + Vector2(w, 0), wood.darkened(0.25), 1.0)
+
+
+## Cactus saguaro : tronc + deux bras, vert, avec épines et fleur.
+func _draw_cactus(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	draw_colored_polygon(_diamond_shadow(base, 16.0), Color(0, 0, 0, 0.16))
+	var green := Color(0.30, 0.50, 0.28)
+	var dark := green.darkened(0.22)
+	var tw := 8.0
+	var th := 56.0
+	var top := base + Vector2(0, -th)
+	# Tronc (capsule).
+	draw_line(base + Vector2(0, -tw), top, dark, tw * 2.0 + 2.0)
+	draw_line(base + Vector2(0, -tw), top, green, tw * 2.0 - 2.0)
+	draw_circle(top, tw - 1.0, green)
+	# Bras gauche et droit (montent puis se redressent).
+	var lj := base + Vector2(-1, -th * 0.45)       # jonction bras gauche
+	draw_line(lj, lj + Vector2(-13, 0), green, tw + 3.0)
+	draw_line(lj + Vector2(-13, 0), lj + Vector2(-13, -16), green, tw)
+	draw_circle(lj + Vector2(-13, -16), tw * 0.5 + 1.0, green)
+	var rj := base + Vector2(1, -th * 0.62)        # jonction bras droit
+	draw_line(rj, rj + Vector2(12, 0), green, tw + 2.0)
+	draw_line(rj + Vector2(12, 0), rj + Vector2(12, -20), green, tw - 1.0)
+	draw_circle(rj + Vector2(12, -20), tw * 0.5, green)
+	# Côtes verticales + petites épines.
+	for sx in [-3.0, 0.0, 3.0]:
+		draw_line(base + Vector2(sx, -tw), top + Vector2(sx * 0.6, 2), dark, 1.0)
+	# Fleur rouge au sommet.
+	draw_circle(top + Vector2(0, -1), 3.0, Color(0.85, 0.30, 0.28))
+
+
 ## Barre d'attache (poteaux + traverse) derrière les chevaux de l'écurie.
 func _draw_hitch() -> void:
 	var a := Iso.project(Vector2(1335, 1012))
@@ -619,91 +689,144 @@ func _horse(world_pos: Vector2) -> void:
 	draw_circle(head + Vector2(-2, -1), 1.0, Color(0.05, 0.04, 0.03))   # œil
 
 
-## Bâtiment western "false front" (devanture plate haute typique du Far West) :
-## corps en volume + fausse façade + bardage + fenêtres à carreaux + porte +
-## auvent sur poteaux + enseigne. Base = empreinte de collision exacte.
+## Style visuel par commerce (inspiré des décors western d'Almería) : murs en
+## plâtre clair ou bois, volets/portes colorés, 1 ou 2 étages avec galerie.
+func _building_style(label: String) -> Dictionary:
+	match label:
+		"★ BANQUE ★": return {"wall": Color(0.90, 0.86, 0.74), "trim": Color(0.45, 0.30, 0.16),
+			"door": Color(0.20, 0.13, 0.08), "shutter": Color(0.30, 0.40, 0.55), "stories": 2}
+		"SALOON": return {"wall": Color(0.86, 0.50, 0.42), "trim": Color(0.40, 0.18, 0.12),
+			"door": Color(0.30, 0.18, 0.10), "shutter": Color(0.85, 0.80, 0.70), "stories": 2}
+		"HÔTEL": return {"wall": Color(0.84, 0.82, 0.76), "trim": Color(0.42, 0.28, 0.16),
+			"door": Color(0.25, 0.35, 0.50), "shutter": Color(0.30, 0.45, 0.60), "stories": 2}
+		"MAGASIN": return {"wall": Color(0.74, 0.55, 0.34), "trim": Color(0.40, 0.26, 0.14),
+			"door": Color(0.30, 0.45, 0.35), "shutter": Color(0.55, 0.40, 0.22), "stories": 1}
+		"ÉGLISE": return {"wall": Color(0.92, 0.90, 0.84), "trim": Color(0.40, 0.27, 0.15),
+			"door": Color(0.30, 0.20, 0.10), "shutter": Color(0.6, 0.5, 0.35), "stories": 1, "cross": true}
+		"SHÉRIF": return {"wall": Color(0.78, 0.80, 0.82), "trim": Color(0.35, 0.30, 0.26),
+			"door": Color(0.22, 0.16, 0.12), "shutter": Color(0.35, 0.42, 0.50), "stories": 1, "star": true}
+		"ÉCURIE": return {"wall": Color(0.55, 0.40, 0.24), "trim": Color(0.32, 0.21, 0.11),
+			"door": Color(0.14, 0.09, 0.05), "shutter": Color(0.42, 0.30, 0.16), "stories": 1, "bigdoor": true}
+		"POSTE": return {"wall": Color(0.86, 0.82, 0.66), "trim": Color(0.40, 0.27, 0.15),
+			"door": Color(0.30, 0.45, 0.35), "shutter": Color(0.35, 0.55, 0.40), "stories": 1}
+		"FORGE": return {"wall": Color(0.50, 0.45, 0.42), "trim": Color(0.28, 0.24, 0.22),
+			"door": Color(0.12, 0.10, 0.10), "shutter": Color(0.45, 0.35, 0.25), "stories": 1, "bigdoor": true}
+		"DOCTEUR": return {"wall": Color(0.90, 0.89, 0.85), "trim": Color(0.42, 0.28, 0.16),
+			"door": Color(0.55, 0.22, 0.18), "shutter": Color(0.70, 0.25, 0.22), "stories": 1, "redcross": true}
+		_: return {"wall": Color(0.82, 0.78, 0.70), "trim": Color(0.42, 0.28, 0.16),
+			"door": Color(0.24, 0.16, 0.10), "shutter": Color(0.45, 0.40, 0.30), "stories": 1}
+
+
+## Bâtiment style "Almería" : murs plâtre/bois, étage + galerie sur poteaux,
+## volets colorés, parapet, enseigne. Base = empreinte de collision exacte.
 func _draw_building(b: Dictionary) -> void:
 	var fr: Rect2 = b["foot"]
-	var tint: Color = b["tint"]
-	var wood := _tinted(Color(0.60, 0.43, 0.25), tint)
-	var wood_d := wood.darkened(0.24)
-	var U := Vector2(0, -1)                         # vecteur "vers le haut" (1 px)
-	var wall_h: float = clampf(float(b["h"]) * 0.5, 82.0, 130.0)
-	var false_h: float = wall_h + 46.0
+	var s := _building_style(str(b["label"]))
+	var wall: Color = s["wall"]
+	var side := wall.darkened(0.24)
+	var trim: Color = s["trim"]
+	var two: bool = int(s.get("stories", 1)) >= 2
+	var U := Vector2(0, -1)
+	var gh := 84.0                                   # rez-de-chaussée
+	var uh := 74.0 if two else 0.0                   # étage
+	var body := gh + uh
+	var parapet := 15.0
+	var total := body + parapet
 	var b0 := Iso.project(fr.position)
 	var b1 := Iso.project(Vector2(fr.end.x, fr.position.y))
 	var b2 := Iso.project(fr.end)
 	var b3 := Iso.project(Vector2(fr.position.x, fr.end.y))
-	var fL := b3                                    # façade sud (face caméra)
+	var fL := b3
 	var fR := b2
 	# Ombre.
-	draw_colored_polygon(PackedVector2Array([b0, b1, b2, b3]), Color(0, 0, 0, 0.16))
-	# Corps : côté est + toit plat (vus derrière la fausse façade).
-	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + U * wall_h, b1 + U * wall_h]), wood_d)
+	draw_colored_polygon(PackedVector2Array([b0 + Vector2(3, 3), b1 + Vector2(3, 3),
+		b2 + Vector2(3, 3), b3 + Vector2(3, 3)]), Color(0, 0, 0, 0.18))
+	# Côté est + dessus (volume).
+	draw_colored_polygon(PackedVector2Array([b1, b2, b2 + U * total, b1 + U * total]), side)
 	draw_colored_polygon(PackedVector2Array([
-		b0 + U * wall_h, b1 + U * wall_h, b2 + U * wall_h, b3 + U * wall_h]),
-		_tinted(Color(0.42, 0.30, 0.20), tint))
-	# Fausse façade plate (le look western).
-	draw_colored_polygon(PackedVector2Array([fL, fR, fR + U * false_h, fL + U * false_h]), wood)
-	# Corniche en haut.
+		b0 + U * body, b1 + U * body, b2 + U * body, b3 + U * body]), wall.darkened(0.32))
+	# Façade.
+	draw_colored_polygon(PackedVector2Array([fL, fR, fR + U * total, fL + U * total]), wall)
+	# Parapet (corniche) + ligne.
 	draw_colored_polygon(PackedVector2Array([
-		fL + U * (false_h - 9), fR + U * (false_h - 9), fR + U * false_h, fL + U * false_h]), wood_d)
-	draw_line(fL + U * (false_h - 9), fR + U * (false_h - 9), wood.lightened(0.12), 1.5)
-	# Bardage horizontal.
-	for k in range(1, 8):
-		var yy := false_h * float(k) / 8.0
-		draw_line(fL + U * yy, fR + U * yy, wood_d, 1.0)
-	# Fenêtres à carreaux, éclairées.
-	for wx in [0.2, 0.8]:
-		_window(fL, fR, U, wx, wall_h * 0.34, wall_h * 0.62, wood_d)
-	# Porte (battante si le bâtiment est entrable).
-	_door(fL, fR, U, wall_h, wood_d, b["enter"] != "")
-	# Auvent sur 2 poteaux.
-	var av := wall_h * 0.64
-	var out := Vector2(0, 17)
-	draw_colored_polygon(PackedVector2Array([
-		fL + U * av, fR + U * av, fR + U * av + out, fL + U * av + out]), wood_d.darkened(0.12))
-	draw_line(fL + U * av + out, fR + U * av + out, Color(0.2, 0.12, 0.06), 2.0)
-	for pu in [0.08, 0.92]:
-		var pf := fL.lerp(fR, pu)
-		draw_line(pf + U * av + out, pf + out + Vector2(0, -2), wood_d, 3.0)
-	# Enseigne sur la fausse façade, au-dessus de l'auvent.
-	_sign((fL + fR) * 0.5 + U * (av + (false_h - av) * 0.55), b["label"])
+		fL + U * body, fR + U * body, fR + U * total, fL + U * total]), wall.darkened(0.12))
+	draw_line(fL + U * body, fR + U * body, trim.lightened(0.1), 1.5)
+	# Symboles optionnels (croix, étoile).
+	var topc := (fL + fR) * 0.5 + U * (total + 10.0)
+	if s.get("cross", false) or s.get("redcross", false):
+		var cc: Color = Color(0.7, 0.2, 0.18) if s.get("redcross", false) else trim
+		draw_line(topc, topc + U * 12, cc, 3.0)
+		draw_line(topc + U * 8 + Vector2(-5, 0), topc + U * 8 + Vector2(5, 0), cc, 3.0)
+
+	# --- Étage : galerie (balcon) sur poteaux ---
+	var out := Vector2(0, 18)
+	if two:
+		var av := gh + 4.0
+		# Plancher du balcon (déborde vers la rue) + bord.
+		draw_colored_polygon(PackedVector2Array([
+			fL + U * av, fR + U * av, fR + U * av + out, fL + U * av + out]), trim.darkened(0.05))
+		draw_line(fL + U * av + out, fR + U * av + out, trim.darkened(0.25), 2.0)
+		# Garde-corps du balcon.
+		draw_line(fL + U * (av + 22) + out, fR + U * (av + 22) + out, trim, 2.0)
+		for r in range(1, 12):
+			var ru := float(r) / 12.0
+			var rp := (fL + out).lerp(fR + out, ru)
+			draw_line(rp + U * av, rp + U * (av + 22), trim, 1.0)
+		# Fenêtres + porte de l'étage.
+		for wx in [0.22, 0.78]:
+			_win2(fL, fR, U, wx, av + 30, av + uh - 8, trim, s["shutter"])
+		_facequad(fL, fR, U, 0.44, 0.56, av + 26, av + uh - 6, s["door"])
+		# Poteaux de la galerie (du sol au balcon).
+		for pu in [0.07, 0.5, 0.93]:
+			var pf := fL.lerp(fR, pu) + out
+			draw_line(pf, pf + U * av, trim.darkened(0.1), 3.5)
+	else:
+		# 1 étage : auvent sur poteaux.
+		var av := gh * 0.86
+		draw_colored_polygon(PackedVector2Array([
+			fL + U * av, fR + U * av, fR + U * av + out, fL + U * av + out]), trim.darkened(0.08))
+		draw_line(fL + U * av + out, fR + U * av + out, trim.darkened(0.25), 2.0)
+		for pu in [0.08, 0.92]:
+			var pf := fL.lerp(fR, pu) + out
+			draw_line(pf, pf + U * av, trim.darkened(0.1), 3.0)
+
+	# --- Rez-de-chaussée : porte + fenêtres/volets ---
+	if s.get("bigdoor", false):
+		_facequad(fL, fR, U, 0.30, 0.70, 0.0, gh * 0.78, trim.darkened(0.15))
+		_facequad(fL, fR, U, 0.33, 0.67, 0.0, gh * 0.72, s["door"])
+		draw_line(fL.lerp(fR, 0.5) + U * 2, fL.lerp(fR, 0.5) + U * (gh * 0.72), trim, 1.5)
+	else:
+		# Porte centrale.
+		_facequad(fL, fR, U, 0.42, 0.58, 0.0, gh * 0.56, trim.darkened(0.1))
+		_facequad(fL, fR, U, 0.445, 0.555, 0.0, gh * 0.52, s["door"])
+		draw_circle(fL.lerp(fR, 0.535) + U * (gh * 0.26), 1.6, Color(0.85, 0.72, 0.3))
+		# Fenêtres + volets de chaque côté.
+		_win2(fL, fR, U, 0.2, gh * 0.22, gh * 0.5, trim, s["shutter"])
+		_win2(fL, fR, U, 0.8, gh * 0.22, gh * 0.5, trim, s["shutter"])
+
+	# Enseigne accrochée sous l'auvent.
+	var sy: float = (gh + 4.0) if two else (gh * 0.86)
+	_sign((fL + fR) * 0.5 + out + U * (sy - 6.0), b["label"])
 
 
-## Fenêtre à 4 carreaux (cadre + vitre + meneaux).
-func _window(L: Vector2, R: Vector2, U: Vector2, u: float, v0: float, v1: float, frame: Color) -> void:
-	_face_quad(L, R, U, u - 0.095, u + 0.095, v0 - 3, v1 + 3, frame)
-	_face_quad(L, R, U, u - 0.075, u + 0.075, v0, v1, Color(0.97, 0.86, 0.45))
+## Fenêtre à carreaux + 2 volets colorés.
+func _win2(L: Vector2, R: Vector2, U: Vector2, u: float, v0: float, v1: float,
+		frame: Color, shutter: Color) -> void:
+	_facequad(L, R, U, u - 0.13, u - 0.075, v0, v1, shutter)              # volet gauche
+	_facequad(L, R, U, u + 0.075, u + 0.13, v0, v1, shutter)             # volet droit
+	_facequad(L, R, U, u - 0.075, u + 0.075, v0 - 2, v1 + 2, frame)      # cadre
+	_facequad(L, R, U, u - 0.06, u + 0.06, v0, v1, Color(0.97, 0.87, 0.5))  # vitre
 	var mv := (v0 + v1) * 0.5
 	draw_line(L.lerp(R, u) + U * v0, L.lerp(R, u) + U * v1, frame, 1.0)
-	draw_line(L.lerp(R, u - 0.075) + U * mv, L.lerp(R, u + 0.075) + U * mv, frame, 1.0)
+	draw_line(L.lerp(R, u - 0.06) + U * mv, L.lerp(R, u + 0.06) + U * mv, frame, 1.0)
 
 
-## Porte (cadre + vantail). Si entrable : double porte battante de saloon.
-func _door(L: Vector2, R: Vector2, U: Vector2, wall_h: float, frame: Color, swing: bool) -> void:
-	var dv := wall_h * 0.5
-	_face_quad(L, R, U, 0.39, 0.61, 0.0, dv + 2, frame)
-	var col := Color(0.34, 0.20, 0.09) if swing else Color(0.14, 0.08, 0.05)
-	_face_quad(L, R, U, 0.42, 0.58, 0.0, dv, col)
-	if swing:
-		draw_line(L.lerp(R, 0.5) + U * (dv * 0.18), L.lerp(R, 0.5) + U * dv, frame.lightened(0.1), 1.5)
-		_face_quad(L, R, U, 0.42, 0.58, 0.0, dv * 0.16, frame)  # battant bas
-	else:
-		draw_circle(L.lerp(R, 0.55) + U * (dv * 0.5), 1.6, Color(0.85, 0.72, 0.3))
-
-
-## Dessine un quad sur une face verticale paramétrée (L,R = base, up unitaire).
-## u: position horizontale 0..1 ; v: hauteur en pixels. `filled` false = contour.
-func _face_quad(L: Vector2, R: Vector2, up: Vector2, u0: float, u1: float,
-		v0: float, v1: float, col: Color, filled := true) -> void:
-	var q := PackedVector2Array([
-		L.lerp(R, u0) + up * v0, L.lerp(R, u1) + up * v0,
-		L.lerp(R, u1) + up * v1, L.lerp(R, u0) + up * v1])
-	if filled:
-		draw_colored_polygon(q, col)
-	else:
-		draw_polyline(_closed(q), col, 1.0)
+## Quad sur une face verticale (L,R base ; up unitaire ; v en pixels).
+func _facequad(L: Vector2, R: Vector2, U: Vector2, u0: float, u1: float,
+		v0: float, v1: float, col: Color) -> void:
+	draw_colored_polygon(PackedVector2Array([
+		L.lerp(R, u0) + U * v0, L.lerp(R, u1) + U * v0,
+		L.lerp(R, u1) + U * v1, L.lerp(R, u0) + U * v1]), col)
 
 
 func _tinted(base: Color, tint: Color) -> Color:
