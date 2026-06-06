@@ -48,7 +48,9 @@ const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
 var _buildings: Array[Dictionary] = []   # {region,pos,h,label,tint,flavor}
 var _props: Array[Dictionary] = []        # {region,pos,h}
 var _npcs: Array[Dictionary] = []         # {pos,facing,pal,phase}
-var _foots: Array[Rect2] = []             # collisions
+var _foots: Array[Rect2] = []             # empreintes de collision (décor solide)
+var _body: CharacterBody2D                # corps physique du joueur (vrai moteur)
+var _world: Node2D                        # sous-arbre physique (espace monde, sans caméra)
 
 var _zoom := 2.0
 var _cam := Vector2.ZERO
@@ -72,10 +74,63 @@ func _ready() -> void:
 		_facing = Vector2.DOWN
 		GameManager.town_return_pos = Vector2.ZERO
 	_build_town()
+	_build_physics()
 	_apply_zoom()
 	_cam = _camera_target()
 	position = _cam
 	_build_ui()
+
+
+## Crée le VRAI moteur de collision : un corps pour le joueur + un StaticBody2D
+## solide par empreinte de décor (bâtiments, props, puits, chevaux). Le décor a
+## donc un volume et le joueur ne le traverse plus (glisse le long).
+func _build_physics() -> void:
+	# Sous-arbre en espace MONDE (top_level = ignore la transform caméra du parent).
+	_world = Node2D.new()
+	_world.top_level = true
+	add_child(_world)
+	_body = CharacterBody2D.new()
+	_body.collision_layer = 2
+	_body.collision_mask = 1
+	var cs := CollisionShape2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = PLAYER_RADIUS
+	cs.shape = circle
+	_body.add_child(cs)
+	_body.position = _player_pos
+	_world.add_child(_body)
+	for r in _foots:
+		var sb := StaticBody2D.new()
+		sb.collision_layer = 1
+		sb.collision_mask = 0
+		sb.position = r.position + r.size * 0.5
+		var scs := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		rect.size = r.size
+		scs.shape = rect
+		sb.add_child(scs)
+		_world.add_child(sb)
+
+
+func _physics_process(delta: float) -> void:
+	if _entered or _body == null:
+		return
+	var dir := Iso.screen_to_world(InputManager.get_move_vector())
+	if dir.length() > 1.0:
+		dir = dir.normalized()
+	if dir.length() > 0.05:
+		_facing = dir.normalized()
+		_walk += delta * 10.0
+	else:
+		_walk = 0.0
+	_body.velocity = dir * SPEED
+	_body.move_and_slide()
+	# Bornage à la carte (au cas où) + synchro de la position de rendu.
+	var p := _body.position
+	p.x = clampf(p.x, FLOOR.position.x + 40, FLOOR.end.x - 40)
+	p.y = clampf(p.y, FLOOR.position.y + 40, FLOOR.end.y - 40)
+	_body.position = p
+	_player_pos = p
 
 
 # --- Construction du village ---
@@ -191,16 +246,8 @@ func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color,
 # --- Boucle ---
 
 func _process(delta: float) -> void:
+	# Le déplacement du joueur (collision moteur) est dans _physics_process.
 	if not _entered:
-		var dir := Iso.screen_to_world(InputManager.get_move_vector())
-		if dir.length() > 1.0:
-			dir = dir.normalized()
-		if dir.length() > 0.05:
-			_facing = dir.normalized()
-			_walk += delta * 10.0
-		else:
-			_walk = 0.0
-		_move(dir * SPEED * delta)
 		_update_interaction()
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
@@ -335,19 +382,7 @@ func _coach_active() -> bool:
 	return _coach_wait <= 0.0
 
 
-func _move(motion: Vector2) -> void:
-	var p := _player_pos
-	var nx := p + Vector2(motion.x, 0)
-	if not _blocked(nx):
-		p = nx
-	var ny := p + Vector2(0, motion.y)
-	if not _blocked(ny):
-		p = ny
-	p.x = clampf(p.x, FLOOR.position.x + 40, FLOOR.end.x - 40)
-	p.y = clampf(p.y, FLOOR.position.y + 40, FLOOR.end.y - 40)
-	_player_pos = p
-
-
+## Toujours utilisé par l'IA des PNJ (déambulation sans traverser le décor).
 func _blocked(pos: Vector2) -> bool:
 	for r in _foots:
 		if r.grow(PLAYER_RADIUS).has_point(pos):

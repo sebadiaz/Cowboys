@@ -26,6 +26,8 @@ var _action_btn: Button
 
 var _npcs: Array[Dictionary] = []
 var _foots: Array[Rect2] = []
+var _body: CharacterBody2D    # corps physique du joueur
+var _world: Node2D            # sous-arbre physique (espace monde, sans caméra)
 var _zoom := 2.2
 var _cam := Vector2.ZERO
 var _toast: Label
@@ -40,10 +42,60 @@ var _beat_i := 0
 func _ready() -> void:
 	_rng.randomize()
 	_build()
+	_build_physics()
 	_apply_zoom()
 	_cam = _camera_target()
 	position = _cam
 	_build_ui()
+
+
+## Vrai moteur de collision : corps joueur + StaticBody par meuble/mur (murs,
+## comptoir, piano, tables). Sous-arbre top_level (espace monde, hors caméra).
+func _build_physics() -> void:
+	_world = Node2D.new()
+	_world.top_level = true
+	add_child(_world)
+	_body = CharacterBody2D.new()
+	_body.collision_layer = 2
+	_body.collision_mask = 1
+	var cs := CollisionShape2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = PLAYER_RADIUS
+	cs.shape = circle
+	_body.add_child(cs)
+	_body.position = _player_pos
+	_world.add_child(_body)
+	for r in _foots:
+		var sb := StaticBody2D.new()
+		sb.collision_layer = 1
+		sb.collision_mask = 0
+		sb.position = r.position + r.size * 0.5
+		var scs := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		rect.size = r.size
+		scs.shape = rect
+		sb.add_child(scs)
+		_world.add_child(sb)
+
+
+func _physics_process(_delta: float) -> void:
+	if _body == null:
+		return
+	var dir := Iso.screen_to_world(InputManager.get_move_vector())
+	if dir.length() > 1.0:
+		dir = dir.normalized()
+	if dir.length() > 0.05:
+		_facing = dir.normalized()
+		_walk += _delta * 10.0
+	else:
+		_walk = 0.0
+	_body.velocity = dir * SPEED
+	_body.move_and_slide()
+	var p := _body.position
+	p.x = clampf(p.x, 30, FLOOR.size.x - 30)
+	p.y = clampf(p.y, 30, FLOOR.size.y - 10)
+	_body.position = p
+	_player_pos = p
 
 
 func _build() -> void:
@@ -89,15 +141,7 @@ func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color,
 # --- Boucle ---
 
 func _process(delta: float) -> void:
-	var dir := Iso.screen_to_world(InputManager.get_move_vector())
-	if dir.length() > 1.0:
-		dir = dir.normalized()
-	if dir.length() > 0.05:
-		_facing = dir.normalized()
-		_walk += delta * 10.0
-	else:
-		_walk = 0.0
-	_move(dir * SPEED * delta)
+	# Déplacement du joueur (collision moteur) géré dans _physics_process.
 	_update_interaction()
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
@@ -183,19 +227,7 @@ func _leave() -> void:
 	GameManager.return_to_town(TOWN_EXIT)
 
 
-func _move(motion: Vector2) -> void:
-	var p := _player_pos
-	var nx := p + Vector2(motion.x, 0)
-	if not _blocked(nx):
-		p = nx
-	var ny := p + Vector2(0, motion.y)
-	if not _blocked(ny):
-		p = ny
-	p.x = clampf(p.x, 30, FLOOR.size.x - 30)
-	p.y = clampf(p.y, 30, FLOOR.size.y - 10)
-	_player_pos = p
-
-
+## Toujours utilisé par l'IA des clients (déambulation sans traverser les meubles).
 func _blocked(pos: Vector2) -> bool:
 	for r in _foots:
 		if r.grow(PLAYER_RADIUS).has_point(pos):
