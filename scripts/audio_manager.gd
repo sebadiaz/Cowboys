@@ -14,6 +14,10 @@ var _players: Array[AudioStreamPlayer] = []
 var _next := 0
 var _rng := RandomNumberGenerator.new()
 var muted := false
+var _music: AudioStreamPlayer
+var _music_streams: Dictionary = {}
+var _current_music := ""
+const MUS_LEN := 9.6
 
 
 func _ready() -> void:
@@ -24,6 +28,12 @@ func _ready() -> void:
 		add_child(p)
 		_players.append(p)
 	_build_all()
+	_music = AudioStreamPlayer.new()
+	_music.bus = "Master"
+	add_child(_music)
+	if SaveManager.has_signal("settings_changed"):
+		SaveManager.settings_changed.connect(func(_s): _apply_music_volume())
+	_apply_music_volume()
 
 
 ## Joue un son par nom, avec une légère variation de hauteur pour la vie.
@@ -41,6 +51,87 @@ func play(name: String, volume_db: float = 0.0, pitch_var := 0.06) -> void:
 	p.volume_db = volume_db + saved_volume_db
 	p.pitch_scale = 1.0 + _rng.randf_range(-pitch_var, pitch_var)
 	p.play()
+
+
+# --- Musique (boucles synthétisées) ---
+
+func play_music(name: String) -> void:
+	if not (SaveManager.has_method("audio_enabled") and SaveManager.audio_enabled()):
+		stop_music()
+		return
+	if _current_music == name and _music.playing:
+		return
+	if not _music_streams.has(name):
+		var gen := (func(t): return _theme(t)) if name == "tension" else (func(t): return _theme(t))
+		if name == "tension":
+			gen = func(t): return _tension(t)
+		_music_streams[name] = _make_loop(MUS_LEN, gen)
+	_current_music = name
+	_music.stream = _music_streams[name]
+	_music.play()
+
+
+func stop_music() -> void:
+	_current_music = ""
+	if _music != null:
+		_music.stop()
+
+
+func _apply_music_volume() -> void:
+	if _music == null:
+		return
+	if SaveManager.has_method("audio_enabled") and not SaveManager.audio_enabled():
+		_music.stop()
+		return
+	var v := SaveManager.sfx_volume_db() if SaveManager.has_method("sfx_volume_db") else 0.0
+	_music.volume_db = v - 7.0       # la musique reste sous les bruitages
+	if _current_music != "" and not _music.playing:
+		_music.stream = _music_streams.get(_current_music)
+		_music.play()
+
+
+## AudioStreamWAV bouclé sans couture (le générateur tuile la durée).
+func _make_loop(duration: float, gen: Callable) -> AudioStreamWAV:
+	var wav := _make(duration, gen)
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_begin = 0
+	wav.loop_end = int(duration * MIX_RATE)
+	return wav
+
+
+func _pluck(t: float, freq: float) -> float:
+	var e := _env(t, 0.004, 0.5)
+	var v := sin(TAU * freq * t) * 0.7 + sin(TAU * freq * 2.0 * t) * 0.18 + sin(TAU * freq * 3.0 * t) * 0.08
+	return v * e * e
+
+
+## Thème western chaleureux : basse + arpège guitare (do-do-fa-sol), shaker doux.
+func _theme(t: float) -> float:
+	var beat := 0.6
+	var i := int(t / beat) % 16
+	var lt := fmod(t, beat)
+	var roots := [261.63, 261.63, 349.23, 392.00]   # C C F G (1 accord / mesure)
+	var root: float = roots[(i / 4) % roots.size()]
+	var arp := [1.0, 1.25, 1.5, 2.0]
+	var s := 0.0
+	if i % 2 == 0:
+		s += _pluck(lt, root * 0.5) * 0.45            # basse sur temps 1 & 3
+	s += _pluck(lt, root * arp[i % 4]) * 0.30         # arpège
+	s += _noise() * _env(lt, 0.001, 0.05) * 0.04      # shaker
+	return s * 0.5
+
+
+## Thème tension (mission) : drone grave + arpège mineur nerveux + shaker rapide.
+func _tension(t: float) -> float:
+	var beat := 0.4
+	var i := int(t / beat) % 24
+	var lt := fmod(t, beat)
+	var root := 196.00   # G
+	var arp := [1.0, 1.2, 1.5]                         # teinte mineure
+	var s := sin(TAU * root * 0.5 * t) * 0.09          # drone
+	s += _pluck(lt, root * arp[i % 3]) * 0.17
+	s += _noise() * _env(lt, 0.001, 0.035) * 0.05
+	return s * 0.6
 
 
 # --- Construction des sons ---

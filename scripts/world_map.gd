@@ -71,6 +71,7 @@ func _ready() -> void:
 	resized.connect(_layout)
 	_layout()
 	set_process(true)
+	AudioManager.play_music("theme")
 
 
 func _process(delta: float) -> void:

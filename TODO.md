@@ -128,9 +128,13 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [x] **Cowboy charismatique** dessiné en couches (chapeau, bandana, duster,
       ceinturon/holster, bottes, visage), directionnel + animé.
 - [x] Gardes shérifs distincts (manteau bleu, étoile).
+- [x] **Contour « encre » + ombre de contact** sur tous les personnages
+      (`character_art`) → silhouettes lisibles, look cartoon premium.
 - [ ] Sprites PNG animés (remplacer le rendu procédural par des planches).
 - [ ] Animation de mort plus riche (le corps reprend le style du cowboy).
-- [ ] Vrais bruitages / musique western (remplacer l'audio procédural).
+- [x] **Musique western** synthétisée en boucle (thème menus/ville + thème tension
+      en mission) — `AudioManager.play_music()`, sous les bruitages, respecte les réglages.
+- [ ] Vrais samples (remplacer la synthèse) si besoin de plus de cachet.
 
 ## Assets & intégration (suite)
 - [x] Intégrer les vraies planches PNG (1254²) + props en régions d'atlas.

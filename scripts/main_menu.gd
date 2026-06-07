@@ -86,6 +86,7 @@ func _ready() -> void:
 	reset.modulate = Color(1, 1, 1, 0.6)
 	reset.pressed.connect(_on_reset_save)
 	box.add_child(reset)
+	AudioManager.play_music("theme")
 
 
 func _on_play() -> void:

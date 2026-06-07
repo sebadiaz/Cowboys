@@ -85,6 +85,7 @@ func _ready() -> void:
 	position = _cam
 	_build_ui()
 	_setup_atmosphere()
+	AudioManager.play_music("theme")
 
 
 ## Teinte d'ambiance propre à chaque ville (désert, canyon rouge, neige, nuit…).

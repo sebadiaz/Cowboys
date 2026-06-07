@@ -62,6 +62,7 @@ func _ready() -> void:
 	back.pressed.connect(func() -> void: GameManager.goto_world_map())
 	row.add_child(back)
 
+	AudioManager.play_music("theme")
 	_refresh()
 
 

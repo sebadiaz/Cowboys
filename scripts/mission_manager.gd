@@ -113,6 +113,7 @@ func _ready() -> void:
 		hud.show_toast("%s%s" % [lbl, (" — " + diff) if diff != "" else ""])
 	_pick_contract()
 	_update_objective()
+	AudioManager.play_music("tension")
 
 
 ## Contrat (défi) de la banque : déterministe sur les banques procédurales.

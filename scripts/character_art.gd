@@ -42,6 +42,17 @@ static func draw_person(ci: CanvasItem, base: Vector2, f: Vector2, pal: Dictiona
 
 	var footL := base + Vector2(-5 - sw, -1)
 	var footR := base + Vector2(5 + sw, -1)
+	var head_pre := shoulder + Vector2(side * 1.0, -8.0)
+	# Ombre de contact douce (deux couches) pour décoller du sol.
+	ci.draw_colored_polygon(_ellipse(base + Vector2(1, 3), 16.5, 7.6), Color(0, 0, 0, 0.16))
+	# Contour "encre" : silhouette sombre derrière les couches colorées (look cartoon premium).
+	var ink := Color(0.09, 0.07, 0.06)
+	ci.draw_line(hip + Vector2(-4, 0), footL + Vector2(0, 1), ink, 10.0)
+	ci.draw_line(hip + Vector2(4, 0), footR + Vector2(0, 1), ink, 10.0)
+	_capsule(ci, hip, shoulder, 15.5, ink)
+	ci.draw_circle(head_pre, 7.8, ink)
+	ci.draw_colored_polygon(_ellipse(head_pre + Vector2(side * 0.8, -2.5), 15.2, 5.6), ink)
+
 	ci.draw_line(hip + Vector2(-4, 0), footL, pal["pants"], 6.0)
 	ci.draw_line(hip + Vector2(4, 0), footR, pal["pants"], 6.0)
 	_boot(ci, footL, side, pal["boots"])
