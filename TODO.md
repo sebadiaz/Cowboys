@@ -77,6 +77,9 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       mission « Attaque de la diligence » (`data/coach.json`) sur une route — la
       diligence remplace le coffre, escortée par shérifs + snipers. Accès via la
       carte du monde.
+- [x] **Diligence MOBILE** : le convoi (wagon + coffres + snipers à bord + butin)
+      roule le long de la route ; il faut le **rattraper et le piller en mouvement**
+      (le Sang-froid aide à le coller) — vrai feeling d'attaque de convoi.
 
 ## Carte du monde — pistes suivantes
 - [x] **Décor de ville unique par biome** (déterministe) : sapins enneigés +

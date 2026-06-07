@@ -70,6 +70,11 @@ var _hostages: Array = []
 var _hostages_freed := 0
 var _safes2: Array = []
 var _allies: Array = []
+var _coach_group: Array = []
+var _coach_center := Vector2.ZERO
+var _coach_stopped := false
+const COACH_SPEED := 52.0
+const COACH_END_X := 1950.0
 var _focus := 1.0
 var _focus_active := false
 const FOCUS_SLOW := 0.35
@@ -97,6 +102,7 @@ func _ready() -> void:
 	_spawn_dynamite()
 	_build_iso_renderer()
 	_spawn_crew()
+	_init_coach_group()
 	_build_effects()
 	_connect_hud()
 	_update_objective()
@@ -130,6 +136,48 @@ func _contract_done() -> bool:
 		"sweep": return _loot_total > 0 and _loot_bags >= _loot_total
 		"pacifist": return _guards_killed == 0
 	return false
+
+
+## Le "convoi" (diligence + coffres latéraux + snipers à bord + butin proche)
+## se déplace d'un bloc : on mémorise chaque membre et son décalage au centre.
+func _init_coach_group() -> void:
+	if not GameManager.coach_mission or not is_instance_valid(_safe):
+		return
+	_coach_center = _safe.global_position
+	_coach_group.append({"node": _safe, "off": Vector2.ZERO})
+	for sb in _safes2:
+		if is_instance_valid(sb):
+			_coach_group.append({"node": sb, "off": sb.global_position - _coach_center})
+	for g in _guards:
+		if ("kind" in g) and g.kind == "sniper":
+			_coach_group.append({"node": g, "off": g.global_position - _coach_center})
+	for b in _loot_nodes:
+		if is_instance_valid(b) and b.global_position.distance_to(_coach_center) < 260.0:
+			_coach_group.append({"node": b, "off": b.global_position - _coach_center})
+	for h in _hostages:
+		if is_instance_valid(h) and h.global_position.distance_to(_coach_center) < 260.0:
+			_coach_group.append({"node": h, "off": h.global_position - _coach_center})
+
+
+## La diligence roule : il faut la rattraper et la piller en mouvement.
+func _move_coach(delta: float) -> void:
+	if not GameManager.coach_mission or _mission_over or _coach_stopped:
+		return
+	if is_instance_valid(_safe) and _safe._is_open:
+		_coach_stopped = true
+		if hud.has_method("show_toast"):
+			hud.show_toast("DILIGENCE STOPPÉE !")
+		return
+	if _coach_center.x >= COACH_END_X:
+		_coach_stopped = true
+		if hud.has_method("show_toast"):
+			hud.show_toast("La diligence se traîne... rattrape-la !")
+		return
+	_coach_center.x += COACH_SPEED * delta
+	for m in _coach_group:
+		var nd = m["node"]
+		if is_instance_valid(nd):
+			nd.global_position = _coach_center + m["off"]
 
 
 ## Atouts d'équipe modifiant la config (artificier -> dynamite sur la diligence).
@@ -734,6 +782,7 @@ func _process(delta: float) -> void:
 	if _fx != null and player != null and player.is_moving and _foot_t <= 0.0:
 		_fx.foot_dust(player.global_position)
 		_foot_t = 0.18
+	_move_coach(delta)
 
 
 ## Mode tactique "Sang-froid" : ralentit le monde tout en gardant le joueur
@@ -930,6 +979,8 @@ func _update_objective() -> void:
 		text = "Ouvre le coffre, puis file vers la SORTIE"
 	else:
 		text = "Atteins la SORTIE (verte)"
+	if GameManager.coach_mission and not _safe_open:
+		text = "Rattrape et PILLE la diligence (maintiens E)"
 	if not _contract.is_empty():
 		text += "   ·   Contrat: " + str(_contract.get("desc", ""))
 	hud.set_objective(text)
