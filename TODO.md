@@ -70,7 +70,9 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       mécaniques que le coffre principal (barre de progression, son), 1–2 par banque.
 
 ## Carte du monde — pistes suivantes
-- [ ] **Layouts de ville uniques** par biome (pas seulement la teinte).
+- [x] **Décor de ville unique par biome** (déterministe) : sapins enneigés +
+      plaques de neige, rochers/cactus/crânes de canyon & désert, buissons de
+      plaines, lampadaires de nuit — en plus de la teinte d'ambiance.
 - [ ] Déplacement animé d'un **pion** le long de la piste entre deux villes.
 - [ ] Plus de **gabarits de banque** (varier le rendu mission selon le biome).
 

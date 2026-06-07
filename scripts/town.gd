@@ -47,6 +47,7 @@ const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
 
 var _buildings: Array[Dictionary] = []   # {region,pos,h,label,tint,flavor}
 var _props: Array[Dictionary] = []        # {region,pos,h}
+var _biome_decor: Array[Dictionary] = []  # {type,pos} décor propre au biome
 var _npcs: Array[Dictionary] = []         # {pos,facing,pal,phase}
 var _foots: Array[Rect2] = []             # empreintes de collision (décor solide)
 var _body: CharacterBody2D                # corps physique du joueur (vrai moteur)
@@ -77,6 +78,7 @@ func _ready() -> void:
 		_facing = Vector2.DOWN
 		GameManager.town_return_pos = Vector2.ZERO
 	_build_town()
+	_make_biome_decor()
 	_build_physics()
 	_apply_zoom()
 	_cam = _camera_target()
@@ -523,6 +525,8 @@ func _draw() -> void:
 		items.append({"d": Iso.depth(b["pos"]) - 40.0, "k": "b", "o": b})
 	for p in _props:
 		items.append({"d": Iso.depth(p["pos"]), "k": "p", "o": p})
+	for bd in _biome_decor:
+		items.append({"d": Iso.depth(bd["pos"]), "k": "bio", "o": bd})
 	for n in _npcs:
 		items.append({"d": Iso.depth(n["pos"]), "k": "n", "o": n})
 	for hp in _horses:
@@ -544,6 +548,7 @@ func _draw() -> void:
 					_draw_cactus(it["o"]["pos"])
 				else:
 					_billboard(reg, it["o"]["pos"], it["o"]["h"], Color.WHITE)
+			"bio": _draw_bio(it["o"]["type"], it["o"]["pos"])
 			"coach": _draw_coach()
 			"horse": _horse(it["o"])
 			"n":
@@ -580,6 +585,133 @@ func _draw_ground() -> void:
 		var plank := _rect_diamond(Rect2(pos.x - 95, pos.y + 30, 190, 70))
 		draw_colored_polygon(plank, Color(0.52, 0.36, 0.20, 0.9))
 		draw_polyline(_closed(plank), Color(0.35, 0.24, 0.13), 2.0)
+	_draw_biome_ground()
+
+
+## Décor propre au biome (déterministe par ville) : disposé sur les bords pour ne
+## pas gêner la circulation. Rend chaque ville visuellement unique.
+func _make_biome_decor() -> void:
+	_biome_decor.clear()
+	var theme := str(GameManager.current_town_def().get("theme", "desert"))
+	var kinds: Array
+	match theme:
+		"canyon": kinds = ["rock", "rock", "cactus", "skull"]
+		"plains": kinds = ["bush", "pine", "bush", "bush"]
+		"snow": kinds = ["pine_snow", "rock", "pine_snow", "pine_snow"]
+		"night": kinds = ["lamp", "pine", "rock", "lamp"]
+		"sunset": kinds = ["cactus", "rock", "skull", "cactus"]
+		_: kinds = ["cactus", "skull", "rock", "cactus"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = GameManager.current_town * 131 + 17
+	# Bandes périphériques (évitent le centre bâti / la grand-rue).
+	var spots := []
+	for yy in range(120, 1700, 150):
+		spots.append(Vector2(rng.randf_range(70, 300), yy))
+		spots.append(Vector2(rng.randf_range(1900, 2130), yy))
+	for xx in range(360, 1860, 220):
+		spots.append(Vector2(xx, rng.randf_range(70, 170)))
+		spots.append(Vector2(xx, rng.randf_range(1640, 1700)))
+	spots.shuffle()
+	var count := mini(spots.size(), 22)
+	for i in range(count):
+		_biome_decor.append({"type": kinds[rng.randi() % kinds.size()], "pos": spots[i]})
+
+
+func _draw_biome_ground() -> void:
+	var theme := str(GameManager.current_town_def().get("theme", "desert"))
+	var col: Color
+	match theme:
+		"snow": col = Color(0.92, 0.95, 1.0, 0.55)
+		"plains": col = Color(0.45, 0.62, 0.32, 0.35)
+		"canyon": col = Color(0.62, 0.32, 0.20, 0.30)
+		"night": col = Color(0.20, 0.24, 0.40, 0.30)
+		"sunset": col = Color(0.80, 0.45, 0.30, 0.22)
+		_: col = Color(0.78, 0.66, 0.42, 0.22)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = GameManager.current_town * 911 + 3
+	for i in range(26):
+		var c := Vector2(rng.randf_range(60, 2140), rng.randf_range(80, 1700))
+		# On évite la grande rue centrale.
+		if c.x > 880 and c.x < 1320:
+			continue
+		var w := rng.randf_range(60, 130)
+		draw_colored_polygon(_rect_diamond(Rect2(c.x - w * 0.5, c.y - w * 0.4, w, w * 0.8)), col)
+
+
+## Aiguillage du décor de biome.
+func _draw_bio(t: String, pos: Vector2) -> void:
+	match t:
+		"cactus": _draw_cactus(pos)
+		"rock": _draw_rock(pos)
+		"bush": _draw_bush(pos)
+		"skull": _draw_skull(pos)
+		"pine": _draw_pine(pos, false)
+		"pine_snow": _draw_pine(pos, true)
+		"lamp": _draw_lamp_post(pos)
+		_: _draw_rock(pos)
+
+
+func _draw_pine(pos: Vector2, snowy: bool) -> void:
+	var base := Iso.project(pos)
+	var U := Vector2(0, -1)
+	draw_colored_polygon(_diamond_shadow(base, 14.0), Color(0, 0, 0, 0.18))
+	draw_line(base, base + U * 10, Color(0.34, 0.22, 0.12), 4.0)
+	var green := Color(0.22, 0.44, 0.26)
+	for k in range(3):
+		var yy := 10.0 + k * 14.0
+		var ww := 20.0 - k * 5.0
+		draw_colored_polygon(PackedVector2Array([
+			base + U * yy + Vector2(-ww, 0), base + U * (yy + 20.0), base + U * yy + Vector2(ww, 0)]), green)
+		if snowy:
+			draw_colored_polygon(PackedVector2Array([
+				base + U * (yy + 12.0) + Vector2(-ww * 0.5, 0), base + U * (yy + 20.0),
+				base + U * (yy + 12.0) + Vector2(ww * 0.5, 0)]), Color(0.95, 0.97, 1.0))
+
+
+func _draw_rock(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	draw_colored_polygon(_diamond_shadow(base, 16.0), Color(0, 0, 0, 0.16))
+	var theme := str(GameManager.current_town_def().get("theme", "desert"))
+	var rc := Color(0.66, 0.38, 0.26) if theme == "canyon" else Color(0.55, 0.50, 0.46)
+	draw_colored_polygon(_ellipse(base + Vector2(0, -8), 20, 12), rc)
+	draw_colored_polygon(_ellipse(base + Vector2(8, -16), 12, 9), rc.lightened(0.1))
+	draw_colored_polygon(_ellipse(base + Vector2(-10, -12), 9, 7), rc.darkened(0.1))
+
+
+func _draw_bush(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	draw_colored_polygon(_diamond_shadow(base, 13.0), Color(0, 0, 0, 0.15))
+	var g := Color(0.30, 0.50, 0.28)
+	draw_colored_polygon(_ellipse(base + Vector2(0, -9), 16, 11), g)
+	draw_colored_polygon(_ellipse(base + Vector2(-7, -14), 9, 8), g.lightened(0.08))
+	draw_colored_polygon(_ellipse(base + Vector2(7, -13), 8, 7), g.darkened(0.06))
+
+
+func _draw_skull(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	draw_colored_polygon(_diamond_shadow(base, 12.0), Color(0, 0, 0, 0.14))
+	var bone := Color(0.92, 0.90, 0.82)
+	draw_colored_polygon(_ellipse(base + Vector2(0, -8), 11, 9), bone)
+	# Cornes.
+	draw_line(base + Vector2(-9, -12), base + Vector2(-18, -16), bone, 3.0)
+	draw_line(base + Vector2(9, -12), base + Vector2(18, -16), bone, 3.0)
+	# Orbites + museau.
+	draw_circle(base + Vector2(-4, -9), 2.0, Color(0.2, 0.18, 0.14))
+	draw_circle(base + Vector2(4, -9), 2.0, Color(0.2, 0.18, 0.14))
+	draw_colored_polygon(PackedVector2Array([
+		base + Vector2(-3, -4), base + Vector2(3, -4), base + Vector2(0, 0)]), Color(0.2, 0.18, 0.14))
+
+
+func _draw_lamp_post(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	var U := Vector2(0, -1)
+	draw_colored_polygon(_diamond_shadow(base, 10.0), Color(0, 0, 0, 0.16))
+	draw_line(base, base + U * 44, Color(0.20, 0.16, 0.10), 3.0)
+	var head := base + U * 46
+	for i in range(4):
+		draw_circle(head, 20.0 - i * 5, Color(1.0, 0.82, 0.40, 0.10))
+	draw_colored_polygon(_ellipse(head, 5, 6), Color(0.30, 0.22, 0.12))
+	draw_circle(head, 2.6, Color(1.0, 0.92, 0.6))
 
 
 ## Puits de la place centrale (margelle + toit).
@@ -1158,6 +1290,14 @@ func _screen_facing(world_pos: Vector2, facing: Vector2) -> Vector2:
 
 
 # --- Primitives ---
+
+func _ellipse(center: Vector2, rx: float, ry: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in range(16):
+		var a := TAU * float(i) / 16.0
+		pts.append(center + Vector2(cos(a) * rx, sin(a) * ry))
+	return pts
+
 
 func _rect_diamond(r: Rect2) -> PackedVector2Array:
 	return PackedVector2Array([
