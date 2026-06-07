@@ -68,6 +68,7 @@ var _dynamite: Area2D = null
 var _dyn_used := false
 var _hostages: Array = []
 var _hostages_freed := 0
+var _safes2: Array = []
 
 
 func _ready() -> void:
@@ -83,6 +84,7 @@ func _ready() -> void:
 	_spawn_exit()
 	_spawn_guards()
 	_build_bullets()
+	_spawn_strongboxes()
 	_spawn_hostages()
 	_spawn_dynamite()
 	_build_iso_renderer()
@@ -174,6 +176,7 @@ func _build_iso_renderer() -> void:
 	_renderer.biome = str(_cfg.get("biome", "desert"))
 	_renderer.dynamite = _dynamite
 	_renderer.hostages = _hostages
+	_renderer.safes2 = _safes2
 	_renderer.player = player
 	_renderer.guards = _guards
 	_renderer.loot = _loot_nodes
@@ -339,10 +342,15 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	var hostages := []
 	for _h in range(rng.randi_range(1, 2)):
 		hostages.append([ox + rng.randf_range(0.24, 0.76) * W, cyc + rng.randf_range(70.0, 150.0), 150])
+	var strongboxes := []
+	for _b in range(rng.randi_range(1, 2)):
+		var sbx_x: float = (ox + W * 0.30) if rng.randf() < 0.5 else (ox + W * 0.70)
+		strongboxes.append([sbx_x, staff_y + rng.randf_range(-20.0, 30.0), 200 + tier * 60])
 	var diff: String = ["", "Petite banque", "Banque de comté", "Grande banque"][tier]
 	return {
 		"dynamite": dyn,
 		"hostages": hostages,
+		"strongboxes": strongboxes,
 		"name": town_name,
 		"difficulty": diff,
 		"biome": biome,
@@ -485,6 +493,37 @@ func _spawn_exit() -> void:
 
 
 ## Règle un garde selon le mode assist + l'upgrade discrétion.
+## Coffres-forts SECONDAIRES ouvrables (E) : butin bonus, mêmes mécaniques.
+func _spawn_strongboxes() -> void:
+	var arr: Variant = _cfg.get("strongboxes", [])
+	if not (arr is Array):
+		return
+	for sbx in arr:
+		if not (sbx is Array) or sbx.size() < 2:
+			continue
+		var sf := SafeScene.instantiate()
+		sf.global_position = Vector2(float(sbx[0]), float(sbx[1]))
+		sf.value = int(sbx[2]) if sbx.size() > 2 else 250
+		sf.open_time = (float(sbx[3]) if sbx.size() > 3 else 1.8) * SaveManager.safe_mult()
+		sf.visible = false
+		world.add_child(sf)
+		sf.opened.connect(_on_strongbox_opened)
+		_safes2.append(sf)
+
+
+func _on_strongbox_opened(value: int) -> void:
+	if player != null:
+		player.add_safe_reward(value)
+	AudioManager.play("safe")
+	if _fx != null:
+		for sf in _safes2:
+			if is_instance_valid(sf) and sf._is_open:
+				_fx.safe_burst(sf.global_position)
+				break
+	if hud.has_method("show_toast"):
+		hud.show_toast("COFFRE FORCÉ ! +%d $" % value)
+
+
 ## Otages à libérer (optionnels) : civils retenus ; les atteindre rapporte un bonus.
 func _spawn_hostages() -> void:
 	var hs: Variant = _cfg.get("hostages", [])
@@ -524,6 +563,7 @@ func _on_hostage_freed(body: Node, area: Area2D) -> void:
 	_hostages.erase(area)
 	if _renderer != null:
 		_renderer.hostages = _hostages
+	_renderer.safes2 = _safes2
 	area.queue_free()
 
 

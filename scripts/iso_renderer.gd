@@ -18,6 +18,7 @@ var bullets: Node = null
 var biome: String = "desert"
 var dynamite: Node = null
 var hostages: Array = []
+var safes2: Array = []
 var _pal: Dictionary = {}
 
 # Planches d'assets.
@@ -206,6 +207,9 @@ func _draw() -> void:
 	for h in hostages:
 		if is_instance_valid(h):
 			_shadow(h.global_position, 12.0)
+	for sb in safes2:
+		if is_instance_valid(sb):
+			_shadow(sb.global_position, 13.0)
 	for c in _corpses:
 		_draw_corpse(c)
 
@@ -230,6 +234,9 @@ func _draw() -> void:
 	for h in hostages:
 		if is_instance_valid(h):
 			items.append({"d": Iso.depth(h.global_position), "kind": "hostage", "node": h})
+	for sb in safes2:
+		if is_instance_valid(sb):
+			items.append({"d": Iso.depth(sb.global_position), "kind": "safe2", "node": sb})
 
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
@@ -243,6 +250,7 @@ func _draw() -> void:
 			"guard": _draw_guard(it["node"])
 			"dyn": _draw_dynamite(dynamite.global_position)
 			"hostage": _draw_hostage(it["node"].global_position)
+			"safe2": _draw_safe2(it["node"])
 			"player": _draw_player()
 
 	_draw_bullets()
@@ -1080,6 +1088,22 @@ func _draw_clerk(pos: Vector2) -> void:
 	}
 	var base := Iso.project(pos)
 	CharacterArt.draw_person(self, base, Vector2(0, 1), pal, false, false, 0.0, 0.0, 0.0)
+
+
+## Coffre-fort secondaire ouvrable : strongbox + barre de progression / OUVERT.
+func _draw_safe2(node: Node) -> void:
+	_draw_strongbox(node.global_position)
+	var head := Iso.project(node.global_position) + Vector2(0, -70.0)
+	if node._is_open:
+		_text_centered("OUVERT", head, 13, Color(0.95, 0.9, 0.4))
+		return
+	var prog: float = node._progress
+	if node._player_in_range or prog > 0.0:
+		var w := 54.0
+		draw_rect(Rect2(head + Vector2(-w * 0.5, -4), Vector2(w, 7)), Color(0, 0, 0, 0.65))
+		draw_rect(Rect2(head + Vector2(-w * 0.5, -4), Vector2(w * prog, 7)), Color(0.95, 0.8, 0.2))
+		if prog <= 0.01:
+			_text_centered("Maintiens E", head + Vector2(0, -10), 12, Color(1, 1, 1))
 
 
 ## Otage : civil retenu (mains liées) + marqueur d'alerte pulsé "AIDE".

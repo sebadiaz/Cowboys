@@ -66,6 +66,8 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [x] **Otages à libérer** : civils retenus (marqueur « AIDE ! » pulsé) ; les
       atteindre rapporte un bonus de butin (compte pour la sortie + le score),
       1–2 par banque procédurale, non bloquants.
+- [x] **Coffres-forts secondaires** ouvrables (E) : butin bonus à risque, mêmes
+      mécaniques que le coffre principal (barre de progression, son), 1–2 par banque.
 
 ## Carte du monde — pistes suivantes
 - [ ] **Layouts de ville uniques** par biome (pas seulement la teinte).
