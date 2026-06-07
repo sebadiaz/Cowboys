@@ -70,8 +70,61 @@ func _refresh() -> void:
 		c.queue_free()
 	_header.text = "Magot : %d $   ·   Équipe : %d / %d" % [
 		SaveManager.total_money, GameManager.crew.size(), GameManager.CREW_SLOTS]
+	if not SaveManager.gang.is_empty():
+		_list.add_child(_section("⭐ Ta bande fidèle (réembauche gratuite)"))
+		for g in range(SaveManager.gang.size()):
+			_list.add_child(_loyal_row(g))
+		_list.add_child(_section("Recrues à embaucher"))
 	for i in range(GameManager.crew_pool.size()):
 		_list.add_child(_recruit_row(i))
+
+
+func _section(text: String) -> Control:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 16)
+	l.add_theme_color_override("font_color", Color(0.95, 0.85, 0.4))
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
+func _loyal_row(g: int) -> Control:
+	var m: Dictionary = SaveManager.gang[g]
+	var role := str(m.get("role", ""))
+	var nm := str(m.get("name", ""))
+	var hired := GameManager.crew_has_name(nm)
+	var row := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.30, 0.26, 0.14, 0.9)
+	sb.set_corner_radius_all(10)
+	sb.set_content_margin_all(10)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0.95, 0.82, 0.35)
+	row.add_theme_stylebox_override("panel", sb)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 12)
+	row.add_child(h)
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(info)
+	var ri: Dictionary = GameManager.role_info(role)
+	info.add_child(_lbl("%s  «%s»  ⭐" % [_role_icon(role), nm], 20, Color(1, 1, 0.9)))
+	info.add_child(_lbl("%s — %s" % [str(ri.get("label", role)), str(ri.get("desc", ""))], 14, Color(0.85, 0.82, 0.6)))
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(150, 56)
+	if hired:
+		btn.text = "✓ Avec toi"
+		btn.disabled = true
+	else:
+		btn.text = "Rallier
+(gratuit)"
+		btn.disabled = GameManager.crew.size() >= GameManager.CREW_SLOTS
+		btn.pressed.connect(func() -> void:
+			if GameManager.hire_loyal(g):
+				AudioManager.play("pickup")
+				_refresh())
+	h.add_child(btn)
+	return row
 
 
 func _recruit_row(idx: int) -> Control:

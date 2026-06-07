@@ -212,6 +212,8 @@ func _spawn_crew() -> void:
 			circ.radius = 12.0
 			cs.shape = circ
 			a.add_child(cs)
+			a.set_meta("cname", str(c.get("name", "")))
+			a.set_meta("crole", role)
 			a.global_position = player.global_position + Vector2(randf_range(-70, 70), randf_range(-40, 80))
 			world.add_child(a)
 			_allies.append(a)
@@ -850,6 +852,22 @@ func _spawn_reinforcement() -> void:
 		hud.show_toast("RENFORTS !")
 
 
+## Survivants + non-combattants rejoignent la BANDE FIDÈLE (réembauche gratuite).
+func _promote_crew_to_gang() -> void:
+	var alive := {}
+	for a in _allies:
+		if is_instance_valid(a):
+			alive[str(a.get_meta("cname", ""))] = true
+	for c in GameManager.crew:
+		var role := str(c.get("role", ""))
+		var nm := str(c.get("name", ""))
+		if role == "gunman" or role == "marksman":
+			if alive.has(nm):
+				SaveManager.add_loyal(nm, role)
+		else:
+			SaveManager.add_loyal(nm, role)
+
+
 ## Score de mission : butin + bonus discrétion + bonus temps.
 func _compute_score() -> Dictionary:
 	var loot: int = _loot_value
@@ -1010,6 +1028,8 @@ func _end_mission(success: bool) -> void:
 	if player != null:
 		player.focus_boost = 1.0
 	_focus_active = false
+	if GameManager.coach_mission and success:
+		_promote_crew_to_gang()
 	if _bullets != null and _bullets.has_method("stop"):
 		_bullets.stop()
 	for g in _guards:

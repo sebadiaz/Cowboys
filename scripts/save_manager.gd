@@ -29,6 +29,7 @@ var settings: Dictionary = {}
 var levels_unlocked: int = 1   # niveaux débloqués (1 = seul le 1er)
 var towns_unlocked: int = 1    # villes débloquées sur la carte du monde
 var notoriety: int = 0         # notoriété (0..12) : gardes plus nerveux + meilleures primes
+var gang: Array = []           # bande fidèle (survivants de diligence), réembauchable gratis
 
 
 func _ready() -> void:
@@ -45,6 +46,7 @@ func load_game() -> void:
 	levels_unlocked = 1
 	towns_unlocked = 1
 	notoriety = 0
+	gang = []
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
@@ -60,6 +62,8 @@ func load_game() -> void:
 	levels_unlocked = maxi(1, int(data.get("levels_unlocked", 1)))
 	towns_unlocked = maxi(1, int(data.get("towns_unlocked", 1)))
 	notoriety = clampi(int(data.get("notoriety", 0)), 0, 12)
+	var g: Variant = data.get("gang", [])
+	gang = g if g is Array else []
 	# Upgrades : on ne lit que les clés connues, bornées à leur max.
 	var saved: Variant = data.get("upgrades", {})
 	if typeof(saved) == TYPE_DICTIONARY:
@@ -105,6 +109,7 @@ func save_game() -> void:
 		"levels_unlocked": levels_unlocked,
 		"towns_unlocked": towns_unlocked,
 		"notoriety": notoriety,
+		"gang": gang,
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
@@ -169,6 +174,17 @@ func gain_notoriety() -> void:
 
 func lose_notoriety() -> void:
 	notoriety = clampi(notoriety - 2, 0, 12)
+	save_game()
+
+
+## Ajoute un hors-la-loi à la bande fidèle (survivant d'une diligence).
+func add_loyal(nm: String, role: String) -> void:
+	if nm == "":
+		return
+	for g in gang:
+		if str(g.get("name", "")) == nm:
+			return
+	gang.append({"name": nm, "role": role})
 	save_game()
 
 

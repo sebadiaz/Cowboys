@@ -83,6 +83,9 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [x] **Coéquipiers vulnérables** : les balles ennemies peuvent les abattre (3 PV,
       flash de touche, « ALLIÉ À TERRE ! » + corps) → il faut les **protéger** ;
       chaque allié ramené vivant rapporte un **bonus de score** (+120).
+- [x] **Réputation d'équipe (bande fidèle)** : les coéquipiers ramenés vivants
+      d'une diligence rejoignent une **bande persistante** (`SaveManager.gang`) ;
+      ré-embauche **gratuite** depuis l'écran de recrutement (section dédiée).
 
 ## Carte du monde — pistes suivantes
 - [x] **Décor de ville unique par biome** (déterministe) : sapins enneigés +

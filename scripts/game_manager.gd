@@ -36,6 +36,13 @@ var coach_mission := false
 const CREW_SLOTS := 3
 var crew_pool: Array = []
 var crew: Array = []
+const ROLE_DEFS := {
+	"gunman": {"label": "Pistolero", "desc": "Tire sur les gardes à tes côtés", "cost": 400},
+	"marksman": {"label": "Fine gâchette", "desc": "Allié longue portée, tir rapide", "cost": 650},
+	"medic": {"label": "Toubib", "desc": "+1 PV max pour le braquage", "cost": 500},
+	"scout": {"label": "Éclaireur", "desc": "+200 $ de butin", "cost": 450},
+	"demolisher": {"label": "Artificier", "desc": "Dynamite sur la diligence", "cost": 600},
+}
 ## Position de réapparition en ville (ex. en sortant du saloon). Zero = défaut.
 var town_return_pos := Vector2.ZERO
 ## La boutique a-t-elle été ouverte depuis la ville (retour en ville) ?
@@ -118,28 +125,23 @@ func _biome_for(t: float) -> String:
 ## Recrues disponibles pour l'attaque de diligence (déterministe).
 func _generate_crew_pool() -> void:
 	crew_pool.clear()
-	var roles := [
-		{"role": "gunman", "label": "Pistolero", "desc": "Tire sur les gardes à tes côtés", "cost": 400},
-		{"role": "marksman", "label": "Fine gâchette", "desc": "Allié longue portée, tir rapide", "cost": 650},
-		{"role": "medic", "label": "Toubib", "desc": "+1 PV max pour le braquage", "cost": 500},
-		{"role": "scout", "label": "Éclaireur", "desc": "+200 $ de butin", "cost": 450},
-		{"role": "demolisher", "label": "Artificier", "desc": "Dynamite sur la diligence", "cost": 600},
-	]
+	var role_keys: Array = ROLE_DEFS.keys()
 	var names := ["Slim", "Doc", "Whisky", "Borgne", "Curly", "Tex", "Lefty", "Bart",
 		"Cole", "Jesse", "Ringo", "Hank", "Ace", "Diego", "Mad Dog", "Colt"]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 0xBADA55
 	var used := {}
 	for i in range(7):
-		var r: Dictionary = roles[rng.randi() % roles.size()]
+		var rk: String = role_keys[rng.randi() % role_keys.size()]
+		var rd: Dictionary = ROLE_DEFS[rk]
 		var nm := "Recrue %d" % (i + 1)
 		for _a in range(20):
 			var cand: String = names[rng.randi() % names.size()]
 			if not used.has(cand):
 				used[cand] = true; nm = cand; break
 		crew_pool.append({
-			"id": i, "name": nm, "role": r["role"], "label": r["label"],
-			"desc": r["desc"], "cost": int(r["cost"]) + rng.randi_range(-50, 80),
+			"id": i, "name": nm, "role": rk, "label": rd["label"],
+			"desc": rd["desc"], "cost": int(rd["cost"]) + rng.randi_range(-50, 80),
 		})
 
 
@@ -166,6 +168,32 @@ func hire(idx: int) -> bool:
 	if not SaveManager.spend(int(crew_pool[idx]["cost"])):
 		return false
 	crew.append(crew_pool[idx].duplicate(true))
+	return true
+
+
+func role_info(role: String) -> Dictionary:
+	return ROLE_DEFS.get(role, {"label": role, "desc": "", "cost": 0})
+
+
+func crew_has_name(nm: String) -> bool:
+	for c in crew:
+		if str(c.get("name", "")) == nm:
+			return true
+	return false
+
+
+## Embauche GRATUITE d'un membre de la bande fidèle (index dans SaveManager.gang).
+func hire_loyal(g: int) -> bool:
+	if g < 0 or g >= SaveManager.gang.size():
+		return false
+	var m: Dictionary = SaveManager.gang[g]
+	var nm := str(m.get("name", ""))
+	var role := str(m.get("role", ""))
+	if crew.size() >= CREW_SLOTS or crew_has_name(nm):
+		return false
+	var info := role_info(role)
+	crew.append({"name": nm, "role": role, "label": str(info.get("label", role)),
+		"desc": str(info.get("desc", "")), "cost": 0, "loyal": true})
 	return true
 
 
