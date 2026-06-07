@@ -223,7 +223,9 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	var W: float = [0.0, 1180.0, 1380.0, 1560.0][tier]
 	var H: float = [0.0, 820.0, 900.0, 980.0][tier]
 	var cx := ox + W * 0.5
-	var cyc := oy + H * 0.50          # ligne de comptoir
+	var vshift := float(rng.randi_range(-1, 1)) * (W * 0.15)
+	var gx: float = clampf(cx + vshift, ox + 280.0, ox + W - 280.0)   # axe coffre/passage
+	var cyc := oy + H * rng.randf_range(0.47, 0.54)                   # profondeur comptoir variable
 	var gap := 200.0                  # ouverture centrale (entrée + passage comptoir)
 	var th := 24.0
 	var nhw := 150.0                  # demi-largeur de la niche du coffre
@@ -234,14 +236,14 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	walls.append([ox + W - th, oy, th, H, 1])
 	walls.append([ox, oy + H - th, (cx - gap * 0.5) - ox, th, 1])
 	walls.append([cx + gap * 0.5, oy + H - th, (ox + W) - (cx + gap * 0.5), th, 1])
-	walls.append([ox + 80.0, cyc, (cx - gap * 0.5) - (ox + 80.0), th, 0, 1])
-	walls.append([cx + gap * 0.5, cyc, (ox + W - 80.0) - (cx + gap * 0.5), th, 0, 1])
-	walls.append([cx - nhw - 12.0, oy + th, th, nh])
-	walls.append([cx + nhw - 12.0, oy + th, th, nh])
+	walls.append([ox + 80.0, cyc, (gx - gap * 0.5) - (ox + 80.0), th, 0, 1])
+	walls.append([gx + gap * 0.5, cyc, (ox + W - 80.0) - (gx + gap * 0.5), th, 0, 1])
+	walls.append([gx - nhw - 12.0, oy + th, th, nh])
+	walls.append([gx + nhw - 12.0, oy + th, th, nh])
 
 	var safe_y := oy + th + 86.0
 	var safe_val := 450 + tier * 200 + rng.randi_range(0, 150)
-	var safe := {"pos": [cx, safe_y], "value": safe_val, "open_time": 2.3 + tier * 0.2}
+	var safe := {"pos": [gx, safe_y], "value": safe_val, "open_time": 2.3 + tier * 0.2}
 
 	var lobby_y := (cyc + (oy + H - th)) * 0.5
 	var staff_y := ((oy + th + nh) + cyc) * 0.5
@@ -249,8 +251,8 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	var loot := []
 	loot.append({"pos": [cx - 200.0 + rng.randf_range(-20, 20), cyc + 70.0], "value": 200})
 	loot.append({"pos": [cx + 200.0 + rng.randf_range(-20, 20), cyc + 70.0], "value": 200})
-	loot.append({"pos": [cx - 64.0, safe_y + 36.0], "value": 300})
-	loot.append({"pos": [cx + 64.0, safe_y + 36.0], "value": 300})
+	loot.append({"pos": [gx - 64.0, safe_y + 36.0], "value": 300})
+	loot.append({"pos": [gx + 64.0, safe_y + 36.0], "value": 300})
 	if tier >= 2:
 		loot.append({"pos": [ox + 150.0, staff_y], "value": 150})
 		loot.append({"pos": [ox + W - 150.0, staff_y], "value": 150})
@@ -263,8 +265,8 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	guards.append({"route": [[ox + 160, staff_y], [ox + W - 160, staff_y],
 		[ox + W - 160, staff_y + 36], [ox + 160, staff_y + 36]]})
 	if tier >= 2:
-		guards.append({"route": [[cx - 90, cyc - 70], [cx + 90, cyc - 70],
-			[cx + 90, cyc - 34], [cx - 90, cyc - 34]]})
+		guards.append({"route": [[gx - 90, cyc - 70], [gx + 90, cyc - 70],
+			[gx + 90, cyc - 34], [gx - 90, cyc - 34]]})
 	if tier >= 3:
 		guards.append({"route": [[ox + 220, lobby_y + 90], [ox + W - 220, lobby_y + 90]]})
 
@@ -272,15 +274,15 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	for sgn in [-1.0, 1.0]:
 		var cages := 2 if tier == 1 else 3
 		for k in range(cages):
-			props.append(["counter", cx + sgn * (gap * 0.5 + 105.0 + 70.0 * k), cyc - 10.0])
+			props.append(["counter", gx + sgn * (gap * 0.5 + 105.0 + 70.0 * k), cyc - 10.0])
 	props.append(["desk", ox + 160.0, oy + H * 0.30])
 	props.append(["chair", ox + 160.0, oy + H * 0.30 + 46.0])
 	props.append(["desk", ox + W - 160.0, oy + H * 0.30])
 	props.append(["chair", ox + W - 160.0, oy + H * 0.30 + 46.0])
-	props.append(["shelf", cx - nhw + 30.0, oy + 60.0])
-	props.append(["shelf", cx + nhw - 30.0, oy + 60.0])
-	props.append(["money", cx - 70.0, safe_y - 30.0])
-	props.append(["money", cx + 70.0, safe_y - 30.0])
+	props.append(["shelf", gx - nhw + 30.0, oy + 60.0])
+	props.append(["shelf", gx + nhw - 30.0, oy + 60.0])
+	props.append(["money", gx - 70.0, safe_y - 30.0])
+	props.append(["money", gx + 70.0, safe_y - 30.0])
 	props.append(["money", cx - 220.0, cyc - 40.0])
 	props.append(["money", cx + 220.0, cyc - 40.0])
 	props.append(["plant", ox + 120.0, oy + H - 120.0])
@@ -292,9 +294,9 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	props.append(["chandelier", cx, staff_y])
 	props.append(["painting", ox + 50.0, staff_y - 20.0])
 	props.append(["painting", ox + W - 50.0, staff_y + 20.0])
-	props.append(["goldpile", cx, safe_y + 70.0])
-	props.append(["clerk", cx - 150.0, cyc - 44.0])
-	props.append(["clerk", cx + 150.0, cyc - 44.0])
+	props.append(["goldpile", gx, safe_y + 70.0])
+	props.append(["clerk", gx - 150.0, cyc - 44.0])
+	props.append(["clerk", gx + 150.0, cyc - 44.0])
 	# Solides UNIQUEMENT aux 4 coins (hors passage et hors rondes).
 	props.append(["barrel", ox + 110.0, oy + H - 110.0])
 	props.append(["crate", ox + W - 110.0, oy + H - 110.0])

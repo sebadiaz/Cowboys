@@ -51,6 +51,10 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       (+1 balle), Flair du magot (butin +8%) — persistées et appliquées en mission.
 - [x] **Ambiance de banque** : lustres suspendus, tableaux encadrés, tas d'or et
       **guichetiers** (citoyens derrière le comptoir) — décor non bloquant.
+- [x] **Contrats de braquage** par banque (FANTÔME / ÉCLAIR / RAFLE / PACIFISTE) :
+      défi déterministe affiché au HUD, **prime bonus** au score + écran de résultat.
+- [x] **Variété de plan** procédurale : axe coffre/passage décalé (gauche/centre/
+      droite) et profondeur de comptoir variables selon la graine — chemin garanti.
 
 ## Carte du monde — pistes suivantes
 - [ ] **Layouts de ville uniques** par biome (pas seulement la teinte).
