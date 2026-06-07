@@ -28,6 +28,7 @@ var upgrades: Dictionary = {}
 var settings: Dictionary = {}
 var levels_unlocked: int = 1   # niveaux débloqués (1 = seul le 1er)
 var towns_unlocked: int = 1    # villes débloquées sur la carte du monde
+var notoriety: int = 0         # notoriété (0..12) : gardes plus nerveux + meilleures primes
 
 
 func _ready() -> void:
@@ -43,6 +44,7 @@ func load_game() -> void:
 	settings = _default_settings()
 	levels_unlocked = 1
 	towns_unlocked = 1
+	notoriety = 0
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
@@ -57,6 +59,7 @@ func load_game() -> void:
 	missions_completed = int(data.get("missions_completed", 0))
 	levels_unlocked = maxi(1, int(data.get("levels_unlocked", 1)))
 	towns_unlocked = maxi(1, int(data.get("towns_unlocked", 1)))
+	notoriety = clampi(int(data.get("notoriety", 0)), 0, 12)
 	# Upgrades : on ne lit que les clés connues, bornées à leur max.
 	var saved: Variant = data.get("upgrades", {})
 	if typeof(saved) == TYPE_DICTIONARY:
@@ -101,6 +104,7 @@ func save_game() -> void:
 		"settings": settings,
 		"levels_unlocked": levels_unlocked,
 		"towns_unlocked": towns_unlocked,
+		"notoriety": notoriety,
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
@@ -137,6 +141,19 @@ func unlock_town(town: int) -> void:
 
 func is_town_unlocked(town: int) -> bool:
 	return town <= towns_unlocked
+
+
+## Notoriété : prime de récompense (+7% par cran) et montée/descente.
+func notoriety_reward_mult() -> float:
+	return 1.0 + 0.07 * notoriety
+
+func gain_notoriety() -> void:
+	notoriety = clampi(notoriety + 1, 0, 12)
+	save_game()
+
+func lose_notoriety() -> void:
+	notoriety = clampi(notoriety - 2, 0, 12)
+	save_game()
 
 
 # --- Upgrades ---

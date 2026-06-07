@@ -24,8 +24,8 @@ func _ready() -> void:
 			17, Color(0.42, 0.28, 0.16))
 	sub.set_anchors_preset(Control.PRESET_TOP_WIDE); sub.position = Vector2(0, 48)
 	add_child(sub)
-	var prog := _label("Villes conquises : %d / %d   ·   Magot : %d $" % [
-			maxi(0, done), total, SaveManager.total_money], 17, Color(0.30, 0.20, 0.12))
+	var prog := _label("Villes conquises : %d / %d   ·   Magot : %d $   ·   Notoriété : %s" % [
+			maxi(0, done), total, SaveManager.total_money, _stars(SaveManager.notoriety)], 17, Color(0.30, 0.20, 0.12))
 	prog.set_anchors_preset(Control.PRESET_TOP_WIDE); prog.position = Vector2(0, 74)
 	add_child(prog)
 	# Cibles tactiles invisibles sur chaque ville débloquée (marqueurs dessinés en _draw).
@@ -142,6 +142,16 @@ func _draw() -> void:
 	# Marqueurs de ville + noms.
 	for i in range(1, n + 1):
 		_marker(i)
+
+	# Pion courrier qui chevauche jusqu'à la frontière.
+	var fidx := clampi(SaveManager.towns_unlocked, 1, n)
+	if fidx >= 2 and pts.size() >= fidx:
+		var segs := fidx - 1
+		var f := fmod(_t * 0.05, 1.0) * segs
+		var i := clampi(int(f), 0, segs - 1)
+		_pawn(pts[i].lerp(pts[i + 1], f - i))
+	elif pts.size() >= 1:
+		_pawn(pts[0])
 
 	# Rose des vents.
 	_compass(Vector2(inner.end.x - 44, inner.position.y + 54))
@@ -270,6 +280,24 @@ func _ellipse(c: Vector2, rx: float, ry: float) -> PackedVector2Array:
 
 
 # --- Texte / labels ---
+
+## Petit cavalier animé sur la piste.
+func _pawn(p: Vector2) -> void:
+	draw_circle(p + Vector2(2, 5), 6.0, Color(0, 0, 0, 0.18))
+	draw_circle(p + Vector2(0, -1), 5.0, Color(0.46, 0.30, 0.18))      # monture
+	draw_circle(p + Vector2(0, -8), 3.2, Color(0.86, 0.66, 0.46))      # tête
+	draw_colored_polygon(PackedVector2Array([
+		p + Vector2(-5, -10), p + Vector2(5, -10), p + Vector2(0, -15)]), Color(0.30, 0.20, 0.12))
+
+
+func _stars(n: int) -> String:
+	if n <= 0:
+		return "—"
+	var s := ""
+	for i in range(mini(n, 12)):
+		s += "★"
+	return s
+
 
 func _label(text: String, font_size: int, color: Color) -> Label:
 	var l := Label.new()

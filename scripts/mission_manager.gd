@@ -64,6 +64,8 @@ var _reinforced := false
 var _contract: Dictionary = {}
 var _guards_killed := 0
 var _loot_total := 0
+var _dynamite: Area2D = null
+var _dyn_used := false
 
 
 func _ready() -> void:
@@ -79,6 +81,7 @@ func _ready() -> void:
 	_spawn_exit()
 	_spawn_guards()
 	_build_bullets()
+	_spawn_dynamite()
 	_build_iso_renderer()
 	_build_effects()
 	_connect_hud()
@@ -166,6 +169,7 @@ func _build_iso_renderer() -> void:
 	_renderer.walls = _walls
 	_renderer.props = _cfg.get("props", [])
 	_renderer.biome = str(_cfg.get("biome", "desert"))
+	_renderer.dynamite = _dynamite
 	_renderer.player = player
 	_renderer.guards = _guards
 	_renderer.loot = _loot_nodes
@@ -240,6 +244,22 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	walls.append([gx + gap * 0.5, cyc, (ox + W - 80.0) - (gx + gap * 0.5), th, 0, 1])
 	walls.append([gx - nhw - 12.0, oy + th, th, nh])
 	walls.append([gx + nhw - 12.0, oy + th, th, nh])
+	# Variante : bureau cloisonné dans un coin du fond (côté opposé au coffre),
+	# avec une porte (130 px) ouverte sur la zone employés.
+	var office := {}
+	if rng.randf() < 0.5:
+		var left_side := gx > cx
+		var rx0: float = (ox + 24.0) if left_side else (ox + W - 24.0 - 250.0)
+		var rx1 := rx0 + 250.0
+		var ry1 := oy + 224.0
+		if left_side:
+			walls.append([rx1 - 12.0, oy + 24.0, th, 200.0])
+			walls.append([rx0, ry1, 120.0, th])
+		else:
+			walls.append([rx0 - 12.0, oy + 24.0, th, 200.0])
+			walls.append([rx1 - 120.0, ry1, 120.0, th])
+		office = {"lx": rx0 + 70.0, "lx2": rx0 + 180.0, "ly0": oy + 92.0,
+			"dx": rx0 + 125.0, "dy": oy + 150.0}
 
 	var safe_y := oy + th + 86.0
 	var safe_val := 450 + tier * 200 + rng.randi_range(0, 150)
@@ -258,6 +278,9 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 		loot.append({"pos": [ox + W - 150.0, staff_y], "value": 150})
 	if tier >= 3:
 		loot.append({"pos": [cx, lobby_y + 30.0], "value": 200})
+	if not office.is_empty():
+		loot.append({"pos": [office["lx"], office["ly0"]], "value": 200})
+		loot.append({"pos": [office["lx2"], office["ly0"]], "value": 200})
 
 	var guards := []
 	guards.append({"route": [[ox + 120, lobby_y], [ox + W - 120, lobby_y],
@@ -297,14 +320,21 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	props.append(["goldpile", gx, safe_y + 70.0])
 	props.append(["clerk", gx - 150.0, cyc - 44.0])
 	props.append(["clerk", gx + 150.0, cyc - 44.0])
+	if not office.is_empty():
+		props.append(["desk", office["dx"], office["dy"]])
+		props.append(["money", office["lx"], office["ly0"] - 30.0])
 	# Solides UNIQUEMENT aux 4 coins (hors passage et hors rondes).
 	props.append(["barrel", ox + 110.0, oy + H - 110.0])
 	props.append(["crate", ox + W - 110.0, oy + H - 110.0])
 	props.append(["crate", ox + 110.0, oy + 120.0])
 	props.append(["barrel", ox + W - 110.0, oy + 120.0])
 
+	var dyn: Array = []
+	if rng.randf() < 0.6:
+		dyn = [cx + rng.randf_range(-160.0, 160.0), lobby_y + 50.0]
 	var diff: String = ["", "Petite banque", "Banque de comté", "Grande banque"][tier]
 	return {
+		"dynamite": dyn,
 		"name": town_name,
 		"difficulty": diff,
 		"biome": biome,
@@ -447,8 +477,51 @@ func _spawn_exit() -> void:
 
 
 ## Règle un garde selon le mode assist + l'upgrade discrétion.
+## Dynamite ramassable (optionnelle) : la prendre SOUFFLE le coffre instantanément.
+func _spawn_dynamite() -> void:
+	var d: Variant = _cfg.get("dynamite", [])
+	if not (d is Array) or d.size() < 2:
+		return
+	_dynamite = Area2D.new()
+	_dynamite.collision_layer = 0
+	_dynamite.collision_mask = 2          # détecte le joueur (layer 2)
+	_dynamite.monitoring = true
+	_dynamite.global_position = Vector2(float(d[0]), float(d[1]))
+	var cs := CollisionShape2D.new()
+	var sh := CircleShape2D.new()
+	sh.radius = 18.0
+	cs.shape = sh
+	_dynamite.add_child(cs)
+	world.add_child(_dynamite)
+	_dynamite.body_entered.connect(_on_dynamite_grabbed)
+
+
+func _on_dynamite_grabbed(body: Node) -> void:
+	if _dyn_used or _mission_over or not body.is_in_group("player"):
+		return
+	_dyn_used = true
+	AudioManager.play("explosion", 4.0)
+	if _fx != null:
+		_fx.add_shake(11.0)
+		if is_instance_valid(_safe):
+			_fx.safe_burst(_safe.global_position)
+	if hud.has_method("show_toast"):
+		hud.show_toast("DYNAMITE ! Coffre soufflé !")
+	if is_instance_valid(_safe) and _safe.has_method("force_open"):
+		_safe.force_open()
+	if is_instance_valid(_dynamite):
+		_dynamite.visible = false
+		_dynamite.queue_free()
+	_dynamite = null
+	if _renderer != null:
+		_renderer.dynamite = null
+
+
 func _apply_difficulty(g: Node) -> void:
 	g.alarm_gain_mult = SaveManager.stealth_mult()
+	# Notoriété : gardes plus nerveux (alarme + poursuite), bornée.
+	var noto: int = SaveManager.notoriety
+	g.alarm_gain_mult *= 1.0 + 0.035 * noto
 	if GameManager.assist:
 		g.alarm_gain_mult *= 0.5     # alarme monte 2x moins vite
 		g.detect_mult = 0.6          # détection plus lente

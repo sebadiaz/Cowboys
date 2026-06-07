@@ -244,7 +244,7 @@ func start_mission() -> void:
 func finish_mission(success: bool, loot_value: int, loot_bags: int, score: Dictionary = {}) -> void:
 	if score.is_empty():
 		score = {"loot": loot_value, "stealth": 0, "time": 0, "total": loot_value}
-	var money_earned: int = int(score.get("total", loot_value)) if success else 0
+	var money_earned: int = int(round(int(score.get("total", loot_value)) * SaveManager.notoriety_reward_mult())) if success else 0
 	last_result = {
 		"success": success,
 		"loot_value": loot_value,
@@ -260,6 +260,9 @@ func finish_mission(success: bool, loot_value: int, loot_bags: int, score: Dicti
 		# Débloque la ville suivante sur la carte du monde.
 		if current_town < TOWNS.size():
 			SaveManager.unlock_town(current_town + 1)
+		SaveManager.gain_notoriety()
+	else:
+		SaveManager.lose_notoriety()
 	_change_scene(SCENE_RESULT)
 
 

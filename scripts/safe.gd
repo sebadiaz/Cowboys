@@ -36,6 +36,12 @@ func _open() -> void:
 	queue_redraw()
 
 
+## Ouverture instantanée (dynamite).
+func force_open() -> void:
+	if not _is_open:
+		_open()
+
+
 func _on_body_entered(body: Node) -> void:
 	if body.is_in_group("player"):
 		_player_in_range = true

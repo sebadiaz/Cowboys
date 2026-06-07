@@ -16,6 +16,7 @@ var safe: Node = null
 var exit_zone: Node = null
 var bullets: Node = null
 var biome: String = "desert"
+var dynamite: Node = null
 var _pal: Dictionary = {}
 
 # Planches d'assets.
@@ -199,6 +200,8 @@ func _draw() -> void:
 	for b in loot:
 		if is_instance_valid(b):
 			_shadow(b.global_position, 11.0)
+	if is_instance_valid(dynamite) and dynamite.visible:
+		_shadow(dynamite.global_position, 10.0)
 	for c in _corpses:
 		_draw_corpse(c)
 
@@ -218,6 +221,8 @@ func _draw() -> void:
 			items.append({"d": Iso.depth(g.global_position), "kind": "guard", "node": g})
 	if is_instance_valid(player):
 		items.append({"d": Iso.depth(player.global_position), "kind": "player"})
+	if is_instance_valid(dynamite) and dynamite.visible:
+		items.append({"d": Iso.depth(dynamite.global_position), "kind": "dyn"})
 
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
@@ -229,6 +234,7 @@ func _draw() -> void:
 			"safe": _draw_safe()
 			"loot": _draw_loot(it["node"])
 			"guard": _draw_guard(it["node"])
+			"dyn": _draw_dynamite(dynamite.global_position)
 			"player": _draw_player()
 
 	_draw_bullets()
@@ -645,6 +651,7 @@ func _default_h(t: String) -> float:
 		"painting": return 44.0
 		"goldpile": return 16.0
 		"clerk": return 56.0
+		"dynamite": return 20.0
 		_: return 40.0
 
 
@@ -666,6 +673,7 @@ func _draw_prop(t: String, pos: Vector2, h: float) -> void:
 		"painting": _draw_painting(pos)
 		"goldpile": _draw_goldpile(pos)
 		"clerk": _draw_clerk(pos)
+		"dynamite": _draw_dynamite(pos)
 		_: _draw_crate(pos, h)
 
 
@@ -1064,6 +1072,26 @@ func _draw_clerk(pos: Vector2) -> void:
 	}
 	var base := Iso.project(pos)
 	CharacterArt.draw_person(self, base, Vector2(0, 1), pal, false, false, 0.0, 0.0, 0.0)
+
+
+## Caisse de dynamite (objet ramassable) : bâtons rouges + mèche + lueur.
+func _draw_dynamite(pos: Vector2) -> void:
+	var b := Iso.project(pos)
+	var U := Vector2(0, -1)
+	var bob := sin(Time.get_ticks_msec() * 0.005 + b.x * 0.05) * 1.5
+	b += Vector2(0, bob)
+	for i in range(3):
+		draw_circle(b + U * 8, 14.0 - i * 4, Color(1.0, 0.55, 0.20, 0.10))
+	# Trois bâtons.
+	for dx in [-5.0, 0.0, 5.0]:
+		draw_colored_polygon(PackedVector2Array([
+			b + Vector2(dx - 3, 0), b + Vector2(dx + 3, 0),
+			b + Vector2(dx + 3, -16), b + Vector2(dx - 3, -16)]), Color(0.74, 0.18, 0.14))
+		draw_line(b + Vector2(dx, -3), b + Vector2(dx, -13), Color(0.95, 0.85, 0.7), 1.0)
+	# Cerclage + mèche + étincelle.
+	draw_line(b + Vector2(-8, -8), b + Vector2(8, -8), Color(0.30, 0.22, 0.14), 2.0)
+	draw_line(b + Vector2(0, -16), b + Vector2(5, -22), Color(0.2, 0.16, 0.1), 1.5)
+	draw_circle(b + Vector2(5, -22), 2.2, Color(1.0, 0.9, 0.4))
 
 
 ## Palette d'intérieur selon le biome de la ville (sol + murs).

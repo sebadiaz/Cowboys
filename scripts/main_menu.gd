@@ -111,6 +111,7 @@ func _on_reset_save() -> void:
 	SaveManager.missions_completed = 0
 	SaveManager.levels_unlocked = 1
 	SaveManager.towns_unlocked = 1
+	SaveManager.notoriety = 0
 	SaveManager.upgrades = SaveManager._default_upgrades()
 	# On garde les réglages de confort (audio / contrôles tactiles).
 	SaveManager.save_game()

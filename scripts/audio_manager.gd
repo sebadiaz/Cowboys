@@ -56,6 +56,8 @@ func _build_all() -> void:
 	_streams["win"] = _make(0.70, func(t): return _win(t))
 	_streams["lose"] = _make(0.80, func(t): return _lose(t))
 	_streams["click"] = _make(0.06, func(t): return _click(t))
+	_streams["contract"] = _make(0.8, func(t): return _contract(t))
+	_streams["explosion"] = _make(0.6, func(t): return _explosion(t))
 	# Notes de piano (gamme de do majeur) pour la mélodie du saloon.
 	var scale := [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]
 	for i in scale.size():
@@ -152,6 +154,19 @@ func _win(t: float) -> float:
 	idx = clampi(idx, 0, notes.size() - 1)
 	var lt := t - idx * 0.17
 	return _tone(t, notes[idx]) * _env(lt, 0.01, 0.16) * 0.6
+
+func _contract(t: float) -> float:
+	# Petite fanfare de prime (quinte + octave).
+	var notes := [392.0, 587.33, 783.99]
+	var idx := clampi(int(t / 0.22), 0, notes.size() - 1)
+	var lt := t - idx * 0.22
+	return (_tone(t, notes[idx]) * 0.5 + _tone(t, notes[idx] * 2.0) * 0.2) * _env(lt, 0.01, 0.20) * 0.6
+
+func _explosion(t: float) -> float:
+	# Boom : bruit large + chute très grave.
+	var e := _env(t, 0.001, 0.55)
+	var f := maxf(30.0, 120.0 - 80.0 * (t / 0.6))
+	return (_noise() * 0.7 + _tone(t, f) * 0.5) * e * e
 
 func _lose(t: float) -> float:
 	# Descente grave (échec).

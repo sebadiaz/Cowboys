@@ -55,6 +55,14 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       défi déterministe affiché au HUD, **prime bonus** au score + écran de résultat.
 - [x] **Variété de plan** procédurale : axe coffre/passage décalé (gauche/centre/
       droite) et profondeur de comptoir variables selon la graine — chemin garanti.
+- [x] **Bureau cloisonné** (variante de salle) : pièce annexe au fond avec porte
+      + butin, côté opposé au coffre (sans bloquer rondes ni passage).
+- [x] **Dynamite** ramassable : SOUFFLE le coffre instantanément (son d'explosion
+      + secousse), dessinée et déclenchée par contact.
+- [x] **Notoriété** persistante (0..12) : monte à chaque casse, descend si échec ;
+      gardes plus nerveux **et** primes +7 %/cran ; affichée sur la carte.
+- [x] **Pion courrier animé** qui chevauche la piste jusqu'à la ville-frontière.
+- [x] **Sons dédiés** synthétisés : fanfare de prime de contrat, explosion.
 
 ## Carte du monde — pistes suivantes
 - [ ] **Layouts de ville uniques** par biome (pas seulement la teinte).
