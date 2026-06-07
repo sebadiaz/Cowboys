@@ -17,6 +17,7 @@ var exit_zone: Node = null
 var bullets: Node = null
 var biome: String = "desert"
 var dynamite: Node = null
+var hostages: Array = []
 var _pal: Dictionary = {}
 
 # Planches d'assets.
@@ -202,6 +203,9 @@ func _draw() -> void:
 			_shadow(b.global_position, 11.0)
 	if is_instance_valid(dynamite) and dynamite.visible:
 		_shadow(dynamite.global_position, 10.0)
+	for h in hostages:
+		if is_instance_valid(h):
+			_shadow(h.global_position, 12.0)
 	for c in _corpses:
 		_draw_corpse(c)
 
@@ -223,6 +227,9 @@ func _draw() -> void:
 		items.append({"d": Iso.depth(player.global_position), "kind": "player"})
 	if is_instance_valid(dynamite) and dynamite.visible:
 		items.append({"d": Iso.depth(dynamite.global_position), "kind": "dyn"})
+	for h in hostages:
+		if is_instance_valid(h):
+			items.append({"d": Iso.depth(h.global_position), "kind": "hostage", "node": h})
 
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
@@ -235,6 +242,7 @@ func _draw() -> void:
 			"loot": _draw_loot(it["node"])
 			"guard": _draw_guard(it["node"])
 			"dyn": _draw_dynamite(dynamite.global_position)
+			"hostage": _draw_hostage(it["node"].global_position)
 			"player": _draw_player()
 
 	_draw_bullets()
@@ -1072,6 +1080,29 @@ func _draw_clerk(pos: Vector2) -> void:
 	}
 	var base := Iso.project(pos)
 	CharacterArt.draw_person(self, base, Vector2(0, 1), pal, false, false, 0.0, 0.0, 0.0)
+
+
+## Otage : civil retenu (mains liées) + marqueur d'alerte pulsé "AIDE".
+func _draw_hostage(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	# Halo pulsé pour attirer l'oeil.
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
+	draw_circle(base, 16.0 + pulse * 4.0, Color(0.95, 0.85, 0.35, 0.10))
+	var pal := {
+		"hat": Color(0.55, 0.42, 0.26), "hat_band": Color(0.40, 0.30, 0.18),
+		"coat": Color(0.40, 0.50, 0.40), "coat_dark": Color(0.30, 0.40, 0.30),
+		"shirt": Color(0.90, 0.88, 0.80), "pants": Color(0.34, 0.30, 0.26),
+		"skin": Color(0.90, 0.72, 0.54), "bandana": Color(0.70, 0.66, 0.58),
+		"belt": Color(0.30, 0.22, 0.14), "buckle": Color(0.70, 0.60, 0.30),
+		"boots": Color(0.26, 0.18, 0.12), "hair": Color(0.30, 0.22, 0.14),
+	}
+	CharacterArt.draw_person(self, base, Vector2(0, 1), pal, false, false, 0.0, 0.0, 0.0)
+	# Corde aux poignets.
+	draw_line(base + Vector2(-5, -14), base + Vector2(5, -14), Color(0.55, 0.40, 0.22), 2.0)
+	# Bulle "AIDE !".
+	var head := base + Vector2(0, -52)
+	draw_rect(Rect2(head + Vector2(-18, -10), Vector2(36, 16)), Color(0.1, 0.08, 0.05, 0.8))
+	_text_centered("AIDE !", head + Vector2(0, 3), 12, Color(1.0, 0.85, 0.4))
 
 
 ## Caisse de dynamite (objet ramassable) : bâtons rouges + mèche + lueur.

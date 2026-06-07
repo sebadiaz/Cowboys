@@ -66,6 +66,8 @@ var _guards_killed := 0
 var _loot_total := 0
 var _dynamite: Area2D = null
 var _dyn_used := false
+var _hostages: Array = []
+var _hostages_freed := 0
 
 
 func _ready() -> void:
@@ -81,6 +83,7 @@ func _ready() -> void:
 	_spawn_exit()
 	_spawn_guards()
 	_build_bullets()
+	_spawn_hostages()
 	_spawn_dynamite()
 	_build_iso_renderer()
 	_build_effects()
@@ -170,6 +173,7 @@ func _build_iso_renderer() -> void:
 	_renderer.props = _cfg.get("props", [])
 	_renderer.biome = str(_cfg.get("biome", "desert"))
 	_renderer.dynamite = _dynamite
+	_renderer.hostages = _hostages
 	_renderer.player = player
 	_renderer.guards = _guards
 	_renderer.loot = _loot_nodes
@@ -332,9 +336,13 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	var dyn: Array = []
 	if rng.randf() < 0.6:
 		dyn = [cx + rng.randf_range(-160.0, 160.0), lobby_y + 50.0]
+	var hostages := []
+	for _h in range(rng.randi_range(1, 2)):
+		hostages.append([ox + rng.randf_range(0.24, 0.76) * W, cyc + rng.randf_range(70.0, 150.0), 150])
 	var diff: String = ["", "Petite banque", "Banque de comté", "Grande banque"][tier]
 	return {
 		"dynamite": dyn,
+		"hostages": hostages,
 		"name": town_name,
 		"difficulty": diff,
 		"biome": biome,
@@ -477,6 +485,48 @@ func _spawn_exit() -> void:
 
 
 ## Règle un garde selon le mode assist + l'upgrade discrétion.
+## Otages à libérer (optionnels) : civils retenus ; les atteindre rapporte un bonus.
+func _spawn_hostages() -> void:
+	var hs: Variant = _cfg.get("hostages", [])
+	if not (hs is Array):
+		return
+	for h in hs:
+		if not (h is Array) or h.size() < 2:
+			continue
+		var area := Area2D.new()
+		area.collision_layer = 0
+		area.collision_mask = 2
+		area.monitoring = true
+		area.global_position = Vector2(float(h[0]), float(h[1]))
+		area.set_meta("value", int(h[2]) if h.size() > 2 else 150)
+		var cs := CollisionShape2D.new()
+		var sh := CircleShape2D.new()
+		sh.radius = 20.0
+		cs.shape = sh
+		area.add_child(cs)
+		world.add_child(area)
+		area.body_entered.connect(_on_hostage_freed.bind(area))
+		_hostages.append(area)
+
+
+func _on_hostage_freed(body: Node, area: Area2D) -> void:
+	if _mission_over or not body.is_in_group("player") or not is_instance_valid(area):
+		return
+	var value: int = int(area.get_meta("value", 150))
+	_hostages_freed += 1
+	if player != null:
+		player.add_safe_reward(value)     # compte comme butin (sortie + score)
+	AudioManager.play("pickup", 2.0)
+	if _fx != null:
+		_fx.loot_pickup(area.global_position)
+	if hud.has_method("show_toast"):
+		hud.show_toast("OTAGE LIBÉRÉ ! +%d $" % value)
+	_hostages.erase(area)
+	if _renderer != null:
+		_renderer.hostages = _hostages
+	area.queue_free()
+
+
 ## Dynamite ramassable (optionnelle) : la prendre SOUFFLE le coffre instantanément.
 func _spawn_dynamite() -> void:
 	var d: Variant = _cfg.get("dynamite", [])

@@ -63,6 +63,9 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       gardes plus nerveux **et** primes +7 %/cran ; affichée sur la carte.
 - [x] **Pion courrier animé** qui chevauche la piste jusqu'à la ville-frontière.
 - [x] **Sons dédiés** synthétisés : fanfare de prime de contrat, explosion.
+- [x] **Otages à libérer** : civils retenus (marqueur « AIDE ! » pulsé) ; les
+      atteindre rapporte un bonus de butin (compte pour la sortie + le score),
+      1–2 par banque procédurale, non bloquants.
 
 ## Carte du monde — pistes suivantes
 - [ ] **Layouts de ville uniques** par biome (pas seulement la teinte).
