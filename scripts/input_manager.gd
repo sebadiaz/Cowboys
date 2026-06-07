@@ -14,6 +14,7 @@ var _touch_interact_held := false
 var _touch_fire_held := false
 ## Bouton de rechargement tactile (impulsion).
 var _touch_reload_pressed := false
+var _touch_focus_held := false
 
 
 ## Direction de déplacement normalisée-bornée (clavier + tactile fusionnés).
@@ -85,3 +86,11 @@ func is_reload_pressed() -> bool:
 
 func trigger_touch_reload() -> void:
 	_touch_reload_pressed = true
+
+
+## Mode tactique "Sang-froid" : Maj (clavier) ou bouton tactile maintenu.
+func is_focus_held() -> bool:
+	return Input.is_key_pressed(KEY_SHIFT) or _touch_focus_held
+
+func set_touch_focus_held(held: bool) -> void:
+	_touch_focus_held = held

@@ -22,6 +22,7 @@ var _knob := Vector2.ZERO
 var _interact_btn: Button
 var _fire_btn: Button
 var _reload_btn: Button
+var _focus_btn: Button
 var _ui_scale := 1.0
 
 
@@ -65,8 +66,19 @@ func _ready() -> void:
 	_reload_btn.pressed.connect(func() -> void: InputManager.trigger_touch_reload())
 	add_child(_reload_btn)
 
+	_focus_btn = Button.new()
+	_focus_btn.text = "⏳"
+	_focus_btn.add_theme_font_size_override("font_size", int(round(24 * _ui_scale)))
+	_focus_btn.custom_minimum_size = Vector2(96, 70) * _ui_scale
+	_focus_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_focus_btn.position = Vector2(-160, -460) * _ui_scale
+	_focus_btn.modulate = Color(0.8, 0.9, 1.0, 0.9)
+	_focus_btn.button_down.connect(func() -> void: InputManager.set_touch_focus_held(true))
+	_focus_btn.button_up.connect(func() -> void: InputManager.set_touch_focus_held(false))
+	add_child(_focus_btn)
+
 	# Retour visuel + sonore à l'appui (sensation tactile).
-	for b in [_interact_btn, _fire_btn, _reload_btn]:
+	for b in [_interact_btn, _fire_btn, _reload_btn, _focus_btn]:
 		b.button_down.connect(func() -> void: _press_feedback(b))
 
 

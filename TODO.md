@@ -128,7 +128,10 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 ## Gameplay & IA
 - [x] **Occlusion des cônes de vision par les murs** : rayons du cône stoppés au
       premier mur (raycast) — le visuel colle à la détection (déjà en ligne de vue).
-- [ ] Mode **tactique ralenti** (bullet-time pour planifier).
+- [x] Mode **tactique ralenti « Sang-froid »** : Maj (clavier) ou bouton ⏳
+      (tactile) ralentit le monde tout en gardant le joueur réactif (vitesse
+      compensée) ; jauge qui se vide/recharge, voile bleuté ; reset propre du
+      time_scale entre scènes.
 - [x] **Shérifs supplémentaires** et renforts quand l'alarme est pleine.
 - [x] Mémoire des gardes (dernière position connue, fouille de zone).
 - [ ] Phase de **fuite à cheval** après le braquage.

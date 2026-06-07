@@ -19,6 +19,8 @@ var biome: String = "desert"
 var dynamite: Node = null
 var hostages: Array = []
 var safes2: Array = []
+var focus := 1.0
+var focus_active := false
 var _pal: Dictionary = {}
 
 # Planches d'assets.
@@ -256,6 +258,7 @@ func _draw() -> void:
 	_draw_bullets()
 	_draw_objective_arrow()
 	_draw_vignette()
+	_draw_focus()
 ## Flèche d'objectif au-dessus du joueur : pointe vers le butin le plus proche,
 ## sinon le coffre, sinon la sortie. Rend l'objectif évident.
 func _draw_objective_arrow() -> void:
@@ -318,6 +321,26 @@ func _draw_vignette() -> void:
 		var c := Iso.project(player.global_position) + Vector2(0, -16)
 		for i in range(4):
 			draw_circle(c, 120.0 - i * 26.0, Color(1.0, 0.93, 0.7, 0.04))
+
+
+## Jauge "Sang-froid" (mode ralenti) + voile bleuté à l'écran.
+func _draw_focus() -> void:
+	if focus >= 0.999 and not focus_active:
+		return
+	var s: float = scale.x if scale.x > 0.001 else 1.0
+	var vp := get_viewport_rect().size / s
+	var origin := -position / s
+	if focus_active:
+		draw_rect(Rect2(origin, vp), Color(0.35, 0.55, 1.0, 0.08))
+	var bw := 200.0 / s
+	var bh := 9.0 / s
+	var bx := origin.x + vp.x * 0.5 - bw * 0.5
+	var by := origin.y + vp.y - 56.0 / s
+	draw_rect(Rect2(bx, by, bw, bh), Color(0, 0, 0, 0.55))
+	var fc: Color = Color(0.6, 0.75, 1.0) if focus_active else Color(0.45, 0.6, 0.9)
+	draw_rect(Rect2(bx, by, bw * focus, bh), fc)
+	_text_centered("SANG-FROID (Maj)", Vector2(origin.x + vp.x * 0.5, by - 4.0 / s),
+			maxi(6, int(round(12.0 / s))), Color(0.82, 0.9, 1.0))
 
 
 func _draw_bullets() -> void:

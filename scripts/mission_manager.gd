@@ -69,10 +69,16 @@ var _dyn_used := false
 var _hostages: Array = []
 var _hostages_freed := 0
 var _safes2: Array = []
+var _focus := 1.0
+var _focus_active := false
+const FOCUS_SLOW := 0.35
+const FOCUS_DRAIN := 0.33
+const FOCUS_RECHARGE := 0.13
 
 
 func _ready() -> void:
 	randomize()
+	Engine.time_scale = 1.0
 	_cfg = _load_config()
 	_build_alarm()
 	_build_floor()
@@ -657,6 +663,7 @@ func _connect_hud() -> void:
 # --- Boucle ---
 
 func _process(delta: float) -> void:
+	_update_focus(delta)
 	# La caméra (suivi + shake) est gérée par l'IsoRenderer lui-même.
 	if _mission_over:
 		return
@@ -680,6 +687,29 @@ func _process(delta: float) -> void:
 	if _fx != null and player != null and player.is_moving and _foot_t <= 0.0:
 		_fx.foot_dust(player.global_position)
 		_foot_t = 0.18
+
+
+## Mode tactique "Sang-froid" : ralentit le monde tout en gardant le joueur
+## réactif (vitesse compensée). Jauge qui se vide à l'usage et se recharge au repos.
+func _update_focus(delta: float) -> void:
+	var ts: float = Engine.time_scale
+	var rdelta: float = delta / maxf(0.05, ts)
+	var want: bool = (not _mission_over) and InputManager.is_focus_held() and _focus > 0.02
+	if want:
+		_focus = maxf(0.0, _focus - FOCUS_DRAIN * rdelta)
+		Engine.time_scale = FOCUS_SLOW
+		if player != null:
+			player.focus_boost = 1.0 / FOCUS_SLOW
+		_focus_active = true
+	else:
+		Engine.time_scale = 1.0
+		if player != null:
+			player.focus_boost = 1.0
+		_focus_active = false
+		_focus = minf(1.0, _focus + FOCUS_RECHARGE * rdelta)
+	if _renderer != null:
+		_renderer.focus = _focus
+		_renderer.focus_active = _focus_active
 
 
 ## Renfort : un shérif supplémentaire surgit de la sortie quand l'alarme éclate.
@@ -858,6 +888,10 @@ func _update_objective() -> void:
 
 func _end_mission(success: bool) -> void:
 	_mission_over = true
+	Engine.time_scale = 1.0
+	if player != null:
+		player.focus_boost = 1.0
+	_focus_active = false
 	if _bullets != null and _bullets.has_method("stop"):
 		_bullets.stop()
 	for g in _guards:

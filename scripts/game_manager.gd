@@ -283,4 +283,5 @@ func level_info(level: int) -> Dictionary:
 func _change_scene(path: String) -> void:
 	# On s'assure que le jeu n'est pas en pause lors d'un changement de scène.
 	get_tree().paused = false
+	Engine.time_scale = 1.0   # jamais de ralenti résiduel entre scènes
 	get_tree().change_scene_to_file(path)

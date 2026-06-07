@@ -29,6 +29,7 @@ var bullet_system: Node = null
 var iso_renderer: Node2D = null   # pour convertir la position du clic en point monde
 var ammo: int = CYLINDER
 var cap: int = CYLINDER          # capacité du barillet (CYLINDER + upgrade)
+var focus_boost: float = 1.0     # compensation de vitesse en mode Sang-froid
 var is_moving: bool = false   # le tir n'est possible qu'à l'arrêt
 var recoil: float = 0.0       # 0..1, décroît, pour l'animation de recul
 var walk_phase: float = 0.0   # phase d'animation de marche
@@ -62,7 +63,7 @@ func _physics_process(delta: float) -> void:
 	var dir := Iso.screen_to_world(input)
 	if dir.length() > 1.0:
 		dir = dir.normalized()
-	velocity = dir * SPEED * speed_mult
+	velocity = dir * SPEED * speed_mult * focus_boost
 	is_moving = dir.length() > 0.05
 	if is_moving:
 		facing = dir.normalized()
