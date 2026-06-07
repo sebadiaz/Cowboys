@@ -61,6 +61,9 @@ var _alarm_peak := 0.0
 var _was_engaged := false
 var _foot_t := 0.0
 var _reinforced := false
+var _contract: Dictionary = {}
+var _guards_killed := 0
+var _loot_total := 0
 
 
 func _ready() -> void:
@@ -85,6 +88,31 @@ func _ready() -> void:
 		var diff := str(_cfg.get("difficulty", ""))
 		var lbl := str(_cfg.get("name", "Braquage"))
 		hud.show_toast("%s%s" % [lbl, (" — " + diff) if diff != "" else ""])
+	_pick_contract()
+	_update_objective()
+
+
+## Contrat (défi) de la banque : déterministe sur les banques procédurales.
+func _pick_contract() -> void:
+	var defs := [
+		{"id": "ghost", "desc": "FANTÔME : aucune alarme générale", "bonus": 400},
+		{"id": "flash", "desc": "ÉCLAIR : sortir en moins de 75 s", "bonus": 350},
+		{"id": "sweep", "desc": "RAFLE : rafler TOUT le butin", "bonus": 300},
+		{"id": "pacifist", "desc": "PACIFISTE : aucun garde abattu", "bonus": 300},
+	]
+	var i := (absi(GameManager.mission_seed) % defs.size()) if GameManager.procedural else (randi() % defs.size())
+	_contract = defs[i]
+	if hud.has_method("show_toast"):
+		hud.show_toast("CONTRAT — %s (+%d $)" % [str(_contract["desc"]), int(_contract["bonus"])])
+
+
+func _contract_done() -> bool:
+	match str(_contract.get("id", "")):
+		"ghost": return not _alarm_triggered
+		"flash": return _elapsed <= 75.0
+		"sweep": return _loot_total > 0 and _loot_bags >= _loot_total
+		"pacifist": return _guards_killed == 0
+	return false
 
 
 func _build_bullets() -> void:
@@ -393,6 +421,7 @@ func _spawn_loot() -> void:
 		# On capture la position du sac (il est libéré juste après l'émission).
 		bag.collected.connect(func(v): _on_loot_collected(v, bag.global_position))
 		_loot_nodes.append(bag)
+	_loot_total = _loot_nodes.size()
 
 
 func _spawn_safe() -> void:
@@ -523,11 +552,13 @@ func _compute_score() -> Dictionary:
 	stealth += int(round((1.0 - clampf(_alarm_peak / 100.0, 0.0, 1.0)) * 150.0))
 	# Temps : prime à la rapidité (sous 2 minutes).
 	var time_bonus: int = max(0, int(round((120.0 - _elapsed) * 2.0)))
+	var contract := int(_contract.get("bonus", 0)) if _contract_done() else 0
 	return {
 		"loot": loot,
 		"stealth": stealth,
 		"time": time_bonus,
-		"total": loot + stealth + time_bonus,
+		"contract": contract,
+		"total": loot + stealth + time_bonus + contract,
 	}
 
 
@@ -597,6 +628,7 @@ func _on_exit_entered() -> void:
 func _on_guard_killed(g: Node) -> void:
 	if not is_instance_valid(g):
 		return
+	_guards_killed += 1
 	if g.has_method("stop"):
 		g.stop()
 	# Animation de mort : on confie un "corps qui tombe" au renderer avant de
@@ -654,6 +686,8 @@ func _update_objective() -> void:
 		text = "Ouvre le coffre, puis file vers la SORTIE"
 	else:
 		text = "Atteins la SORTIE (verte)"
+	if not _contract.is_empty():
+		text += "   ·   Contrat: " + str(_contract.get("desc", ""))
 	hud.set_objective(text)
 
 
@@ -668,6 +702,9 @@ func _end_mission(success: bool) -> void:
 		player.get_caught()  # fige le joueur
 	AudioManager.play("win" if success else "lose", 2.0)
 	if hud.has_method("show_toast"):
-		hud.show_toast("FUITE RÉUSSIE !" if success else "REPÉRÉ ! ÉCHEC")
+		var msg := "FUITE RÉUSSIE !" if success else "REPÉRÉ ! ÉCHEC"
+		if success and _contract_done():
+			msg += "   CONTRAT +%d $" % int(_contract.get("bonus", 0))
+		hud.show_toast(msg)
 	await get_tree().create_timer(0.9).timeout
 	GameManager.finish_mission(success, _loot_value, _loot_bags, _compute_score())
