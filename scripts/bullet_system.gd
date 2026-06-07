@@ -8,6 +8,7 @@ extends Node2D
 signal guard_killed(guard: Node)
 signal guard_hit(guard: Node)
 signal player_hit()
+signal ally_down(ally: Node)
 signal impact(pos: Vector2, dir: Vector2, friendly: bool)
 signal wall_impact(pos: Vector2)
 
@@ -20,6 +21,7 @@ const WALL_MASK := 1
 var bullets: Array[Dictionary] = []
 
 var guards: Array = []
+var allies: Array = []
 var player: Node2D = null
 var active := true
 

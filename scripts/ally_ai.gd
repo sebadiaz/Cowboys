@@ -16,9 +16,12 @@ const MUZZLE := 16.0
 var facing := Vector2.DOWN
 var walk_phase := 0.0
 var _fire_cd := 0.0
+var hp := 3
+var hit_flash := 0.0
 
 
 func _physics_process(delta: float) -> void:
+	hit_flash = max(0.0, hit_flash - delta * 5.0)
 	if player == null:
 		return
 	var to_player := player.global_position - global_position
@@ -45,6 +48,13 @@ func _physics_process(delta: float) -> void:
 		var aim: Vector2 = target.global_position - global_position
 		bullet_system.spawn(global_position + aim.normalized() * MUZZLE, aim, true)
 		_fire_cd = 0.6 if marksman else 0.95
+
+
+## Encaisse une balle ennemie. Retourne true si l'allié tombe.
+func hit() -> bool:
+	hp -= 1
+	hit_flash = 1.0
+	return hp <= 0
 
 
 func _nearest_guard() -> Node:

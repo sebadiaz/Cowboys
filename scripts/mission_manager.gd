@@ -217,8 +217,26 @@ func _spawn_crew() -> void:
 			_allies.append(a)
 	if _renderer != null:
 		_renderer.allies = _allies
+	if _bullets != null:
+		_bullets.allies = _allies
+		_bullets.ally_down.connect(_on_ally_down)
 	if hud.has_method("show_toast") and not _allies.is_empty():
 		hud.show_toast("ÉQUIPE EN POSITION ! (%d alliés)" % _allies.size())
+
+
+func _on_ally_down(a: Node) -> void:
+	if is_instance_valid(a):
+		if _renderer != null and _renderer.has_method("add_corpse"):
+			_renderer.add_corpse(a.global_position, a.get_facing())
+		_allies.erase(a)
+		if _renderer != null:
+			_renderer.allies = _allies
+		a.queue_free()
+	if _fx != null:
+		_fx.add_shake(3.0)
+	AudioManager.play("hit_player", -3.0)
+	if hud.has_method("show_toast"):
+		hud.show_toast("ALLIÉ À TERRE !")
 
 
 func _build_bullets() -> void:
@@ -844,7 +862,7 @@ func _compute_score() -> Dictionary:
 	# Temps : prime à la rapidité (sous 2 minutes).
 	var time_bonus: int = max(0, int(round((120.0 - _elapsed) * 2.0)))
 	var contract := int(_contract.get("bonus", 0)) if _contract_done() else 0
-	var crew := 200 * GameManager.crew_count_role("scout") if GameManager.coach_mission else 0
+	var crew := (200 * GameManager.crew_count_role("scout") + 120 * _allies.size()) if GameManager.coach_mission else 0
 	return {
 		"loot": loot,
 		"stealth": stealth,

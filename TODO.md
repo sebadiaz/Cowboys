@@ -80,6 +80,9 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [x] **Diligence MOBILE** : le convoi (wagon + coffres + snipers à bord + butin)
       roule le long de la route ; il faut le **rattraper et le piller en mouvement**
       (le Sang-froid aide à le coller) — vrai feeling d'attaque de convoi.
+- [x] **Coéquipiers vulnérables** : les balles ennemies peuvent les abattre (3 PV,
+      flash de touche, « ALLIÉ À TERRE ! » + corps) → il faut les **protéger** ;
+      chaque allié ramené vivant rapporte un **bonus de score** (+120).
 
 ## Carte du monde — pistes suivantes
 - [x] **Décor de ville unique par biome** (déterministe) : sapins enneigés +

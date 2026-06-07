@@ -1290,7 +1290,8 @@ func _draw_ally(node: Node) -> void:
 		"boots": Color(0.26, 0.18, 0.10), "hair": Color(0.22, 0.16, 0.10),
 	}
 	var walk: float = node.walk_phase if "walk_phase" in node else 0.0
-	_draw_person(node.global_position, node.get_facing(), pal, false, false, walk, 0.0, 0.0)
+	var flash: float = node.hit_flash if "hit_flash" in node else 0.0
+	_draw_person(node.global_position, node.get_facing(), pal, false, false, walk, 0.0, flash)
 	# Pastille "allié" (point vert au-dessus).
 	draw_circle(Iso.project(node.global_position) + Vector2(0, -46), 2.6, Color(0.4, 0.9, 0.45))
 
