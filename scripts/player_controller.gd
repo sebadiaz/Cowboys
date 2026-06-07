@@ -28,6 +28,7 @@ var hp: int = MAX_HP
 var bullet_system: Node = null
 var iso_renderer: Node2D = null   # pour convertir la position du clic en point monde
 var ammo: int = CYLINDER
+var cap: int = CYLINDER          # capacité du barillet (CYLINDER + upgrade)
 var is_moving: bool = false   # le tir n'est possible qu'à l'arrêt
 var recoil: float = 0.0       # 0..1, décroît, pour l'animation de recul
 var walk_phase: float = 0.0   # phase d'animation de marche
@@ -42,8 +43,10 @@ func _ready() -> void:
 	speed_mult = SaveManager.speed_mult()
 	reload_mult = SaveManager.reload_mult()
 	# Mode assist (prototype) : plus de PV pour une vraie marge d'erreur.
-	max_hp = 5 if GameManager.assist else MAX_HP
+	max_hp = (5 if GameManager.assist else MAX_HP) + SaveManager.hp_bonus()
 	hp = max_hp
+	cap = CYLINDER + SaveManager.ammo_bonus()
+	ammo = cap
 
 
 func _reload_time() -> float:
@@ -78,12 +81,12 @@ func _handle_fire(delta: float) -> void:
 	if _reload_t > 0.0:
 		_reload_t = max(0.0, _reload_t - delta)
 		if _reload_t <= 0.0:
-			ammo = CYLINDER
-			ammo_changed.emit(ammo, CYLINDER, false)
+			ammo = cap
+			ammo_changed.emit(ammo, cap, false)
 		return
 
 	# Rechargement manuel (touche R / bouton tactile).
-	if InputManager.is_reload_pressed() and ammo < CYLINDER:
+	if InputManager.is_reload_pressed() and ammo < cap:
 		_start_reload()
 		return
 
@@ -100,7 +103,7 @@ func _handle_fire(delta: float) -> void:
 		bullet_system.spawn(global_position + dir * MUZZLE, dir, true)
 		ammo -= 1
 		recoil = 1.0
-		ammo_changed.emit(ammo, CYLINDER, false)
+		ammo_changed.emit(ammo, cap, false)
 		fired.emit(global_position + dir * MUZZLE, dir)
 		_fire_cd = FIRE_RATE
 
@@ -110,7 +113,7 @@ func _start_reload() -> void:
 		return
 	_reload_t = _reload_time()
 	AudioManager.play("reload")
-	ammo_changed.emit(ammo, CYLINDER, true)
+	ammo_changed.emit(ammo, cap, true)
 
 
 func get_reload_ratio() -> float:
@@ -143,13 +146,13 @@ func take_damage(amount: int = 1) -> void:
 ## Ajoute un sac de butin (appelé par LootBag via mission_manager).
 func add_loot(value: int) -> void:
 	loot_bags += 1
-	loot_value += value
+	loot_value += int(round(value * SaveManager.loot_mult()))
 	loot_changed.emit(loot_bags, loot_value)
 
 
 ## Bonus de valeur du coffre (sans incrémenter le nombre de sacs).
 func add_safe_reward(value: int) -> void:
-	loot_value += value
+	loot_value += int(round(value * SaveManager.loot_mult()))
 	loot_changed.emit(loot_bags, loot_value)
 
 

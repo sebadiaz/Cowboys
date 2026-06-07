@@ -641,6 +641,10 @@ func _default_h(t: String) -> float:
 		"money": return 18.0
 		"poster": return 46.0
 		"lamp": return 70.0
+		"chandelier": return 0.0
+		"painting": return 44.0
+		"goldpile": return 16.0
+		"clerk": return 56.0
 		_: return 40.0
 
 
@@ -658,6 +662,10 @@ func _draw_prop(t: String, pos: Vector2, h: float) -> void:
 		"money": _draw_money(pos)
 		"poster": _draw_poster(pos)
 		"lamp": _draw_floor_lamp(pos)
+		"chandelier": _draw_chandelier(pos)
+		"painting": _draw_painting(pos)
+		"goldpile": _draw_goldpile(pos)
+		"clerk": _draw_clerk(pos)
 		_: _draw_crate(pos, h)
 
 
@@ -981,6 +989,81 @@ func _draw_counter_base(r: Rect2) -> void:
 	draw_colored_polygon(topq, Color(0.62, 0.42, 0.22))
 	draw_polyline(_closed(topq), Color(0.78, 0.60, 0.34), 1.5)
 
+
+
+## Lustre suspendu : chaîne + couronne de bougies + lueur chaude.
+func _draw_chandelier(pos: Vector2) -> void:
+	var p := Iso.project(pos)
+	var ring := p + Vector2(0, -96)
+	draw_line(p + Vector2(0, -150), ring, Color(0.25, 0.18, 0.10), 2.0)
+	for i in range(5):
+		draw_circle(ring, 34.0 - i * 6.0, Color(1.0, 0.84, 0.42, 0.06))
+	# Anneau métallique + bras.
+	draw_arc(ring, 16.0, 0, TAU, 22, Color(0.55, 0.42, 0.20), 2.5)
+	for k in range(6):
+		var a := TAU * k / 6.0
+		var bp := ring + Vector2(cos(a), sin(a) * 0.55) * 16.0
+		draw_line(ring, bp, Color(0.55, 0.42, 0.20), 2.0)
+		draw_line(bp, bp + Vector2(0, -6), Color(0.95, 0.9, 0.75), 2.0)      # bougie
+		draw_circle(bp + Vector2(0, -8), 2.2, Color(1.0, 0.92, 0.6))         # flamme
+	draw_circle(ring, 3.0, Color(0.6, 0.45, 0.22))
+
+
+## Tableau encadré (cadre doré + petite scène western : soleil + mesa).
+func _draw_painting(pos: Vector2) -> void:
+	var base := Iso.project(pos)
+	var U := Vector2(0, -1)
+	var w := 30.0
+	var bot := 16.0
+	var top := 44.0
+	var L := base + Vector2(-w * 0.5, 0)
+	var R := base + Vector2(w * 0.5, 0)
+	var mid := (bot + top) * 0.5
+	# Cadre doré + toile + ciel.
+	draw_colored_polygon(PackedVector2Array([
+		L + U * (bot - 3), R + U * (bot - 3), R + U * (top + 3), L + U * (top + 3)]),
+		Color(0.78, 0.60, 0.24))
+	draw_colored_polygon(PackedVector2Array([
+		L + U * bot, R + U * bot, R + U * top, L + U * top]), Color(0.55, 0.40, 0.26))
+	draw_colored_polygon(PackedVector2Array([
+		L + U * mid, R + U * mid, R + U * top, L + U * top]), Color(0.95, 0.78, 0.50))
+	draw_circle(base + U * (top - 8), 4.0, Color(1.0, 0.86, 0.45))
+	draw_colored_polygon(PackedVector2Array([
+		L.lerp(R, 0.2) + U * bot, L.lerp(R, 0.45) + U * mid, L.lerp(R, 0.7) + U * bot]),
+		Color(0.50, 0.34, 0.24))
+
+
+## Tas d'or : lingots empilés + pièces, lueur dorée (près du coffre).
+func _draw_goldpile(pos: Vector2) -> void:
+	var b := Iso.project(pos)
+	var gold := Color(0.93, 0.79, 0.34)
+	for i in range(3):
+		draw_circle(b + Vector2(0, -6), 18.0 - i * 5, Color(1.0, 0.85, 0.35, 0.10))
+	# Lingots (rangée + dessus).
+	for x in [-10.0, 0.0, 10.0]:
+		draw_colored_polygon(PackedVector2Array([
+			b + Vector2(x - 6, 0), b + Vector2(x + 6, 0), b + Vector2(x + 5, -6), b + Vector2(x - 5, -6)]), gold)
+		draw_polyline(_closed(PackedVector2Array([
+			b + Vector2(x - 6, 0), b + Vector2(x + 6, 0), b + Vector2(x + 5, -6), b + Vector2(x - 5, -6)])),
+			gold.darkened(0.25), 1.0)
+	draw_colored_polygon(PackedVector2Array([
+		b + Vector2(-6, -6), b + Vector2(6, -6), b + Vector2(5, -12), b + Vector2(-5, -12)]), gold.lightened(0.08))
+	for off in [Vector2(-12, 1), Vector2(12, 0)]:
+		draw_colored_polygon(_ellipse(b + off, 4, 2.4), gold)
+
+
+## Guichetier : citoyen statique derrière le comptoir (vie de la banque).
+func _draw_clerk(pos: Vector2) -> void:
+	var pal := {
+		"hat": Color(0.20, 0.16, 0.12), "hat_band": Color(0.12, 0.09, 0.06),
+		"coat": Color(0.30, 0.24, 0.20), "coat_dark": Color(0.22, 0.17, 0.14),
+		"shirt": Color(0.88, 0.84, 0.74), "pants": Color(0.26, 0.22, 0.18),
+		"skin": Color(0.88, 0.68, 0.50), "bandana": Color(0.55, 0.18, 0.16),
+		"belt": Color(0.18, 0.13, 0.09), "buckle": Color(0.85, 0.72, 0.32),
+		"boots": Color(0.20, 0.14, 0.09), "hair": Color(0.18, 0.13, 0.09),
+	}
+	var base := Iso.project(pos)
+	CharacterArt.draw_person(self, base, Vector2(0, 1), pal, false, false, 0.0, 0.0, 0.0)
 
 
 ## Palette d'intérieur selon le biome de la ville (sol + murs).

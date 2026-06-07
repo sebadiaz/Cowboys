@@ -47,6 +47,10 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       gabarit jouable (hall fermé → comptoir → coffre → sortie), taille/gardes/
       butin/valeur selon la difficulté, **décor thématisé par biome** (sol + murs).
       Les 3 banques JSON restent pour le « Niveau rapide ».
+- [x] **Nouvelles upgrades** boutique : Gilet épais (+1 PV), Barillet allongé
+      (+1 balle), Flair du magot (butin +8%) — persistées et appliquées en mission.
+- [x] **Ambiance de banque** : lustres suspendus, tableaux encadrés, tas d'or et
+      **guichetiers** (citoyens derrière le comptoir) — décor non bloquant.
 
 ## Carte du monde — pistes suivantes
 - [ ] **Layouts de ville uniques** par biome (pas seulement la teinte).

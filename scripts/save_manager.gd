@@ -15,9 +15,12 @@ const UPGRADE_DEFS := {
 	"reload":  {"name": "Barillet huilé",  "desc": "Recharge -12% / niveau",      "cost": [300, 600, 1000]},
 	"safe":    {"name": "Crochets fins",   "desc": "Coffre -15% plus vite / niv", "cost": [350, 700, 1200]},
 	"stealth": {"name": "Pas feutrés",     "desc": "Alarme monte -15% / niveau",  "cost": [350, 700, 1200, 1800]},
+	"vitality":{"name": "Gilet épais",     "desc": "+1 PV max / niveau",          "cost": [400, 800, 1400]},
+	"ammo":    {"name": "Barillet allongé", "desc": "+1 balle au barillet / niv",  "cost": [450, 1000]},
+	"fortune": {"name": "Flair du magot",  "desc": "Butin +8% / niveau",          "cost": [500, 1000, 1700]},
 }
 ## Ordre d'affichage stable dans la boutique.
-const UPGRADE_ORDER := ["speed", "reload", "safe", "stealth"]
+const UPGRADE_ORDER := ["speed", "reload", "safe", "stealth", "vitality", "ammo", "fortune"]
 
 var total_money: int = 0
 var missions_completed: int = 0
@@ -182,6 +185,15 @@ func safe_mult() -> float:
 
 func stealth_mult() -> float:
 	return maxf(0.3, 1.0 - 0.15 * get_level("stealth"))
+
+func hp_bonus() -> int:
+	return get_level("vitality")
+
+func ammo_bonus() -> int:
+	return get_level("ammo")
+
+func loot_mult() -> float:
+	return 1.0 + 0.08 * get_level("fortune")
 
 
 # --- Réglages persistants ---

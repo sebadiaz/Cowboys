@@ -259,6 +259,14 @@ func _generate_bank_cfg(seed_val: int, tier: int, biome: String, town_name: Stri
 	props.append(["plant", ox + W - 120.0, oy + H - 120.0])
 	props.append(["poster", ox + 54.0, lobby_y - 60.0])
 	props.append(["poster", ox + W - 54.0, lobby_y + 60.0])
+	# Ambiance (lustres, tableaux, tas d'or, guichetiers) — purement décoratif.
+	props.append(["chandelier", cx, lobby_y])
+	props.append(["chandelier", cx, staff_y])
+	props.append(["painting", ox + 50.0, staff_y - 20.0])
+	props.append(["painting", ox + W - 50.0, staff_y + 20.0])
+	props.append(["goldpile", cx, safe_y + 70.0])
+	props.append(["clerk", cx - 150.0, cyc - 44.0])
+	props.append(["clerk", cx + 150.0, cyc - 44.0])
 	# Solides UNIQUEMENT aux 4 coins (hors passage et hors rondes).
 	props.append(["barrel", ox + 110.0, oy + H - 110.0])
 	props.append(["crate", ox + W - 110.0, oy + H - 110.0])
@@ -449,7 +457,7 @@ func _connect_hud() -> void:
 	if hud.has_method("set_health"):
 		hud.set_health(player.hp, player.max_hp)
 	if hud.has_method("set_ammo"):
-		hud.set_ammo(player.ammo, player.CYLINDER, false)
+		hud.set_ammo(player.ammo, player.cap, false)
 
 
 # --- Boucle ---
