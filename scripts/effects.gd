@@ -7,6 +7,7 @@ extends Node2D
 
 var iso_offset := Vector2.ZERO        # décalage de projection (0 quand le noeud est zoomé)
 var shake_amount: float = 0.0
+var _kick := Vector2.ZERO
 
 # Particule : {pos(screen), vel, life, max_life, size, color, kind}
 var _parts: Array[Dictionary] = []
@@ -26,13 +27,14 @@ func _process(delta: float) -> void:
 		if p["life"] <= 0.0:
 			continue
 		p["vel"] *= 0.90
-		if p["kind"] == "shell" or p["kind"] == "dust":
+		if p["kind"] == "shell" or p["kind"] == "dust" or p["kind"] == "blood":
 			p["vel"].y += 120.0 * delta   # petite gravité écran
 		p["pos"] += p["vel"] * delta
 		alive.append(p)
 	_parts = alive
-	# Décroissance du shake.
+	# Décroissance du shake + du recul caméra.
 	shake_amount = max(0.0, shake_amount - delta * 40.0)
+	_kick = _kick.lerp(Vector2.ZERO, clampf(delta * 14.0, 0.0, 1.0))
 	queue_redraw()
 
 
@@ -108,9 +110,32 @@ func add_shake(amount: float) -> void:
 
 ## Décalage de tremblement à appliquer au renderer (lu par mission_manager).
 func get_shake_offset() -> Vector2:
-	if shake_amount <= 0.01:
-		return Vector2.ZERO
-	return Vector2(_rng.randf_range(-1, 1), _rng.randf_range(-1, 1)) * shake_amount
+	var sh := Vector2.ZERO
+	if shake_amount > 0.01:
+		sh = Vector2(_rng.randf_range(-1, 1), _rng.randf_range(-1, 1)) * shake_amount
+	return sh + _kick
+
+
+## Recul directionnel de la caméra (kick écran) — donne du punch au tir/impact.
+func kick(screen_dir: Vector2, amount: float) -> void:
+	_kick += screen_dir.normalized() * amount
+	if _kick.length() > 13.0:
+		_kick = _kick.normalized() * 13.0
+
+
+## Giclée de sang directionnelle (mort/impact d'un garde).
+func blood(world_pos: Vector2, dir: Vector2) -> void:
+	var sc := _proj(world_pos)
+	var d := _screen_dir(world_pos, dir)
+	for i in range(16):
+		var a := d.angle() + _rng.randf_range(-0.85, 0.85)
+		var spd := _rng.randf_range(90, 280)
+		_parts.append(_mk(sc, Vector2.RIGHT.rotated(a) * spd, _rng.randf_range(0.25, 0.65),
+				_rng.randf_range(2.0, 4.0), Color(0.62, 0.06, 0.06), "blood"))
+	for i in range(5):
+		_parts.append(_mk(sc, d * 130 + _rand_v(70), _rng.randf_range(0.45, 0.85),
+				_rng.randf_range(3, 5), Color(0.48, 0.04, 0.04), "blood"))
+	add_shake(4.0)
 
 
 # --- interne ---

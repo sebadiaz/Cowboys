@@ -110,6 +110,13 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       ajouté sur les 3 niveaux **sans toucher aux collisions** (props décoratifs
       non bloquants, patrouilles préservées).
 
+## Fait dans la passe "game feel combat (cap genre twin-stick)"
+- [x] **Hit-stop** (gel d'image ~30–70 ms) sur impact/kill/dégâts joueur — punch.
+- [x] **Recul caméra directionnel** (kick) au tir + screen-shake retravaillé.
+- [x] **Knockback** des gardes touchés (recul proportionnel, mort = poussée forte).
+- [x] **Sang** directionnel + **corps projeté** dans la direction de la balle.
+- [x] **Traceurs de balles** (traînée + cœur brillant + halo) pour la lisibilité.
+
 ## Fait dans la passe "arcade V2" (cf. CLAUDE.md §6 bis)
 - [x] Game juice : screen-shake, recul joueur, flash de touche des gardes.
 - [x] Particules : poussière de pas, étincelles, impact de balle, douilles,

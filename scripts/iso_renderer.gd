@@ -54,8 +54,8 @@ var _corpses: Array[Dictionary] = []      # gardes abattus (animation de chute)
 
 
 ## Démarre l'animation de mort d'un garde à `world_pos`.
-func add_corpse(world_pos: Vector2, facing: Vector2) -> void:
-	_corpses.append({"pos": world_pos, "facing": facing, "t": 0.0})
+func add_corpse(world_pos: Vector2, facing: Vector2, dir := Vector2.ZERO) -> void:
+	_corpses.append({"pos": world_pos, "facing": facing, "t": 0.0, "dir": dir})
 
 
 var _cam_pos := Vector2.ZERO   # position de caméra lissée (sans le shake)
@@ -357,9 +357,16 @@ func _draw_bullets() -> void:
 		return
 	for b in bullets.bullets:
 		var p: Vector2 = Iso.project(b["pos"]) + Vector2(0, -16.0)
-		var col := Color(1.0, 0.9, 0.3) if b["friendly"] else Color(1.0, 0.4, 0.2)
-		draw_circle(p, 4.5, Color(0, 0, 0, 0.3))
-		draw_circle(p, 3.5, col)
+		var d: Vector2 = b["dir"]
+		var sdir := (Iso.project(b["pos"] + d) - Iso.project(b["pos"]))
+		sdir = sdir.normalized() if sdir.length() > 0.001 else Vector2.RIGHT
+		var col := Color(1.0, 0.92, 0.4) if b["friendly"] else Color(1.0, 0.45, 0.2)
+		# Traceur (traînée) derrière la balle.
+		draw_line(p - sdir * 20.0, p, Color(col.r, col.g, col.b, 0.35), 4.0)
+		draw_line(p - sdir * 11.0, p, Color(col.r, col.g, col.b, 0.7), 3.0)
+		draw_circle(p, 5.0, Color(col.r, col.g, col.b, 0.25))   # halo
+		draw_circle(p, 3.6, col)
+		draw_circle(p - sdir * 1.0, 1.6, Color(1, 1, 0.9))       # cœur brillant
 
 
 # --- Décor au sol (tapis) + lampes d'ambiance ---
@@ -711,6 +718,10 @@ func _draw_person(world_pos: Vector2, facing: Vector2, pal: Dictionary, is_guard
 func _draw_corpse(c: Dictionary) -> void:
 	var t: float = clampf(c["t"] / 0.7, 0.0, 1.0)
 	var base := Iso.project(c["pos"])
+	var dvec: Vector2 = c.get("dir", Vector2.ZERO)
+	if dvec.length() > 0.01:
+		var sdir := (Iso.project(c["pos"] + dvec) - Iso.project(c["pos"])).normalized()
+		base += sdir * ((1.0 - (1.0 - t) * (1.0 - t)) * 30.0)   # projection (ease-out)
 	var a := (1.0 - t) * 0.9
 	# S'aplatit progressivement en une silhouette couchée.
 	var fall := lerpf(0.0, 10.0, t)

@@ -37,6 +37,7 @@ var fire_mult: float = 1.0         # cadence de tir (assist = plus lent)
 var lethal_touch: bool = true      # contact mortel (false en assist)
 var kind := "patrol"               # "patrol" ou "sniper" (posté, longue portée)
 var _touch_cd: float = 0.0         # délai entre deux dégâts de contact
+var _knock := Vector2.ZERO         # recul quand touché par balle
 
 const GUARD_FIRE_RATE := 1.1   # secondes entre deux tirs de garde
 const MAX_HP := 2              # le garde encaisse 2 balles
@@ -114,6 +115,8 @@ func _physics_process(delta: float) -> void:
 		bullet_system.spawn(global_position + aim.normalized() * 18.0, aim, false)
 		_fire_cd = GUARD_FIRE_RATE * fire_mult
 
+	velocity += _knock
+	_knock = _knock.lerp(Vector2.ZERO, clampf(delta * 9.0, 0.0, 1.0))
 	move_and_slide()
 	_aim_cone(delta)
 	_update_cone_visual()
@@ -207,6 +210,11 @@ func get_view_distance() -> float:
 
 func get_view_half_angle() -> float:
 	return deg_to_rad(_cone.view_angle_deg) if _cone != null else 0.0
+
+
+## Recul appliqué quand une balle touche le garde.
+func apply_knockback(v: Vector2) -> void:
+	_knock += v
 
 
 ## Encaisse une balle. Retourne true si le garde est abattu (PV à 0).

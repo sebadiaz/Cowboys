@@ -76,6 +76,7 @@ var _coach_stopped := false
 const COACH_SPEED := 52.0
 const COACH_END_X := 1950.0
 var _focus := 1.0
+var _hitstop_until := 0
 var _focus_active := false
 const FOCUS_SLOW := 0.35
 const FOCUS_DRAIN := 0.33
@@ -278,11 +279,13 @@ func _build_effects() -> void:
 	player.fired.connect(func(pos, dir):
 		_fx.muzzle_flash(pos, dir)
 		_fx.add_shake(3.0)
+		_fx.kick(_fx._screen_dir(pos, -dir), 6.0)
 		AudioManager.play("shot"))
 	player.damaged.connect(func():
 		if hud.has_method("flash"):
 			hud.flash(Color(0.8, 0.0, 0.0, 0.45))
-		_fx.add_shake(7.0)
+		_fx.add_shake(8.0)
+		_hit_stop(55)
 		AudioManager.play("hit_player"))
 
 
@@ -779,6 +782,9 @@ func _connect_hud() -> void:
 # --- Boucle ---
 
 func _process(delta: float) -> void:
+	if not _mission_over and Time.get_ticks_msec() < _hitstop_until:
+		Engine.time_scale = 0.0    # gel d'image (hit-stop) — punch d'impact
+		return
 	_update_focus(delta)
 	# La caméra (suivi + shake) est gérée par l'IsoRenderer lui-même.
 	if _mission_over:
@@ -804,6 +810,11 @@ func _process(delta: float) -> void:
 		_fx.foot_dust(player.global_position)
 		_foot_t = 0.18
 	_move_coach(delta)
+
+
+## Gel d'image très court (hit-stop) au moment d'un impact : donne du punch.
+func _hit_stop(ms: int) -> void:
+	_hitstop_until = maxi(_hitstop_until, Time.get_ticks_msec() + ms)
 
 
 ## Mode tactique "Sang-froid" : ralentit le monde tout en gardant le joueur
@@ -963,10 +974,13 @@ func _on_guard_killed(g: Node) -> void:
 		g.stop()
 	# Animation de mort : on confie un "corps qui tombe" au renderer avant de
 	# libérer le garde.
+	var ddir: Vector2 = g.get_meta("death_dir", Vector2.DOWN)
 	if _renderer != null and _renderer.has_method("add_corpse"):
-		_renderer.add_corpse(g.global_position, g.get_facing())
+		_renderer.add_corpse(g.global_position, g.get_facing(), ddir)
 	if _fx != null:
-		_fx.add_shake(4.0)
+		_fx.blood(g.global_position, ddir)
+		_fx.add_shake(7.0)
+	_hit_stop(70)
 	AudioManager.play("hit_guard")
 	_guards.erase(g)
 	g.queue_free()
@@ -978,7 +992,8 @@ func _on_guard_hit(_g: Node) -> void:
 	# Garde touché mais encore debout.
 	AudioManager.play("hit_guard", -4.0)
 	if _fx != null:
-		_fx.add_shake(2.0)
+		_fx.add_shake(2.5)
+	_hit_stop(28)
 
 
 func _on_player_hit() -> void:
