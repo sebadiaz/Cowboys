@@ -114,6 +114,22 @@ func save_game() -> void:
 	file.close()
 
 
+## Dépense du magot (recrutement, etc.). Retourne true si payé.
+func spend(amount: int) -> bool:
+	if amount <= 0:
+		return true
+	if total_money < amount:
+		return false
+	total_money -= amount
+	save_game()
+	return true
+
+
+func refund(amount: int) -> void:
+	total_money += max(0, amount)
+	save_game()
+
+
 ## Enregistre la récompense d'une mission réussie.
 func register_success(money_earned: int) -> void:
 	total_money += max(0, money_earned)

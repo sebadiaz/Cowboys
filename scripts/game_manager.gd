@@ -12,6 +12,7 @@ const SCENE_LEVEL_SELECT := "res://scenes/LevelSelect.tscn"
 const SCENE_SHOP := "res://scenes/ShopScreen.tscn"
 const SCENE_SETTINGS := "res://scenes/SettingsScreen.tscn"
 const SCENE_WORLD_MAP := "res://scenes/WorldMap.tscn"
+const SCENE_CREW := "res://scenes/CrewScreen.tscn"
 
 ## Villes du territoire — GÉNÉRÉES PROCÉDURALEMENT (déterministe, même carte à
 ## chaque lancement). ~20 villes le long d'une piste sinueuse traversant des
@@ -30,6 +31,11 @@ var current_town: int = 1
 var procedural := false
 var mission_seed := 0
 var mission_biome := "desert"
+## Attaque de diligence + équipe recrutée.
+var coach_mission := false
+const CREW_SLOTS := 3
+var crew_pool: Array = []
+var crew: Array = []
 ## Position de réapparition en ville (ex. en sortant du saloon). Zero = défaut.
 var town_return_pos := Vector2.ZERO
 ## La boutique a-t-elle été ouverte depuis la ville (retour en ville) ?
@@ -55,6 +61,7 @@ const _SKY := [
 
 func _ready() -> void:
 	_generate_towns()
+	_generate_crew_pool()
 
 
 ## Génère ~20 villes de façon DÉTERMINISTE (même carte à chaque lancement) le long
@@ -106,6 +113,86 @@ func _biome_for(t: float) -> String:
 	elif t < 0.80:
 		return "snow"
 	return "night"
+
+
+## Recrues disponibles pour l'attaque de diligence (déterministe).
+func _generate_crew_pool() -> void:
+	crew_pool.clear()
+	var roles := [
+		{"role": "gunman", "label": "Pistolero", "desc": "Tire sur les gardes à tes côtés", "cost": 400},
+		{"role": "marksman", "label": "Fine gâchette", "desc": "Allié longue portée, tir rapide", "cost": 650},
+		{"role": "medic", "label": "Toubib", "desc": "+1 PV max pour le braquage", "cost": 500},
+		{"role": "scout", "label": "Éclaireur", "desc": "+200 $ de butin", "cost": 450},
+		{"role": "demolisher", "label": "Artificier", "desc": "Dynamite sur la diligence", "cost": 600},
+	]
+	var names := ["Slim", "Doc", "Whisky", "Borgne", "Curly", "Tex", "Lefty", "Bart",
+		"Cole", "Jesse", "Ringo", "Hank", "Ace", "Diego", "Mad Dog", "Colt"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 0xBADA55
+	var used := {}
+	for i in range(7):
+		var r: Dictionary = roles[rng.randi() % roles.size()]
+		var nm := "Recrue %d" % (i + 1)
+		for _a in range(20):
+			var cand: String = names[rng.randi() % names.size()]
+			if not used.has(cand):
+				used[cand] = true; nm = cand; break
+		crew_pool.append({
+			"id": i, "name": nm, "role": r["role"], "label": r["label"],
+			"desc": r["desc"], "cost": int(r["cost"]) + rng.randi_range(-50, 80),
+		})
+
+
+func goto_crew() -> void:
+	_change_scene(SCENE_CREW)
+
+
+func crew_has(idx: int) -> bool:
+	for c in crew:
+		if int(c.get("id", -1)) == idx:
+			return true
+	return false
+
+
+func can_hire(idx: int) -> bool:
+	if crew_has(idx) or crew.size() >= CREW_SLOTS:
+		return false
+	return SaveManager.total_money >= int(crew_pool[idx]["cost"])
+
+
+func hire(idx: int) -> bool:
+	if not can_hire(idx):
+		return false
+	if not SaveManager.spend(int(crew_pool[idx]["cost"])):
+		return false
+	crew.append(crew_pool[idx].duplicate(true))
+	return true
+
+
+## Renvoie l'équipe + rembourse (avant de partir).
+func disband_crew() -> void:
+	var total := 0
+	for c in crew:
+		total += int(c.get("cost", 0))
+	if total > 0:
+		SaveManager.refund(total)
+	crew.clear()
+
+
+func crew_count_role(role: String) -> int:
+	var n := 0
+	for c in crew:
+		if str(c.get("role", "")) == role:
+			n += 1
+	return n
+
+
+## Lance l'attaque de diligence avec l'équipe recrutée.
+func start_coach_attack() -> void:
+	coach_mission = true
+	procedural = false
+	current_level = 2
+	_change_scene(SCENE_MISSION)
 
 
 func _process(delta: float) -> void:
@@ -254,15 +341,18 @@ func finish_mission(success: bool, loot_value: int, loot_bags: int, score: Dicti
 	}
 	if success:
 		SaveManager.register_success(money_earned)
-		# Débloque le niveau suivant.
-		if current_level < LEVEL_COUNT:
-			SaveManager.unlock_level(current_level + 1)
-		# Débloque la ville suivante sur la carte du monde.
-		if current_town < TOWNS.size():
-			SaveManager.unlock_town(current_town + 1)
+		if not coach_mission:
+			# Débloque le niveau + la ville suivante.
+			if current_level < LEVEL_COUNT:
+				SaveManager.unlock_level(current_level + 1)
+			if current_town < TOWNS.size():
+				SaveManager.unlock_town(current_town + 1)
 		SaveManager.gain_notoriety()
 	else:
 		SaveManager.lose_notoriety()
+	if coach_mission:
+		coach_mission = false
+		crew.clear()
 	_change_scene(SCENE_RESULT)
 
 

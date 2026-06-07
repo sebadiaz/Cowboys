@@ -21,6 +21,8 @@ var hostages: Array = []
 var safes2: Array = []
 var focus := 1.0
 var focus_active := false
+var allies: Array = []
+var coach_mode := false
 var _pal: Dictionary = {}
 
 # Planches d'assets.
@@ -212,6 +214,9 @@ func _draw() -> void:
 	for sb in safes2:
 		if is_instance_valid(sb):
 			_shadow(sb.global_position, 13.0)
+	for a in allies:
+		if is_instance_valid(a):
+			_shadow(a.global_position, 13.0)
 	for c in _corpses:
 		_draw_corpse(c)
 
@@ -239,6 +244,9 @@ func _draw() -> void:
 	for sb in safes2:
 		if is_instance_valid(sb):
 			items.append({"d": Iso.depth(sb.global_position), "kind": "safe2", "node": sb})
+	for a in allies:
+		if is_instance_valid(a):
+			items.append({"d": Iso.depth(a.global_position), "kind": "ally", "node": a})
 
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
@@ -253,6 +261,7 @@ func _draw() -> void:
 			"dyn": _draw_dynamite(dynamite.global_position)
 			"hostage": _draw_hostage(it["node"].global_position)
 			"safe2": _draw_safe2(it["node"])
+			"ally": _draw_ally(it["node"])
 			"player": _draw_player()
 
 	_draw_bullets()
@@ -504,9 +513,37 @@ func _draw_cones() -> void:
 
 # --- Coffre & butin texturés ---
 
+## En mode "diligence" : le coffre principal EST la diligence (caisse + cadran).
+func _draw_coach_safe() -> void:
+	_draw_coach_prop(safe.global_position)
+	var base := Iso.project(safe.global_position)
+	var U := Vector2(0, -1)
+	var dc := base + U * 24.0
+	draw_circle(dc, 8.0, Color(0.30, 0.33, 0.38))
+	draw_arc(dc, 8.0, 0, TAU, 16, Color(0.90, 0.76, 0.32), 2.0)
+	for k in range(4):
+		var d := Vector2.RIGHT.rotated(TAU * k / 4.0 + 0.4)
+		draw_line(dc, dc + d * 6.0, Color(0.90, 0.76, 0.32), 1.5)
+	draw_circle(dc, 2.2, Color(0.95, 0.82, 0.4))
+	var head := base + Vector2(0, -74.0)
+	if safe._is_open:
+		_text_centered("DILIGENCE PILLÉE", head, 13, Color(0.95, 0.9, 0.4))
+	else:
+		var prog: float = safe._progress
+		if safe._player_in_range or prog > 0.0:
+			var w := 66.0
+			draw_rect(Rect2(head + Vector2(-w * 0.5, -4), Vector2(w, 8)), Color(0, 0, 0, 0.65))
+			draw_rect(Rect2(head + Vector2(-w * 0.5, -4), Vector2(w * prog, 8)), Color(0.95, 0.8, 0.2))
+			if prog <= 0.01:
+				_text_centered("Maintiens E — pille la diligence", head + Vector2(0, -10), 12, Color(1, 1, 1))
+
+
 ## Porte de coffre principale : GRANDE porte ronde en acier, volant à rayons,
 ## rivets, charnières, or — pièce maîtresse de la scène.
 func _draw_safe() -> void:
+	if coach_mode:
+		_draw_coach_safe()
+		return
 	var base := Iso.project(safe.global_position)
 	var U := Vector2(0, -1)
 	var opened: bool = safe._is_open
@@ -719,6 +756,7 @@ func _default_h(t: String) -> float:
 		"goldpile": return 16.0
 		"clerk": return 56.0
 		"dynamite": return 20.0
+		"coach": return 60.0
 		_: return 40.0
 
 
@@ -741,6 +779,7 @@ func _draw_prop(t: String, pos: Vector2, h: float) -> void:
 		"goldpile": _draw_goldpile(pos)
 		"clerk": _draw_clerk(pos)
 		"dynamite": _draw_dynamite(pos)
+		"coach": _draw_coach_prop(pos)
 		_: _draw_crate(pos, h)
 
 
@@ -1198,6 +1237,62 @@ func _draw_dynamite(pos: Vector2) -> void:
 	draw_line(b + Vector2(-8, -8), b + Vector2(8, -8), Color(0.30, 0.22, 0.14), 2.0)
 	draw_line(b + Vector2(0, -16), b + Vector2(5, -22), Color(0.2, 0.16, 0.1), 1.5)
 	draw_circle(b + Vector2(5, -22), 2.2, Color(1.0, 0.9, 0.4))
+
+
+## Diligence (prop) : caisse en bois + toit + grandes roues + porte + lanterne.
+func _draw_coach_prop(pos: Vector2) -> void:
+	var U := Vector2(0, -1)
+	var r := Rect2(pos - Vector2(62, 26), Vector2(124, 52))
+	var wood := Color(0.50, 0.30, 0.16)
+	_iso_box(r, 46.0, wood.lightened(0.08), wood.darkened(0.22), wood)
+	var b0 := Iso.project(r.position)
+	var b1 := Iso.project(Vector2(r.end.x, r.position.y))
+	var b2 := Iso.project(r.end)
+	var b3 := Iso.project(Vector2(r.position.x, r.end.y))
+	var up := Vector2(0, -46)
+	# Toit + galerie.
+	var topq := PackedVector2Array([b0 + up, b1 + up, b2 + up, b3 + up])
+	draw_colored_polygon(topq, Color(0.36, 0.22, 0.12))
+	draw_polyline(_closed(topq), Color(0.6, 0.45, 0.25), 1.5)
+	# Liseré doré + porte avec fenêtre (face sud).
+	draw_line(b3 + U * 30, b2 + U * 30, Color(0.85, 0.68, 0.28), 2.0)
+	draw_colored_polygon(PackedVector2Array([b3.lerp(b2, 0.40) + U * 4, b3.lerp(b2, 0.60) + U * 4,
+		b3.lerp(b2, 0.60) + U * 36, b3.lerp(b2, 0.40) + U * 36]), wood.darkened(0.2))
+	draw_colored_polygon(PackedVector2Array([b3.lerp(b2, 0.43) + U * 20, b3.lerp(b2, 0.57) + U * 20,
+		b3.lerp(b2, 0.57) + U * 33, b3.lerp(b2, 0.43) + U * 33]), Color(0.55, 0.70, 0.78))
+	draw_circle((b3.lerp(b2, 0.5)) + U * 20, 1.4, Color(0.9, 0.8, 0.4))
+	# Inscription.
+	_text_centered("DILIGENCE", (b3.lerp(b2, 0.5)) + U * 42, 11, Color(0.92, 0.8, 0.4))
+	# Grandes roues (rayons) sur la face sud.
+	for wx in [0.18, 0.82]:
+		var c := b3.lerp(b2, wx) + Vector2(0, -8)
+		draw_circle(c, 12.0, Color(0.20, 0.13, 0.08))
+		draw_arc(c, 12.0, 0, TAU, 16, Color(0.45, 0.30, 0.16), 2.0)
+		for k in range(6):
+			var a := TAU * k / 6.0
+			draw_line(c, c + Vector2(cos(a), sin(a)) * 11.0, Color(0.45, 0.30, 0.16), 1.5)
+		draw_circle(c, 2.5, Color(0.5, 0.5, 0.55))
+	# Lanterne avant.
+	var lp := b2 + U * 40
+	for i in range(3):
+		draw_circle(lp, 12.0 - i * 4, Color(1.0, 0.82, 0.4, 0.10))
+	draw_circle(lp, 2.4, Color(1.0, 0.92, 0.6))
+
+
+## Coéquipier recruté : hors-la-loi (duster fauve, bandana vert) + petite étoile bleue.
+func _draw_ally(node: Node) -> void:
+	var pal := {
+		"hat": Color(0.62, 0.50, 0.34), "hat_band": Color(0.30, 0.45, 0.30),
+		"coat": Color(0.52, 0.42, 0.26), "coat_dark": Color(0.40, 0.31, 0.18),
+		"shirt": Color(0.55, 0.62, 0.45), "pants": Color(0.30, 0.28, 0.22),
+		"skin": Color(0.88, 0.68, 0.50), "bandana": Color(0.32, 0.60, 0.38),
+		"belt": Color(0.26, 0.18, 0.10), "buckle": Color(0.85, 0.74, 0.34),
+		"boots": Color(0.26, 0.18, 0.10), "hair": Color(0.22, 0.16, 0.10),
+	}
+	var walk: float = node.walk_phase if "walk_phase" in node else 0.0
+	_draw_person(node.global_position, node.get_facing(), pal, false, false, walk, 0.0, 0.0)
+	# Pastille "allié" (point vert au-dessus).
+	draw_circle(Iso.project(node.global_position) + Vector2(0, -46), 2.6, Color(0.4, 0.9, 0.45))
 
 
 ## Palette d'intérieur selon le biome de la ville (sol + murs).

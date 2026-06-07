@@ -59,6 +59,14 @@ func _ready() -> void:
 	quick.custom_minimum_size = Vector2(190, 46)
 	quick.pressed.connect(func() -> void: GameManager.goto_level_select())
 	add_child(quick)
+	var coach := Button.new()
+	coach.text = "🐎 Attaque de diligence"
+	coach.add_theme_font_size_override("font_size", 18)
+	coach.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	coach.custom_minimum_size = Vector2(270, 46)
+	coach.position = Vector2(-135, -62)
+	coach.pressed.connect(func() -> void: GameManager.goto_crew())
+	add_child(coach)
 
 	resized.connect(_layout)
 	_layout()

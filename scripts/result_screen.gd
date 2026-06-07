@@ -53,6 +53,8 @@ func _ready() -> void:
 		box.add_child(_row("Bonus rapidité", int(score.get("time", 0))))
 		if int(score.get("contract", 0)) > 0:
 			box.add_child(_row("Prime de contrat", int(score.get("contract", 0))))
+		if int(score.get("crew", 0)) > 0:
+			box.add_child(_row("Renforts (éclaireurs)", int(score.get("crew", 0))))
 		var total := _label("TOTAL GAGNÉ : %d $" % int(r.get("money_earned", 0)), 26)
 		total.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
 		box.add_child(total)

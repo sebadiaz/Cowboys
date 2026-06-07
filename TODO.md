@@ -71,6 +71,12 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [x] **Nouvel ennemi : tireur posté (sniper)** — immobile, **long cône étroit**
       (portée 330), **cadence rapide**, tire dès qu'il te voit ; look distinct
       (manteau noir, bandana rouge, carabine). Apparaît dès le palier 2.
+- [x] **Attaque de diligence + équipe** : écran de recrutement (`CrewScreen`) pour
+      embaucher des hors-la-loi avec le magot (pistolero/fine gâchette = alliés IA
+      qui tirent ; toubib +PV ; éclaireur +butin ; artificier = dynamite), puis
+      mission « Attaque de la diligence » (`data/coach.json`) sur une route — la
+      diligence remplace le coffre, escortée par shérifs + snipers. Accès via la
+      carte du monde.
 
 ## Carte du monde — pistes suivantes
 - [x] **Décor de ville unique par biome** (déterministe) : sapins enneigés +

@@ -69,6 +69,7 @@ var _dyn_used := false
 var _hostages: Array = []
 var _hostages_freed := 0
 var _safes2: Array = []
+var _allies: Array = []
 var _focus := 1.0
 var _focus_active := false
 const FOCUS_SLOW := 0.35
@@ -80,6 +81,7 @@ func _ready() -> void:
 	randomize()
 	Engine.time_scale = 1.0
 	_cfg = _load_config()
+	_apply_crew_to_cfg()
 	_build_alarm()
 	_build_floor()
 	_build_walls()
@@ -94,6 +96,7 @@ func _ready() -> void:
 	_spawn_hostages()
 	_spawn_dynamite()
 	_build_iso_renderer()
+	_spawn_crew()
 	_build_effects()
 	_connect_hud()
 	_update_objective()
@@ -127,6 +130,47 @@ func _contract_done() -> bool:
 		"sweep": return _loot_total > 0 and _loot_bags >= _loot_total
 		"pacifist": return _guards_killed == 0
 	return false
+
+
+## Atouts d'équipe modifiant la config (artificier -> dynamite sur la diligence).
+func _apply_crew_to_cfg() -> void:
+	if not GameManager.coach_mission:
+		return
+	if GameManager.crew_count_role("demolisher") > 0:
+		var sp: Array = _cfg.get("safe", {}).get("pos", [1140, 560])
+		_cfg["dynamite"] = [float(sp[0]) - 90.0, float(sp[1]) + 30.0]
+
+
+## Équipe recrutée (attaque de diligence) : alliés combattants + bonus.
+func _spawn_crew() -> void:
+	if not GameManager.coach_mission:
+		return
+	var medics := GameManager.crew_count_role("medic")
+	if medics > 0 and player != null:
+		player.max_hp += medics
+		player.hp = player.max_hp
+	for c in GameManager.crew:
+		var role := str(c.get("role", ""))
+		if role == "gunman" or role == "marksman":
+			var a := preload("res://scripts/ally_ai.gd").new()
+			a.player = player
+			a.guards = _guards
+			a.bullet_system = _bullets
+			a.marksman = (role == "marksman")
+			a.collision_layer = 0
+			a.collision_mask = 1
+			var cs := CollisionShape2D.new()
+			var circ := CircleShape2D.new()
+			circ.radius = 12.0
+			cs.shape = circ
+			a.add_child(cs)
+			a.global_position = player.global_position + Vector2(randf_range(-70, 70), randf_range(-40, 80))
+			world.add_child(a)
+			_allies.append(a)
+	if _renderer != null:
+		_renderer.allies = _allies
+	if hud.has_method("show_toast") and not _allies.is_empty():
+		hud.show_toast("ÉQUIPE EN POSITION ! (%d alliés)" % _allies.size())
 
 
 func _build_bullets() -> void:
@@ -182,6 +226,7 @@ func _build_iso_renderer() -> void:
 	_renderer.biome = str(_cfg.get("biome", "desert"))
 	_renderer.dynamite = _dynamite
 	_renderer.hostages = _hostages
+	_renderer.coach_mode = GameManager.coach_mission
 	_renderer.safes2 = _safes2
 	_renderer.player = player
 	_renderer.guards = _guards
@@ -211,7 +256,7 @@ func _load_config() -> Dictionary:
 		var tier := clampi(GameManager.current_level, 1, 3)
 		var tname := str(GameManager.current_town_def().get("name", "Banque"))
 		return _generate_bank_cfg(GameManager.mission_seed, tier, GameManager.mission_biome, tname)
-	var path := _config_path()
+	var path := "res://data/coach.json" if GameManager.coach_mission else _config_path()
 	if not FileAccess.file_exists(path):
 		return DEFAULT_CFG.duplicate(true)
 	var file := FileAccess.open(path, FileAccess.READ)
@@ -750,12 +795,14 @@ func _compute_score() -> Dictionary:
 	# Temps : prime à la rapidité (sous 2 minutes).
 	var time_bonus: int = max(0, int(round((120.0 - _elapsed) * 2.0)))
 	var contract := int(_contract.get("bonus", 0)) if _contract_done() else 0
+	var crew := 200 * GameManager.crew_count_role("scout") if GameManager.coach_mission else 0
 	return {
 		"loot": loot,
 		"stealth": stealth,
 		"time": time_bonus,
 		"contract": contract,
-		"total": loot + stealth + time_bonus + contract,
+		"crew": crew,
+		"total": loot + stealth + time_bonus + contract + crew,
 	}
 
 
