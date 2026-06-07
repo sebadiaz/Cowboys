@@ -68,6 +68,9 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
       1–2 par banque procédurale, non bloquants.
 - [x] **Coffres-forts secondaires** ouvrables (E) : butin bonus à risque, mêmes
       mécaniques que le coffre principal (barre de progression, son), 1–2 par banque.
+- [x] **Nouvel ennemi : tireur posté (sniper)** — immobile, **long cône étroit**
+      (portée 330), **cadence rapide**, tire dès qu'il te voit ; look distinct
+      (manteau noir, bandana rouge, carabine). Apparaît dès le palier 2.
 
 ## Carte du monde — pistes suivantes
 - [x] **Décor de ville unique par biome** (déterministe) : sapins enneigés +

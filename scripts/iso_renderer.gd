@@ -629,9 +629,29 @@ func _draw_guard(g: Node) -> void:
 		"belt": Color(0.12, 0.13, 0.18), "buckle": Color(0.82, 0.84, 0.88),
 		"boots": Color(0.12, 0.13, 0.18), "hair": Color(0.16, 0.14, 0.12),
 	}
+	var sniper: bool = ("kind" in g) and g.kind == "sniper"
+	if sniper:
+		# Tireur posté : long manteau noir, bandana rouge, chapeau sombre.
+		pal = {
+			"hat": Color(0.10, 0.10, 0.12), "hat_band": Color(0.05, 0.05, 0.06),
+			"coat": Color(0.16, 0.16, 0.20) if alert else Color(0.13, 0.13, 0.16),
+			"coat_dark": Color(0.09, 0.09, 0.12),
+			"shirt": Color(0.45, 0.16, 0.14), "pants": Color(0.12, 0.12, 0.14),
+			"skin": Color(0.82, 0.62, 0.45), "bandana": Color(0.78, 0.16, 0.14),
+			"belt": Color(0.10, 0.09, 0.08), "buckle": Color(0.70, 0.62, 0.30),
+			"boots": Color(0.10, 0.09, 0.08), "hair": Color(0.10, 0.08, 0.06),
+		}
 	var flash: float = g.hit_flash if "hit_flash" in g else 0.0
 	_draw_person(g.global_position, g.get_facing(), pal, true, alert,
 			_wphase(g), 0.0, flash)
+	if sniper:
+		# Canon de carabine pointé dans la direction de visée.
+		var base := Iso.project(g.global_position)
+		var f := Iso.project(g.global_position + g.get_facing()) - base
+		if f.length() > 0.001:
+			f = f.normalized()
+		draw_line(base + Vector2(0, -16), base + Vector2(0, -16) + f * 20.0, Color(0.12, 0.10, 0.08), 3.0)
+		draw_circle(base + Vector2(0, -16) + f * 20.0, 1.6, Color(0.6, 0.6, 0.65))
 
 
 func _wphase(g: Node) -> float:

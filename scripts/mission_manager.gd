@@ -636,6 +636,8 @@ func _spawn_guards() -> void:
 		var g := GuardScene.instantiate()
 		g.patrol_points = route
 		g.global_position = route[0]
+		if str(entry.get("kind", "")) == "sniper":
+			g.kind = "sniper"
 		g.player = player
 		g.alarm = alarm
 		_apply_difficulty(g)

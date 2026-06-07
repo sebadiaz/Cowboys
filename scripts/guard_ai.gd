@@ -35,6 +35,7 @@ var detect_mult: float = 1.0       # vitesse de détection (assist = plus lent)
 var chase_mult: float = 1.0        # vitesse de poursuite (assist = plus lent)
 var fire_mult: float = 1.0         # cadence de tir (assist = plus lent)
 var lethal_touch: bool = true      # contact mortel (false en assist)
+var kind := "patrol"               # "patrol" ou "sniper" (posté, longue portée)
 var _touch_cd: float = 0.0         # délai entre deux dégâts de contact
 
 const GUARD_FIRE_RATE := 1.1   # secondes entre deux tirs de garde
@@ -58,6 +59,9 @@ func _ready() -> void:
 	if patrol_points.size() > 0:
 		# Démarre la ronde vers le premier point distinct.
 		_wp_index = 0
+	if kind == "sniper" and _cone != null:
+		_cone.view_distance = 330.0      # longue portée
+		_cone.view_angle_deg = 15.0      # cône étroit
 	_update_cone_visual()
 
 
