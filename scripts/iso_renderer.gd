@@ -445,6 +445,7 @@ func _draw_exit() -> void:
 # --- Cônes de vision ---
 
 func _draw_cones() -> void:
+	var space := get_world_2d().direct_space_state
 	for g in guards:
 		if not is_instance_valid(g):
 			continue
@@ -457,10 +458,17 @@ func _draw_cones() -> void:
 		var base_angle := facing.angle()
 		var pts := PackedVector2Array()
 		pts.append(Iso.project(apex))
-		var steps := 16
+		var steps := 22
 		for i in range(steps + 1):
 			var a: float = base_angle - half + (2.0 * half) * float(i) / float(steps)
-			pts.append(Iso.project(apex + Vector2.RIGHT.rotated(a) * dist))
+			var endp := apex + Vector2.RIGHT.rotated(a) * dist
+			# Occlusion : le rayon s'arrête sur le premier mur rencontré.
+			var q := PhysicsRayQueryParameters2D.create(apex, endp, 1)
+			q.collide_with_areas = false
+			q.collide_with_bodies = true
+			var hit := space.intersect_ray(q)
+			var rp: Vector2 = hit["position"] if not hit.is_empty() else endp
+			pts.append(Iso.project(rp))
 		var fill: Color
 		if g.is_alert():
 			fill = Color(1.0, 0.15, 0.15, 0.28)

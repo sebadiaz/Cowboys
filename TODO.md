@@ -121,10 +121,11 @@ Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.m
 - [ ] **Séparation définitive** props décoratifs / objets gameplay.
 - [ ] **Migrer le rendu de `MissionRoot`** vers les sprites des planches
       (dessiner les régions d'atlas dans `iso_renderer.gd` au lieu des formes).
-- [ ] **Occlusion des cônes de vision par les murs** (découpe visuelle du cône).
+- [x] **Occlusion des cônes de vision par les murs** (découpe visuelle du cône).
 
 ## Gameplay & IA
-- [ ] **Occlusion des cônes de vision par les murs** (découpe visuelle du cône).
+- [x] **Occlusion des cônes de vision par les murs** : rayons du cône stoppés au
+      premier mur (raycast) — le visuel colle à la détection (déjà en ligne de vue).
 - [ ] Mode **tactique ralenti** (bullet-time pour planifier).
 - [x] **Shérifs supplémentaires** et renforts quand l'alarme est pleine.
 - [x] Mémoire des gardes (dernière position connue, fouille de zone).
