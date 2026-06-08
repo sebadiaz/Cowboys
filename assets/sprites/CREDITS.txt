@@ -1,0 +1,3 @@
+Crédits assets (CC0)
+====================
+- "Tiny Town" par Kenney (www.kenney.nl) — licence CC0. Voir assets/sprites/tiny_town_LICENSE.txt
