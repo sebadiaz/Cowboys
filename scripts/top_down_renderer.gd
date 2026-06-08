@@ -62,6 +62,8 @@ var _wall_atlas: AtlasTexture
 var _wood_atlas: AtlasTexture
 var _corpses: Array[Dictionary] = []
 var _cam := Vector2.ZERO
+var _anim: Dictionary = {}      # instance_id -> {pos, spd, phase} : marche/balancement
+var _detail: Array = []         # éclats de sol déterministes (cailloux, touffes)
 
 
 func add_corpse(world_pos: Vector2, facing: Vector2, dir := Vector2.ZERO) -> void:
@@ -75,6 +77,7 @@ func setup() -> void:
 	_floor_atlas = _atlas(T_SAND if biome != "plains" else T_GRASS)
 	_wall_atlas = _atlas(T_WALL)
 	_wood_atlas = _atlas(T_WOOD)
+	_build_detail()
 	_apply_zoom()
 	_cam = _camera_target()
 	position = _cam
@@ -124,6 +127,36 @@ func _clamp_axis(t: float, s: float, screen: float, bmin: float, bmax: float) ->
 	return clampf(t, lo, hi)
 
 
+## Met à jour vitesse + phase de marche d'un perso (pour le balancement/flip).
+func _track(node: Node2D, delta: float) -> void:
+	if not is_instance_valid(node):
+		return
+	var id := node.get_instance_id()
+	var cur: Vector2 = node.global_position
+	var e: Dictionary = _anim.get(id, {"pos": cur, "spd": 0.0, "phase": 0.0})
+	var spd: float = (cur - (e["pos"] as Vector2)).length() / maxf(delta, 0.0001)
+	e["spd"] = lerpf(e["spd"], spd, 0.4)
+	e["pos"] = cur
+	if e["spd"] > 6.0:
+		e["phase"] += delta * 9.0
+	_anim[id] = e
+
+
+## Éclats de sol déterministes (cailloux, touffes) pour casser le côté plat.
+func _build_detail() -> void:
+	_detail.clear()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector2i(floor_rect.size))
+	var n := int(floor_rect.size.x * floor_rect.size.y / 5200.0)
+	for i in range(n):
+		_detail.append({
+			"p": Vector2(rng.randf_range(floor_rect.position.x + 12.0, floor_rect.end.x - 12.0),
+					rng.randf_range(floor_rect.position.y + 12.0, floor_rect.end.y - 12.0)),
+			"r": rng.randf_range(3.0, 7.0),
+			"k": rng.randi() % 3,
+		})
+
+
 func _process(delta: float) -> void:
 	var live: Array[Dictionary] = []
 	for c in _corpses:
@@ -131,6 +164,15 @@ func _process(delta: float) -> void:
 		if c["t"] < 1.2:
 			live.append(c)
 	_corpses = live
+	# Suivi de marche (vitesse + phase) pour le balancement des persos.
+	if is_instance_valid(player):
+		_track(player, delta)
+	for g in guards:
+		_track(g, delta)
+	for a in allies:
+		_track(a, delta)
+	for h in hostages:
+		_track(h, delta)
 	_cam = _cam.lerp(_camera_target(), clampf(delta * 9.0, 0.0, 1.0))
 	var shake := Vector2.ZERO
 	if fx != null and fx.has_method("get_shake_offset"):
@@ -192,17 +234,17 @@ func _draw() -> void:
 				_safe_bar(it["o"], "COFFRE")
 			"loot": _shadow_spr(T_COIN, it["o"].global_position, 18, 18, 1.0)
 			"host":
-				_char(it["o"].global_position, Vector2.DOWN, Color(1.1, 1.0, 0.85), "host")
+				_char(it["o"].global_position, Vector2.DOWN, Color(1.1, 1.0, 0.85), "host", it["o"])
 				_label_c("AIDE !", it["o"].global_position + Vector2(0, -34), 11, Color(1, 0.85, 0.4))
 			"dyn": _shadow_spr(T_BOMB, dynamite.global_position, 20, 20, 1.0)
-			"ally": _char(it["o"].global_position, it["o"].get_facing(), Color(0.78, 1.05, 0.8), "ally")
+			"ally": _char(it["o"].global_position, it["o"].get_facing(), Color(0.78, 1.05, 0.8), "ally", it["o"])
 			"guard":
 				var gk := "sniper" if str(it["o"].get("kind")) == "sniper" else "guard"
 				var gmod := Color(0.85, 0.9, 1.2) if it["o"].is_alert() else Color(0.92, 0.95, 1.08)
 				if gk == "sniper":
 					gmod = Color(0.6, 0.62, 0.72)   # manteau sombre du tireur
-				_char(it["o"].global_position, it["o"].get_facing(), gmod, gk)
-			"me": _char(player.global_position, player.facing, Color(1.4, 0.95, 0.4), "me")
+				_char(it["o"].global_position, it["o"].get_facing(), gmod, gk, it["o"])
+			"me": _char(player.global_position, player.facing, Color(1.4, 0.95, 0.4), "me", player)
 
 	_draw_bullets()
 	_draw_focus()
@@ -213,10 +255,33 @@ func _draw() -> void:
 
 func _draw_floor() -> void:
 	draw_texture_rect(_floor_atlas, floor_rect, true)
+	# Éclats déterministes : taches d'ombre, cailloux, touffes sèches.
+	for d in _detail:
+		var p: Vector2 = d["p"]
+		var r: float = d["r"]
+		match int(d["k"]):
+			0: draw_colored_polygon(_ellipse(p, r * 1.4, r * 0.7), Color(0, 0, 0, 0.06))
+			1:
+				draw_colored_polygon(_ellipse(p, r * 0.55, r * 0.4), Color(0.32, 0.26, 0.2, 0.5))
+				draw_colored_polygon(_ellipse(p + Vector2(0, -1), r * 0.4, r * 0.3), Color(0.5, 0.42, 0.32, 0.6))
+			2:
+				for k in range(3):
+					var a := -PI * 0.5 + (k - 1) * 0.5
+					draw_line(p, p + Vector2.RIGHT.rotated(a) * r, Color(0.55, 0.5, 0.28, 0.45), 1.0)
 	draw_rect(floor_rect, Color(0, 0, 0, 0.10), false, 2.0)
 
 
 func _draw_walls() -> void:
+	# Ombres portées d'abord (sous tous les murs) pour le volume.
+	for w in walls:
+		var r: Rect2 = w["rect"]
+		var off := 5.0 if not w.get("low", false) else 2.5
+		draw_colored_polygon(PackedVector2Array([
+			r.position + Vector2(off, off),
+			Vector2(r.end.x + off, r.position.y + off),
+			r.end + Vector2(off, off),
+			Vector2(r.position.x + off, r.end.y + off),
+		]), Color(0, 0, 0, 0.22))
 	for w in walls:
 		var r: Rect2 = w["rect"]
 		var low: bool = w.get("low", false)
@@ -267,13 +332,26 @@ func _safe_bar(node: Node, label: String) -> void:
 
 # --- Personnages ---
 
-func _char(pos: Vector2, facing: Vector2, mod: Color, kind: String) -> void:
-	# Ombre de contact.
-	draw_colored_polygon(_ellipse(pos + Vector2(0, 2), 11, 5), Color(0, 0, 0, 0.28))
-	# Sprite distinct par camp (sheet Tiny Dungeon), légèrement teinté.
+func _char(pos: Vector2, facing: Vector2, mod: Color, kind: String, node: Node2D = null) -> void:
+	# Balancement de marche + écrasement de l'ombre selon la vitesse.
+	var spd := 0.0
+	var phase := 0.0
+	if node != null and is_instance_valid(node):
+		var e: Dictionary = _anim.get(node.get_instance_id(), {})
+		spd = e.get("spd", 0.0)
+		phase = e.get("phase", 0.0)
+	var moving := spd > 6.0
+	var bob := -absf(sin(phase)) * 3.0 if moving else 0.0
+	var sw := 1.0 + (0.06 * sin(phase) if moving else 0.0)
+	# Ombre de contact (rétrécit quand le perso "saute" en marchant).
+	draw_colored_polygon(_ellipse(pos + Vector2(0, 2), 11.0 * (1.0 + bob * 0.03), 5.0), Color(0, 0, 0, 0.28))
+	# Sprite distinct par camp (sheet Tiny Dungeon), teinté, flip selon la direction.
 	var idx: int = _char_idx(kind)
 	var w := 30.0 if kind == "me" else 28.0
-	draw_texture_rect_region(_chars, Rect2(pos.x - w * 0.5, pos.y - w + 2.0, w, w), _region(idx), mod)
+	var flip := facing.x < -0.15
+	draw_set_transform(pos, 0.0, Vector2(-1.0 if flip else 1.0, sw))
+	draw_texture_rect_region(_chars, Rect2(-w * 0.5, (-w + 2.0 + bob) / sw, w, w), _region(idx), mod)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# Pastille de camp au-dessus (lisibilité instantanée).
 	var c: Color
 	match kind:
@@ -282,7 +360,7 @@ func _char(pos: Vector2, facing: Vector2, mod: Color, kind: String) -> void:
 		"ally": c = Color(0.4, 0.9, 0.45)
 		"host": c = Color(1.0, 0.8, 0.3)
 		_: c = Color(0.8, 0.8, 0.8)
-	draw_circle(pos + Vector2(0, -w + 1.0), 2.6, c)
+	draw_circle(pos + Vector2(0, -w + 1.0 + bob), 2.6, c)
 
 
 ## Tuile de personnage (sheet Tiny Dungeon) selon le camp.
