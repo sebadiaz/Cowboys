@@ -5,9 +5,18 @@ extends Node2D
 ## visée souris, balles, effets, cônes) fonctionne tel quel grâce à `Iso.top_down`
 ## (projection identité). Les entités restent invisibles ; ce noeud les dessine.
 
-const SHEET_PATH := "res://assets/sprites/tiny_town.png"
+const SHEET_PATH := "res://assets/sprites/tiny_town.png"      # décor (sol, murs, props)
+const CHARS_PATH := "res://assets/sprites/tiny_dungeon.png"   # personnages (cast distinct)
 const TILE := 16          # taille native d'une tuile (px)
 const COLS := 12          # colonnes du sheet
+
+# Cast (sheet Tiny Dungeon) — silhouettes distinctes par camp.
+const C_PLAYER := 84      # figure à chapeau -> cowboy (teinté tan)
+const C_GUARD := 96       # chevalier casqué -> shérif/garde (armure)
+const C_SNIPER := 97      # chevalier sombre -> tireur posté
+const C_ALLY := 112       # rôdeur -> hors-la-loi de la bande
+const C_HOST := 99        # civil(e) -> otage
+const C_NPC := 88         # villageois -> commis de banque
 
 # Index de tuiles (cf. cartographie du sheet).
 const T_SAND := 40
@@ -47,6 +56,7 @@ var focus := 1.0
 var focus_active := false
 
 var _sheet: Texture2D
+var _chars: Texture2D
 var _floor_atlas: AtlasTexture
 var _wall_atlas: AtlasTexture
 var _wood_atlas: AtlasTexture
@@ -61,6 +71,7 @@ func add_corpse(world_pos: Vector2, facing: Vector2, dir := Vector2.ZERO) -> voi
 func setup() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_sheet = load(SHEET_PATH)
+	_chars = load(CHARS_PATH)
 	_floor_atlas = _atlas(T_SAND if biome != "plains" else T_GRASS)
 	_wall_atlas = _atlas(T_WALL)
 	_wood_atlas = _atlas(T_WOOD)
@@ -185,8 +196,13 @@ func _draw() -> void:
 				_label_c("AIDE !", it["o"].global_position + Vector2(0, -34), 11, Color(1, 0.85, 0.4))
 			"dyn": _shadow_spr(T_BOMB, dynamite.global_position, 20, 20, 1.0)
 			"ally": _char(it["o"].global_position, it["o"].get_facing(), Color(0.78, 1.05, 0.8), "ally")
-			"guard": _char(it["o"].global_position, it["o"].get_facing(), Color(0.7, 0.82, 1.15) if it["o"].is_alert() else Color(0.78, 0.85, 1.05), "guard")
-			"me": _char(player.global_position, player.facing, Color(1.12, 1.0, 0.85), "me")
+			"guard":
+				var gk := "sniper" if str(it["o"].get("kind")) == "sniper" else "guard"
+				var gmod := Color(0.85, 0.9, 1.2) if it["o"].is_alert() else Color(0.92, 0.95, 1.08)
+				if gk == "sniper":
+					gmod = Color(0.6, 0.62, 0.72)   # manteau sombre du tireur
+				_char(it["o"].global_position, it["o"].get_facing(), gmod, gk)
+			"me": _char(player.global_position, player.facing, Color(1.4, 0.95, 0.4), "me")
 
 	_draw_bullets()
 	_draw_focus()
@@ -252,9 +268,12 @@ func _safe_bar(node: Node, label: String) -> void:
 # --- Personnages ---
 
 func _char(pos: Vector2, facing: Vector2, mod: Color, kind: String) -> void:
-	# Ombre.
+	# Ombre de contact.
 	draw_colored_polygon(_ellipse(pos + Vector2(0, 2), 11, 5), Color(0, 0, 0, 0.28))
-	_spr(T_CHAR, pos, 26, 28, mod, 2.0)
+	# Sprite distinct par camp (sheet Tiny Dungeon), légèrement teinté.
+	var idx: int = _char_idx(kind)
+	var w := 30.0 if kind == "me" else 28.0
+	draw_texture_rect_region(_chars, Rect2(pos.x - w * 0.5, pos.y - w + 2.0, w, w), _region(idx), mod)
 	# Pastille de camp au-dessus (lisibilité instantanée).
 	var c: Color
 	match kind:
@@ -263,7 +282,18 @@ func _char(pos: Vector2, facing: Vector2, mod: Color, kind: String) -> void:
 		"ally": c = Color(0.4, 0.9, 0.45)
 		"host": c = Color(1.0, 0.8, 0.3)
 		_: c = Color(0.8, 0.8, 0.8)
-	draw_circle(pos + Vector2(0, -32), 2.6, c)
+	draw_circle(pos + Vector2(0, -w + 1.0), 2.6, c)
+
+
+## Tuile de personnage (sheet Tiny Dungeon) selon le camp.
+func _char_idx(kind: String) -> int:
+	match kind:
+		"me": return C_PLAYER
+		"guard": return C_GUARD
+		"sniper": return C_SNIPER
+		"ally": return C_ALLY
+		"host": return C_HOST
+		_: return C_NPC
 
 
 func _draw_corpse(c: Dictionary) -> void:
@@ -272,9 +302,9 @@ func _draw_corpse(c: Dictionary) -> void:
 	var dvec: Vector2 = c.get("dir", Vector2.ZERO)
 	pos += dvec.normalized() * ((1.0 - (1.0 - t) * (1.0 - t)) * 22.0) if dvec.length() > 0.01 else Vector2.ZERO
 	draw_colored_polygon(_ellipse(pos + Vector2(0, 2), 12, 5), Color(0, 0, 0, 0.18 * (1.0 - t)))
-	# Sprite couché (transposé) qui s'efface.
-	var region := _region(T_CHAR)
-	draw_texture_rect_region(_sheet, Rect2(pos + Vector2(-13, -8), Vector2(26, 16)), region,
+	# Garde couché (sprite chevalier transposé) qui s'efface dans une mare sombre.
+	var region := _region(C_GUARD)
+	draw_texture_rect_region(_chars, Rect2(pos + Vector2(-13, -8), Vector2(26, 16)), region,
 			Color(0.55, 0.18, 0.16, 1.0 - t), true)
 
 
