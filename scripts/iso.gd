@@ -1,44 +1,50 @@
 extends RefCounted
 class_name Iso
-## Projection isométrique 2:1 (rendu seulement).
-## La logique/physique du jeu reste en coordonnées cartésiennes "top-down" ;
-## on projette uniquement à l'affichage. Origine de projection = (0,0) ; le
-## décalage de centrage est géré par la position du noeud IsoRenderer.
+## Projection de la vue (rendu seulement). La logique/physique reste en
+## coordonnées cartésiennes "top-down" ; on ne transforme qu'à l'affichage.
 ##
-## `yaw` permet de FAIRE PIVOTER la vue (autour de l'axe vertical du monde) sans
-## toucher à la simulation : on tourne les coordonnées monde AVANT la projection
-## iso. À 0 on retrouve la vue iso classique. Les scènes qui ne veulent pas de
-## rotation (mission, saloon) remettent `Iso.yaw = 0.0`.
+## Deux modes :
+##  • ISO 2:1 (par défaut) : losanges, `yaw` permet de pivoter la vue.
+##  • TOP-DOWN (`top_down = true`) : projection IDENTITÉ (vue de dessus, sprites).
+##    Tout le reste (visée souris, déplacement, effets, balles, cônes) marche tel
+##    quel car il passe par project/unproject/depth/screen_to_world.
 
-const S := 0.52        # échelle horizontale
+const S := 0.52        # échelle horizontale (iso)
 const H := 0.5         # aplatissement vertical (2:1)
 const WALL_HEIGHT := 34.0
-const ACTOR_LIFT := 1.4  # hauteur du corps au-dessus du sol (x rayon)
+const ACTOR_LIFT := 1.4
 
-static var yaw := 0.0   # rotation de la vue (radians), appliquée avant la projection
+static var yaw := 0.0          # rotation de la vue iso (radians)
+static var top_down := false   # true = vue de dessus (identité), pour le rendu sprites
 
 
-## Monde cartésien -> position écran (relative).
+## Monde -> écran (relatif).
 static func project(p: Vector2) -> Vector2:
+	if top_down:
+		return p
 	var r := p.rotated(yaw)
 	return Vector2((r.x - r.y) * S, (r.x + r.y) * S * H)
 
 
-## Inverse de project() : position écran (relative) -> monde cartésien.
+## Inverse de project().
 static func unproject(s: Vector2) -> Vector2:
-	var a := s.x / S            # = r.x - r.y
-	var b := s.y / (S * H)      # = r.x + r.y
+	if top_down:
+		return s
+	var a := s.x / S
+	var b := s.y / (S * H)
 	return Vector2((a + b) * 0.5, (b - a) * 0.5).rotated(-yaw)
 
 
-## Profondeur de tri : plus c'est grand, plus c'est "devant" (dessiné en dernier).
+## Profondeur de tri (plus grand = devant).
 static func depth(p: Vector2) -> float:
+	if top_down:
+		return p.y
 	var r := p.rotated(yaw)
 	return r.x + r.y
 
 
-## Vecteur d'entrée écran (droite=+x, bas=+y) -> direction de déplacement monde.
-## Donne des contrôles alignés sur l'écran (WASD = haut/bas/gauche/droite visuels),
-## quelle que soit la rotation courante de la vue.
+## Entrée écran (droite=+x, bas=+y) -> direction monde (contrôles alignés écran).
 static func screen_to_world(v: Vector2) -> Vector2:
+	if top_down:
+		return v
 	return (v.x * Vector2(1.0, -1.0) + v.y * Vector2(1.0, 1.0)).rotated(-yaw)

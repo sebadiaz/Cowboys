@@ -290,8 +290,8 @@ func _build_effects() -> void:
 
 
 func _build_iso_renderer() -> void:
-	_renderer = preload("res://scripts/iso_renderer.gd").new()
-	_renderer.name = "IsoRenderer"
+	_renderer = preload("res://scripts/top_down_renderer.gd").new()
+	_renderer.name = "MissionRenderer"
 	_renderer.floor_rect = _floor_rect
 	_renderer.walls = _walls
 	_renderer.props = _cfg.get("props", [])

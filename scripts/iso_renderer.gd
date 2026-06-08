@@ -192,6 +192,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	Iso.top_down = false   # ce renderer dessine en iso (sécurité si un autre l'a basculé)
 	Iso.yaw = 0.0          # la mission se joue toujours en vue iso fixe
 	_draw_floor()
 	_draw_decor()

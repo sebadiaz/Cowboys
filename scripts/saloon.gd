@@ -40,6 +40,7 @@ var _beat_i := 0
 
 
 func _ready() -> void:
+	Iso.top_down = false   # le saloon se dessine en iso
 	Iso.yaw = 0.0          # le saloon se joue en vue iso fixe
 	_rng.randomize()
 	_build()

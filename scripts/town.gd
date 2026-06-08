@@ -507,6 +507,7 @@ func _on_viewport_resized() -> void:
 # --- Rendu iso (coords locales : la caméra = position/scale du noeud) ---
 
 func _draw() -> void:
+	Iso.top_down = false   # la ville se dessine en iso
 	_draw_ground()
 	_draw_well()
 	_draw_hitch()
