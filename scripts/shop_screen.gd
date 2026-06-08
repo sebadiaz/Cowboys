@@ -10,12 +10,8 @@ var _rows: VBoxContainer
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-
-	var bg := ColorRect.new()
-	bg.color = Color(0.16, 0.12, 0.08)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg)
+	theme = UiTheme.build()
+	UiTheme.add_backdrop(self, "shop")
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -66,6 +62,13 @@ func _make_row(key: String) -> Control:
 
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.14, 0.09, 0.06, 0.92)
+	sb.set_corner_radius_all(10)
+	sb.set_border_width_all(2)
+	sb.border_color = (Color(0.5, 0.8, 0.4) if SaveManager.can_buy(key) else Color(0.5, 0.38, 0.22))
+	sb.set_content_margin_all(12)
+	panel.add_theme_stylebox_override("panel", sb)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)

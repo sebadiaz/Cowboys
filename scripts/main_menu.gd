@@ -9,25 +9,24 @@ var _magot_label: Label
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-
-	var bg := ColorRect.new()
-	bg.color = Color(0.85, 0.74, 0.53)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg)
+	theme = UiTheme.build()
+	UiTheme.add_backdrop(self, "menu")
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 
+	var panel := UiTheme.panel()
+	center.add_child(panel)
+
 	var box := VBoxContainer.new()
 	box.custom_minimum_size = Vector2(460, 0)
 	box.add_theme_constant_override("separation", 14)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	center.add_child(box)
+	panel.add_child(box)
 
-	box.add_child(_label("DUST & DOLLARS", 52, Color(0.35, 0.2, 0.1)))
-	box.add_child(_label("Braquage de banque — Far West", 20, Color(0.4, 0.28, 0.16)))
+	box.add_child(UiTheme.title("DUST & DOLLARS", 54))
+	box.add_child(_label("Braquage de banque — Far West", 20, Color(0.85, 0.78, 0.55)))
 
 	box.add_child(_spacer(20))
 
@@ -66,17 +65,17 @@ func _ready() -> void:
 
 	box.add_child(_label(
 		"Clavier : WASD/ZQSD bouger · Espace/clic TIRER · E interagir/porte · R recharger · Échap pause", 15,
-		Color(0.3, 0.2, 0.12)))
+		Color(0.82, 0.75, 0.55)))
 	box.add_child(_label(
 		"Mobile : joystick (gauche) + boutons TIR / RECH / E (droite)", 16,
-		Color(0.3, 0.2, 0.12)))
+		Color(0.82, 0.75, 0.55)))
 
 	box.add_child(_spacer(12))
 
 	_magot_label = _label(
 		"Magot total : %d $   ·   Missions réussies : %d" % [
 			SaveManager.total_money, SaveManager.missions_completed], 18,
-		Color(0.3, 0.2, 0.12))
+		Color(0.95, 0.82, 0.4))
 	box.add_child(_magot_label)
 
 	# Réinitialiser la sauvegarde (discret) si la save bloque le test.

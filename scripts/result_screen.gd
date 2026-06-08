@@ -6,29 +6,27 @@ extends Control
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-
-	var bg := ColorRect.new()
-	bg.color = Color(0.12, 0.09, 0.06)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg)
+	theme = UiTheme.build()
 
 	var r: Dictionary = GameManager.last_result
 	var success: bool = bool(r.get("success", false))
+	UiTheme.add_backdrop(self, "win" if success else "lose")
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 
+	var panel := UiTheme.panel()
+	center.add_child(panel)
+
 	var box := VBoxContainer.new()
 	box.custom_minimum_size = Vector2(460, 0)
 	box.add_theme_constant_override("separation", 12)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	center.add_child(box)
+	panel.add_child(box)
 
-	var title := _label("MISSION RÉUSSIE !" if success else "ÉCHEC DU BRAQUAGE", 40)
-	title.add_theme_color_override("font_color",
-		Color(0.4, 0.9, 0.4) if success else Color(0.95, 0.4, 0.35))
+	var title := UiTheme.title("MISSION RÉUSSIE !" if success else "ÉCHEC DU BRAQUAGE", 40,
+		Color(0.45, 0.95, 0.45) if success else Color(0.97, 0.42, 0.36))
 	box.add_child(title)
 
 	# Niveau joué.
