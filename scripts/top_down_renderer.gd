@@ -34,6 +34,10 @@ const T_TREE := 3
 const T_DOOR := 74        # porte (sortie)
 const T_BOMB := 105       # dynamite
 const T_CHAR := 104       # personnage
+# Sols. Intérieur banque = dalle de pierre claire (sheet Tiny Dungeon, tuiles
+# sans bord, donc tilables). Extérieur = sable (sheet Tiny Town).
+const FD_STONE := [49, 49, 49, 49, 53]   # pierre claire + rares dalles cloutées (dungeon)
+const F_SAND := [25, 25, 25, 40]         # sable propre + rares touffes (town)
 
 # Données fournies par mission_manager (mêmes noms que l'ancien renderer).
 var floor_rect: Rect2
@@ -58,6 +62,8 @@ var focus_active := false
 var _sheet: Texture2D
 var _chars: Texture2D
 var _floor_atlas: AtlasTexture
+var _floor_baked: ImageTexture
+var _interior := false
 var _wall_atlas: AtlasTexture
 var _wood_atlas: AtlasTexture
 var _corpses: Array[Dictionary] = []
@@ -77,6 +83,8 @@ func setup() -> void:
 	_floor_atlas = _atlas(T_SAND if biome != "plains" else T_GRASS)
 	_wall_atlas = _atlas(T_WALL)
 	_wood_atlas = _atlas(T_WOOD)
+	_interior = not coach_mode and biome != "plains"
+	_bake_floor()
 	_build_detail()
 	_apply_zoom()
 	_cam = _camera_target()
@@ -140,6 +148,33 @@ func _track(node: Node2D, delta: float) -> void:
 	if e["spd"] > 6.0:
 		e["phase"] += delta * 9.0
 	_anim[id] = e
+
+
+## Cuit le sol en UNE texture (tuiles variées) — banque = pierre, extérieur = sable.
+## Fait une fois au setup : zéro coût par frame (web-friendly).
+func _bake_floor() -> void:
+	# Intérieur -> tuiles du sheet Tiny Dungeon ; extérieur -> Tiny Town.
+	var src: Image = load(CHARS_PATH if _interior else SHEET_PATH).get_image()
+	if src == null:
+		return
+	if src.is_compressed():
+		src.decompress()
+	var w := int(ceil(floor_rect.size.x))
+	var h := int(ceil(floor_rect.size.y))
+	if w <= 0 or h <= 0 or w * h > 6_000_000:
+		return   # garde-fou : sol énorme -> on retombe sur la tuile répétée
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector2i(w, h))
+	var set: Array = FD_STONE if _interior else F_SAND
+	var cn := int(ceil(w / float(TILE)))
+	var rn := int(ceil(h / float(TILE)))
+	for ty in range(rn):
+		for tx in range(cn):
+			var idx: int = set[rng.randi() % set.size()]
+			var sr := Rect2i((idx % COLS) * TILE, (idx / COLS) * TILE, TILE, TILE)
+			img.blit_rect(src, sr, Vector2i(tx * TILE, ty * TILE))
+	_floor_baked = ImageTexture.create_from_image(img)
 
 
 ## Éclats de sol déterministes (cailloux, touffes) pour casser le côté plat.
@@ -254,21 +289,35 @@ func _draw() -> void:
 # --- Sol & murs ---
 
 func _draw_floor() -> void:
-	draw_texture_rect(_floor_atlas, floor_rect, true)
-	# Éclats déterministes : taches d'ombre, cailloux, touffes sèches.
+	if _floor_baked != null:
+		draw_texture(_floor_baked, floor_rect.position)
+	else:
+		draw_texture_rect(_floor_atlas, floor_rect, true)
+	# Éclats déterministes : usure, taches, cailloux/touffes (selon intérieur/extérieur).
 	for d in _detail:
 		var p: Vector2 = d["p"]
 		var r: float = d["r"]
 		match int(d["k"]):
 			0: draw_colored_polygon(_ellipse(p, r * 1.4, r * 0.7), Color(0, 0, 0, 0.06))
 			1:
-				draw_colored_polygon(_ellipse(p, r * 0.55, r * 0.4), Color(0.32, 0.26, 0.2, 0.5))
-				draw_colored_polygon(_ellipse(p + Vector2(0, -1), r * 0.4, r * 0.3), Color(0.5, 0.42, 0.32, 0.6))
+				if _interior:
+					# Éclat clair (reflet/usure du marbre).
+					draw_colored_polygon(_ellipse(p, r * 0.5, r * 0.3), Color(1, 1, 1, 0.05))
+				else:
+					draw_colored_polygon(_ellipse(p, r * 0.55, r * 0.4), Color(0.32, 0.26, 0.2, 0.5))
+					draw_colored_polygon(_ellipse(p + Vector2(0, -1), r * 0.4, r * 0.3), Color(0.5, 0.42, 0.32, 0.6))
 			2:
-				for k in range(3):
-					var a := -PI * 0.5 + (k - 1) * 0.5
-					draw_line(p, p + Vector2.RIGHT.rotated(a) * r, Color(0.55, 0.5, 0.28, 0.45), 1.0)
-	draw_rect(floor_rect, Color(0, 0, 0, 0.10), false, 2.0)
+				if _interior:
+					# Fissure sombre dans la pierre.
+					draw_line(p, p + Vector2(r * 0.8, -r * 0.4), Color(0, 0, 0, 0.18), 1.0)
+				else:
+					for k in range(3):
+						var a := -PI * 0.5 + (k - 1) * 0.5
+						draw_line(p, p + Vector2.RIGHT.rotated(a) * r, Color(0.55, 0.5, 0.28, 0.45), 1.0)
+	# Vignette d'intérieur : bords assombris pour l'ambiance.
+	if _interior:
+		draw_rect(floor_rect, Color(0.15, 0.1, 0.08, 0.18), false, 14.0)
+	draw_rect(floor_rect, Color(0, 0, 0, 0.18), false, 2.0)
 
 
 func _draw_walls() -> void:
