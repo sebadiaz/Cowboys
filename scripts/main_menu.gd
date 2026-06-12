@@ -66,6 +66,12 @@ func _ready() -> void:
 	settings.pressed.connect(func() -> void: GameManager.goto_settings())
 	box.add_child(settings)
 
+	var chase := Button.new()
+	chase.text = "🐎 POURSUITE (prototype)"
+	chase.custom_minimum_size = Vector2(460, 46)
+	chase.pressed.connect(func() -> void: GameManager.goto_chase_test())
+	box.add_child(chase)
+
 	# Mode assist (prototype facile) : basculable.
 	_assist_btn = Button.new()
 	_assist_btn.custom_minimum_size = Vector2(460, 46)

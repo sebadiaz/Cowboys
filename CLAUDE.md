@@ -91,11 +91,15 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
   `shop_screen`, `crew_screen`, `world_map`, `settings_screen`.
 - **Monture** : `horse_controller.gd` (FAIT, lot 16) — système isolé (état
   monté, vitesse, inertie/galop). Intégré en ville (`town.gd` : monter/descendre
-  E, cavalier dessiné, poussière). Réutilisable pour les poursuites (lots 17-19).
+  E, cavalier dessiné, poussière).
+- **Poursuite** : `relative_chase_controller.gd` (FAIT, lot 17) — système isolé :
+  offset du joueur dans le repère de la cible (avancer/reculer + latéral), borné
+  à une bande, états à-hauteur / distancé. Banc d'essai `scenes/levels/ChaseTest.tscn`
+  (+ bouton menu « POURSUITE (prototype) »). À POSER dessous : diligence (18) et train (19).
 - **Données** : `data/mission_0N.json`, `data/coach.json`.
   Sprites : `assets/sprites/` (Tiny Town = décor, Tiny Dungeon = personnages).
-- **À créer plus tard (lots dédiés)** : `relative_chase_controller`,
-  `train_chase`, `stagecoach_chase` (refonte), `wanted_system`, `jail_system`,
+- **À créer plus tard (lots dédiés)** : `stagecoach_chase` (refonte diligence sur
+  le chase relatif), `train_chase`, `wanted_system`, `jail_system`,
   migration mission banque in-map, `card_game`, commerces (armurier / pharmacie / magasin).
 
 ## 8. Interdits (toutes versions)

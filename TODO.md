@@ -34,7 +34,10 @@
 - [x] **HorseController (Lot 16)** : cheval montable en ville (E pour monter/
       descendre, vitesse ×1.9, inertie/galop, cavalier dessiné, poussière).
       Système isolé `horse_controller.gd`, prêt pour les poursuites.
-- [ ] **RelativeChaseController** générique, puis **refonte diligence** dessus.
+- [x] **RelativeChaseController (Lot 17)** : déplacement relatif à une cible
+      mobile (avancer/reculer + latéral), monde qui défile, tir. Banc d'essai
+      `ChaseTest.tscn` (bouton menu). Reste : poser la diligence/le train dessus.
+- [ ] **Refonte diligence (Lot 18)** sur `RelativeChaseController`.
 - [ ] **TrainChaseSystem** : wagons, coffre de wagon, gardes de train.
 - [ ] **Saloon : jeu de cartes** arcade simple (blackjack ou poker à 1 manche).
 - [ ] **Audio** : passe d'amélioration (tir plus punchy, galop, train, ambiance).

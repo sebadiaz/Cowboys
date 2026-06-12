@@ -269,6 +269,11 @@ func goto_settings() -> void:
 	_change_scene(SCENE_SETTINGS)
 
 
+## Banc d'essai de la poursuite relative (lot 17, prototype).
+func goto_chase_test() -> void:
+	_change_scene("res://scenes/levels/ChaseTest.tscn")
+
+
 ## Entre dans le saloon (depuis la ville).
 func goto_saloon() -> void:
 	_change_scene(SCENE_SALOON)
