@@ -46,9 +46,14 @@ saloon. Missions **courtes (2–5 min)**, rejouables, lisibles. Construit par
   masqué), le **toit / les murs proches deviennent transparents** (occlusion alpha).
 - **Lisibilité > réalisme.** S'applique à : banque, saloon, armurier,
   pharmacie, magasin, prison, bureau du shérif.
-- État actuel : la mission banque est une scène dédiée (`MissionRoot`).
-  Acceptable en V1 ; la migration vers intérieurs in-map est un **lot dédié**
-  (ne pas la faire en douce).
+- **FAIT (ville iso, `town.gd`)** : occlusion-transparence opérationnelle — tout
+  bâtiment qui masque le joueur (dessiné par-dessus lui + couvre sa silhouette)
+  passe en alpha ~0.3, fondu lissé, valable aux 8 rotations. Voir
+  `_occlusion_target()` + `_fade`/`_fa()`. Réutilisable pour tout bâtiment posé
+  sur la carte.
+- État actuel : la mission banque est encore une scène dédiée (`MissionRoot`).
+  Acceptable en V1 ; la migration de la mission vers un intérieur in-map (avec
+  cette transparence) reste un **lot dédié** (ne pas la faire en douce).
 
 ## 5. Règle cheval / train / diligence (poursuites)
 

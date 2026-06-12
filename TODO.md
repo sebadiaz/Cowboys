@@ -22,8 +22,12 @@
 - [ ] **WantedLevelSystem** : la prime (champ `notoriety` déjà dans la save)
       a des effets : chasseurs de primes, prix d'entrée en ville.
 - [ ] **JailSystem** : capture → prison → caution ou évasion courte.
-- [ ] **Intérieurs in-map** avec toit transparent (banque d'abord) —
-      remplace progressivement la scène mission dédiée (cf. CLAUDE.md §4).
+- [x] **Occlusion-transparence (Lot 7)** : en ville, tout bâtiment qui masque
+      le joueur devient transparent (toit/murs en alpha, fondu lissé, 8
+      rotations). Système réutilisable (`town.gd` `_occlusion_target`/`_fa`).
+- [ ] **Migration mission banque in-map** : dessiner la banque DANS la ville et
+      réutiliser cette transparence au lieu de la scène `MissionRoot` dédiée
+      (gros lot à part, cf. CLAUDE.md §4).
 
 ## P2 — polish / contenus suivants
 
