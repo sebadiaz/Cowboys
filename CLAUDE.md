@@ -105,8 +105,12 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
   L'ancien mode coach de `mission_manager` n'est plus routé (conservé, non supprimé).
 - **Données** : `data/mission_0N.json`, `data/coach.json`.
   Sprites : `assets/sprites/` (Tiny Town = décor, Tiny Dungeon = personnages).
-- **À créer plus tard (lots dédiés)** : `train_chase` (lot 19, sur le chase relatif),
-  `wanted_system`, `jail_system`,
+- **Train** : `train_chase.gd` (FAIT, lot 19, sur le chase relatif) — locomotive +
+  wagons en file ; avancer/reculer longe le convoi, on pille chaque wagon (E à
+  hauteur), le wagon d'OR au bout = objectif, gardes postés sur les toits, puis on
+  décroche. Lancé par `GameManager.start_train_attack()` (scène `TrainChase.tscn`),
+  bouton dédié dans CrewScreen. Réutilise HUD/équipe/résultat/bande comme la diligence.
+- **À créer plus tard (lots dédiés)** : `wanted_system`, `jail_system`,
   migration mission banque in-map, `card_game`, commerces (armurier / pharmacie / magasin).
 
 ## 8. Interdits (toutes versions)

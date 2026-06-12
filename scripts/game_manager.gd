@@ -8,6 +8,7 @@ const SCENE_TOWN := "res://scenes/levels/Town.tscn"
 const SCENE_SALOON := "res://scenes/levels/Saloon.tscn"
 const SCENE_MISSION := "res://scenes/MissionRoot.tscn"
 const SCENE_STAGECOACH := "res://scenes/levels/StagecoachChase.tscn"
+const SCENE_TRAIN := "res://scenes/levels/TrainChase.tscn"
 const SCENE_RESULT := "res://scenes/ResultScreen.tscn"
 const SCENE_LEVEL_SELECT := "res://scenes/LevelSelect.tscn"
 const SCENE_SHOP := "res://scenes/ShopScreen.tscn"
@@ -224,6 +225,15 @@ func start_coach_attack() -> void:
 	# Lot 18 : la diligence est désormais une vraie poursuite à cheval
 	# (stagecoach_chase) posée sur le RelativeChaseController.
 	_change_scene(SCENE_STAGECOACH)
+
+
+## Braquage de train (lot 19) : même flux d'équipe que la diligence (coach_mission
+## pour le résultat/score/bande), mais convoi = locomotive + wagons.
+func start_train_attack() -> void:
+	coach_mission = true
+	procedural = false
+	current_level = 3
+	_change_scene(SCENE_TRAIN)
 
 
 func _process(delta: float) -> void:

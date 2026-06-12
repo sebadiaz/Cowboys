@@ -42,7 +42,11 @@
       montée qui riposte, équipe (CrewScreen) qui chevauche et tire, HUD + résultat
       + bande fidèle réutilisés. Routée par `start_coach_attack()`. Vérifiée
       (victoire et échec en headless). Reste : train (lot 19) sur la même base.
-- [ ] **TrainChaseSystem** : wagons, coffre de wagon, gardes de train.
+- [x] **TrainChaseSystem (Lot 19)** : `train_chase.gd` sur le chase relatif —
+      locomotive + 4 wagons, on longe le convoi et pille chaque wagon (E à hauteur),
+      wagon d'OR = objectif, gardes postés sur les toits, décrochage pour fuir.
+      Bouton « ATTAQUER LE TRAIN » dans CrewScreen. Vérifié headless (4/4 wagons,
+      1740 $, victoire). Bande du RelativeChaseController rendue réglable par instance.
 - [ ] **Saloon : jeu de cartes** arcade simple (blackjack ou poker à 1 manche).
 - [ ] **Audio** : passe d'amélioration (tir plus punchy, galop, train, ambiance).
 

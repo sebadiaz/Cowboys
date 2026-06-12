@@ -16,6 +16,13 @@ const BEHIND_MAX := 420.0   # ...ou décrocher en arrière (au-delà = distancé
 const MOVE_SPEED := 260.0   # vitesse de repositionnement relatif
 const CATCH_X := 40.0       # |rel.x| sous lequel on est "à hauteur" de la cible
 
+# Bornes de la bande, réglables PAR INSTANCE (un train est plus long qu'une
+# diligence). Par défaut = les constantes ci-dessus -> comportement inchangé.
+var lane_half := LANE_HALF
+var ahead_max := AHEAD_MAX
+var behind_max := BEHIND_MAX
+var move_speed := MOVE_SPEED
+
 # Offset dans le repère de la cible : x le long de la course, y latéral.
 # Départ : un peu en arrière, sur le côté.
 var rel := Vector2(-300.0, 120.0)
@@ -24,9 +31,9 @@ var rel := Vector2(-300.0, 120.0)
 ## Met à jour l'offset relatif depuis l'entrée (direction monde alignée écran).
 ## `input.x` = avancer(+)/reculer(-), `input.y` = latéral.
 func update(delta: float, input: Vector2) -> void:
-	rel += input.limit_length(1.0) * MOVE_SPEED * delta
-	rel.x = clampf(rel.x, -BEHIND_MAX, AHEAD_MAX)
-	rel.y = clampf(rel.y, -LANE_HALF, LANE_HALF)
+	rel += input.limit_length(1.0) * move_speed * delta
+	rel.x = clampf(rel.x, -behind_max, ahead_max)
+	rel.y = clampf(rel.y, -lane_half, lane_half)
 
 
 ## Position MONDE du joueur, étant donné la cible et sa direction de course.
@@ -48,4 +55,4 @@ func caught_up() -> bool:
 
 ## A-t-on été distancé (collé à la limite arrière) ?
 func is_distanced() -> bool:
-	return rel.x <= -BEHIND_MAX + 1.0
+	return rel.x <= -behind_max + 1.0

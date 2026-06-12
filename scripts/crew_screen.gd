@@ -40,11 +40,18 @@ func _ready() -> void:
 	scroll.add_child(_list)
 
 	var go := Button.new()
-	go.text = "🔫 LANCER L'ASSAUT"
-	go.custom_minimum_size = Vector2(620, 60)
-	go.add_theme_font_size_override("font_size", 22)
+	go.text = "🐎 ATTAQUER LA DILIGENCE"
+	go.custom_minimum_size = Vector2(620, 56)
+	go.add_theme_font_size_override("font_size", 21)
 	go.pressed.connect(func() -> void: GameManager.start_coach_attack())
 	box.add_child(go)
+
+	var train := Button.new()
+	train.text = "🚂 ATTAQUER LE TRAIN (long convoi, plus de butin)"
+	train.custom_minimum_size = Vector2(620, 56)
+	train.add_theme_font_size_override("font_size", 21)
+	train.pressed.connect(func() -> void: GameManager.start_train_attack())
+	box.add_child(train)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
