@@ -77,6 +77,7 @@ const COACH_SPEED := 52.0
 const COACH_END_X := 1950.0
 var _focus := 1.0
 var _hitstop_until := 0
+var _hitstop_block_until := 0
 var _focus_active := false
 const FOCUS_SLOW := 0.35
 const FOCUS_DRAIN := 0.33
@@ -813,8 +814,20 @@ func _process(delta: float) -> void:
 
 
 ## Gel d'image très court (hit-stop) au moment d'un impact : donne du punch.
+## Anti-spam : sous le feu nourri de plusieurs gardes, les gels en chaîne
+## transformaient le jeu en diaporama — un gel max par fenêtre de 240 ms.
 func _hit_stop(ms: int) -> void:
-	_hitstop_until = maxi(_hitstop_until, Time.get_ticks_msec() + ms)
+	var now := Time.get_ticks_msec()
+	if now < _hitstop_block_until:
+		return
+	_hitstop_until = maxi(_hitstop_until, now + ms)
+	_hitstop_block_until = now + 240
+
+
+## Quoi qu'il arrive (retour menu en plein gel, scène remplacée), le time_scale
+## ne doit JAMAIS survivre à la mission : sinon tous les timers du jeu gèlent.
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
 
 
 ## Mode tactique "Sang-froid" : ralentit le monde tout en gardant le joueur
