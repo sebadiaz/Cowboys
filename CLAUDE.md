@@ -95,11 +95,18 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
 - **Poursuite** : `relative_chase_controller.gd` (FAIT, lot 17) — système isolé :
   offset du joueur dans le repère de la cible (avancer/reculer + latéral), borné
   à une bande, états à-hauteur / distancé. Banc d'essai `scenes/levels/ChaseTest.tscn`
-  (+ bouton menu « POURSUITE (prototype) »). À POSER dessous : diligence (18) et train (19).
+  (+ bouton menu « POURSUITE (prototype) »).
+- **Diligence** : `stagecoach_chase.gd` (FAIT, lot 18) — vraie poursuite posée sur
+  `RelativeChaseController` + `HorseController` : la diligence roule en continu,
+  on la rattrape, on se met à hauteur pour piller le coffre (maintien E), l'escorte
+  montée riposte, l'équipe (CrewScreen) chevauche et tire, puis on décroche pour
+  fuir. Réutilise le HUD, le flux résultat/score et la promotion en bande fidèle.
+  Lancée par `GameManager.start_coach_attack()` (scène `StagecoachChase.tscn`).
+  L'ancien mode coach de `mission_manager` n'est plus routé (conservé, non supprimé).
 - **Données** : `data/mission_0N.json`, `data/coach.json`.
   Sprites : `assets/sprites/` (Tiny Town = décor, Tiny Dungeon = personnages).
-- **À créer plus tard (lots dédiés)** : `stagecoach_chase` (refonte diligence sur
-  le chase relatif), `train_chase`, `wanted_system`, `jail_system`,
+- **À créer plus tard (lots dédiés)** : `train_chase` (lot 19, sur le chase relatif),
+  `wanted_system`, `jail_system`,
   migration mission banque in-map, `card_game`, commerces (armurier / pharmacie / magasin).
 
 ## 8. Interdits (toutes versions)

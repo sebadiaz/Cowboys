@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://c0wb0ystagecoach18"]
+
+[ext_resource type="Script" path="res://scripts/stagecoach_chase.gd" id="1"]
+
+[node name="StagecoachChase" type="Node2D"]
+script = ExtResource("1")

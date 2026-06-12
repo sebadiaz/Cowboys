@@ -7,6 +7,7 @@ const SCENE_MAIN_MENU := "res://scenes/MainMenu.tscn"
 const SCENE_TOWN := "res://scenes/levels/Town.tscn"
 const SCENE_SALOON := "res://scenes/levels/Saloon.tscn"
 const SCENE_MISSION := "res://scenes/MissionRoot.tscn"
+const SCENE_STAGECOACH := "res://scenes/levels/StagecoachChase.tscn"
 const SCENE_RESULT := "res://scenes/ResultScreen.tscn"
 const SCENE_LEVEL_SELECT := "res://scenes/LevelSelect.tscn"
 const SCENE_SHOP := "res://scenes/ShopScreen.tscn"
@@ -220,7 +221,9 @@ func start_coach_attack() -> void:
 	coach_mission = true
 	procedural = false
 	current_level = 2
-	_change_scene(SCENE_MISSION)
+	# Lot 18 : la diligence est désormais une vraie poursuite à cheval
+	# (stagecoach_chase) posée sur le RelativeChaseController.
+	_change_scene(SCENE_STAGECOACH)
 
 
 func _process(delta: float) -> void:

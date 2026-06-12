@@ -37,7 +37,11 @@
 - [x] **RelativeChaseController (Lot 17)** : déplacement relatif à une cible
       mobile (avancer/reculer + latéral), monde qui défile, tir. Banc d'essai
       `ChaseTest.tscn` (bouton menu). Reste : poser la diligence/le train dessus.
-- [ ] **Refonte diligence (Lot 18)** sur `RelativeChaseController`.
+- [x] **Refonte diligence (Lot 18)** : `stagecoach_chase.gd` sur le chase relatif
+      — rattraper → piller le coffre à hauteur (E) → décrocher pour fuir ; escorte
+      montée qui riposte, équipe (CrewScreen) qui chevauche et tire, HUD + résultat
+      + bande fidèle réutilisés. Routée par `start_coach_attack()`. Vérifiée
+      (victoire et échec en headless). Reste : train (lot 19) sur la même base.
 - [ ] **TrainChaseSystem** : wagons, coffre de wagon, gardes de train.
 - [ ] **Saloon : jeu de cartes** arcade simple (blackjack ou poker à 1 manche).
 - [ ] **Audio** : passe d'amélioration (tir plus punchy, galop, train, ambiance).
