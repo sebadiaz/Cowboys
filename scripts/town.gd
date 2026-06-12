@@ -45,7 +45,8 @@ var _horses: Array[Vector2] = []     # chevaux attachés (décor solide + caress
 const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
 	"*hennissement* Doux, mon beau...", "Ce cheval ferait une belle monture de fuite."]
 
-var _buildings: Array[Dictionary] = []   # {region,pos,h,label,tint,flavor}
+var _buildings: Array[Dictionary] = []   # {region,pos,h,label,tint,flavor,fade}
+var _fade := 1.0   # opacité du bâtiment en cours de dessin (occlusion -> transparence)
 var _props: Array[Dictionary] = []        # {region,pos,h}
 var _biome_decor: Array[Dictionary] = []  # {type,pos} décor propre au biome
 var _npcs: Array[Dictionary] = []         # {pos,facing,pal,phase}
@@ -297,6 +298,11 @@ func _process(delta: float) -> void:
 		_update_interaction()
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
+	# Occlusion : un bâtiment qui masque le joueur devient transparent (toit/murs).
+	# Fondu lissé pour éviter le clignotement quand on entre/sort de sa silhouette.
+	var occ := clampf(delta * 9.0, 0.0, 1.0)
+	for b in _buildings:
+		b["fade"] = lerpf(float(b.get("fade", 1.0)), _occlusion_target(b), occ)
 	_update_coach(delta)
 	# Rotation douce de la vue vers l'angle visé (pivote tout le décor).
 	if absf(angle_difference(Iso.yaw, _yaw_target)) > 0.0005:
@@ -305,6 +311,38 @@ func _process(delta: float) -> void:
 	position = _cam
 	_hint_t += delta
 	queue_redraw()
+
+
+## Couleur teintée par l'opacité du bâtiment courant (occlusion).
+func _fa(c: Color) -> Color:
+	return Color(c.r, c.g, c.b, c.a * _fade)
+
+
+## Opacité cible d'un bâtiment : 1 normalement, ~0.3 quand il couvre le joueur
+## à l'écran tout en étant dessiné par-dessus lui (donc en train de le masquer).
+## Fonctionne à toutes les rotations (project/depth intègrent déjà le yaw).
+func _occlusion_target(b: Dictionary) -> float:
+	# Dessiné AVANT le joueur (derrière lui) -> ne peut pas le masquer.
+	if Iso.depth(b["pos"]) - 40.0 <= Iso.depth(_player_pos):
+		return 1.0
+	var fr: Rect2 = b["foot"]
+	var ps := Iso.project(_player_pos)
+	var corners := [Iso.project(fr.position), Iso.project(Vector2(fr.end.x, fr.position.y)),
+			Iso.project(fr.end), Iso.project(Vector2(fr.position.x, fr.end.y))]
+	var minx: float = corners[0].x
+	var maxx: float = corners[0].x
+	var miny: float = corners[0].y
+	var maxy: float = corners[0].y
+	for p in corners:
+		minx = minf(minx, p.x)
+		maxx = maxf(maxx, p.x)
+		miny = minf(miny, p.y)
+		maxy = maxf(maxy, p.y)
+	var height := 250.0 if str(b["label"]) == "★ BANQUE ★" else 180.0
+	var pad := 8.0
+	if ps.x > minx - pad and ps.x < maxx + pad and ps.y > miny - height and ps.y < maxy + pad:
+		return 0.3
+	return 1.0
 
 
 ## Fait pivoter la vue par pas de 45° (la simulation reste inchangée).
@@ -539,7 +577,10 @@ func _draw() -> void:
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
 		match it["k"]:
-			"b": _draw_building(it["o"])
+			"b":
+				_fade = float(it["o"].get("fade", 1.0))
+				_draw_building(it["o"])
+				_fade = 1.0
 			"p":
 				var reg: Rect2 = it["o"]["region"]
 				if reg == R_WAGON:
@@ -912,13 +953,14 @@ func _building_style(label: String) -> Dictionary:
 func _draw_bank(b: Dictionary) -> void:
 	var fr: Rect2 = b["foot"]
 	var U := Vector2(0, -1)
-	var stone := Color(0.82, 0.74, 0.57)
+	# Occlusion : couleurs sources teintées par _fade (transparence du toit/murs).
+	var stone := _fa(Color(0.82, 0.74, 0.57))
 	var side := stone.darkened(0.24)
 	var roof := stone.darkened(0.34)
-	var trim := Color(0.54, 0.43, 0.29)
-	var gold := Color(0.95, 0.80, 0.34)
-	var door := Color(0.24, 0.14, 0.08)
-	var glass := Color(0.58, 0.73, 0.80)
+	var trim := _fa(Color(0.54, 0.43, 0.29))
+	var gold := _fa(Color(0.95, 0.80, 0.34))
+	var door := _fa(Color(0.24, 0.14, 0.08))
+	var glass := _fa(Color(0.58, 0.73, 0.80))
 	var gh := 92.0           # rez-de-chaussée
 	var uh := 74.0           # étage
 	var corn := 26.0         # entablement / corniche
@@ -1094,9 +1136,13 @@ func _draw_building(b: Dictionary) -> void:
 		return
 	var fr: Rect2 = b["foot"]
 	var s := _building_style(str(b["label"]))
-	var wall: Color = s["wall"]
+	# Occlusion : on fade les couleurs sources ; tout ce qui en dérive (darkened/
+	# lightened) hérite de l'alpha, donc le bâtiment devient transparent d'un coup.
+	s["door"] = _fa(s["door"])
+	s["shutter"] = _fa(s["shutter"])
+	var wall: Color = _fa(s["wall"])
 	var side := wall.darkened(0.24)
-	var trim: Color = s["trim"]
+	var trim: Color = _fa(s["trim"])
 	var two: bool = int(s.get("stories", 1)) >= 2
 	var plaster: bool = bool(s.get("plaster", false))
 	var U := Vector2(0, -1)
