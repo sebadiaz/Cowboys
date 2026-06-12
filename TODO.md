@@ -1,185 +1,37 @@
-# TODO — Améliorations futures de Dust & Dollars
+# TODO — priorisé (cf. CLAUDE.md pour les règles)
 
-Le MVP est jouable. Pistes d'évolution, sans dériver du concept (cf. `CLAUDE.md`) :
+## P0 — indispensable (V1 solide)
 
-## Fait dans la passe "village explorable"
-- [x] **Ville EL DORADO** visitable : grande carte, rue principale, 7 commerces
-      nommés (Banque, Saloon, Hôtel, Magasin, Shérif, Écurie, Poste), **PNJ**
-      cowboys, props (chariot, tonneaux, cactus, panneaux), trottoirs en bois.
-- [x] **Dialogues** : E pour parler aux habitants (répliques qui défilent).
-- [x] **PNJ vivants** (`npc_ai.gd`) : déambulation avec collisions, coups d'œil,
-      bulles d'ambiance ; ils s'arrêtent et se tournent vers toi quand tu parles.
-- [x] **Saloon entrable** (intérieur : barman, clients, pianiste, piano, tables,
-      comptoir) avec dialogues, sortie qui ramène en ville.
-- [x] **Pianiste qui joue** une mélodie honky-tonk (notes piano synthétisées).
-- [x] **Magasin entrable** → ouvre la **boutique d'upgrades** (retour en ville).
-- [x] **Diligence** qui traverse la grande rue (chevaux + poussière).
-- [x] **Logo d'action cliquable** devant les portes/cibles (🚪/🛒/💬/👁/🐴).
-- [x] **Décor solide** : collisions sur les meubles (banques : tonneaux/caisses/
-      bureaux) et les props de ville (tonneaux, cactus, chariots, panneaux, puits).
-- [x] **Ville + saloon passés au vrai moteur physique** : joueur CharacterBody2D
-      + StaticBody2D par décor (sous-arbre top_level hors caméra) → on ne traverse
-      plus rien, glissement le long des murs.
-- [x] **Chevaux attachés** devant l'écurie (décor solide + on peut les caresser).
-- [x] **Collisions** sur les bâtiments (on ne traverse plus les murs).
-- [x] Caméra qui suit le cowboy (ville + saloon) ; banque repérable + flèche.
-- [x] Entrée banque/saloon sur **E** (clavier + bouton tactile).
-- [x] Rendu du cowboy **mutualisé** (`character_art.gd`) entre ville et mission.
+- [ ] **Stabilisation** : jouer les 3 banques + diligence de bout en bout,
+      corriger crashs / softlocks / objectifs bloqués.
+- [ ] **Équilibrage V1** : dégâts, vitesse alarme, agressivité — la mission 1
+      doit être finissable par un débutant en mode assist.
+- [ ] **Contrôles mobiles** : valider joystick + TIR/RECH/E sur petit écran
+      (480×800) ; zones de toucher assez grandes.
+- [ ] **Build web testé sur navigateur réel** (perf, audio, tactile).
 
-## Fait dans la passe "grande banque + cowboy"
-- [x] **Grande banque** (1480×840) : hall étendu, zone personnel, bureau, salle
-      des coffres refermée, **aile droite** ; 7 sacs, 4 gardes.
-- [x] Décor enrichi : tapis (prestige coffre / hall / entrée), lampes d'ambiance,
-      tonneaux/caisses/bureaux de couverture.
-- [x] Accessibilité vérifiée (BFS) : aucune entité dans un mur, tout atteignable.
+## P1 — important (boucle méta)
 
-## Fait dans la passe "carte du monde + villes"
-- [x] **Carte du monde** (`WorldMap.tscn`/`world_map.gd`) façon parchemin western :
-      reliefs, rivière, cactus, rose des vents, **piste en pointillés** reliant
-      plusieurs **villes** (pastilles cliquables, desktop + mobile).
-- [x] **~20 villes générées PROCÉDURALEMENT** (`GameManager._generate_towns`,
-      seed déterministe) : noms western, biomes par région (désert → canyon →
-      plaines → neige → nuit), difficulté croissante, chacune liée à **sa banque**.
-- [x] **Déblocage séquentiel persistant** (`SaveManager.towns_unlocked`) :
-      villes conquises (✓), frontière pulsée « à conquérir », suivantes verrouillées.
-- [x] Flux : Menu → **Carte** → Ville (thématisée) → Banque → mission.
-- [x] **Banque PROCÉDURALE par ville** (`mission_manager._generate_bank_cfg`) :
-      gabarit jouable (hall fermé → comptoir → coffre → sortie), taille/gardes/
-      butin/valeur selon la difficulté, **décor thématisé par biome** (sol + murs).
-      Les 3 banques JSON restent pour le « Niveau rapide ».
-- [x] **Nouvelles upgrades** boutique : Gilet épais (+1 PV), Barillet allongé
-      (+1 balle), Flair du magot (butin +8%) — persistées et appliquées en mission.
-- [x] **Ambiance de banque** : lustres suspendus, tableaux encadrés, tas d'or et
-      **guichetiers** (citoyens derrière le comptoir) — décor non bloquant.
-- [x] **Contrats de braquage** par banque (FANTÔME / ÉCLAIR / RAFLE / PACIFISTE) :
-      défi déterministe affiché au HUD, **prime bonus** au score + écran de résultat.
-- [x] **Variété de plan** procédurale : axe coffre/passage décalé (gauche/centre/
-      droite) et profondeur de comptoir variables selon la graine — chemin garanti.
-- [x] **Bureau cloisonné** (variante de salle) : pièce annexe au fond avec porte
-      + butin, côté opposé au coffre (sans bloquer rondes ni passage).
-- [x] **Dynamite** ramassable : SOUFFLE le coffre instantanément (son d'explosion
-      + secousse), dessinée et déclenchée par contact.
-- [x] **Notoriété** persistante (0..12) : monte à chaque casse, descend si échec ;
-      gardes plus nerveux **et** primes +7 %/cran ; affichée sur la carte.
-- [x] **Pion courrier animé** qui chevauche la piste jusqu'à la ville-frontière.
-- [x] **Sons dédiés** synthétisés : fanfare de prime de contrat, explosion.
-- [x] **Otages à libérer** : civils retenus (marqueur « AIDE ! » pulsé) ; les
-      atteindre rapporte un bonus de butin (compte pour la sortie + le score),
-      1–2 par banque procédurale, non bloquants.
-- [x] **Coffres-forts secondaires** ouvrables (E) : butin bonus à risque, mêmes
-      mécaniques que le coffre principal (barre de progression, son), 1–2 par banque.
-- [x] **Nouvel ennemi : tireur posté (sniper)** — immobile, **long cône étroit**
-      (portée 330), **cadence rapide**, tire dès qu'il te voit ; look distinct
-      (manteau noir, bandana rouge, carabine). Apparaît dès le palier 2.
-- [x] **Attaque de diligence + équipe** : écran de recrutement (`CrewScreen`) pour
-      embaucher des hors-la-loi avec le magot (pistolero/fine gâchette = alliés IA
-      qui tirent ; toubib +PV ; éclaireur +butin ; artificier = dynamite), puis
-      mission « Attaque de la diligence » (`data/coach.json`) sur une route — la
-      diligence remplace le coffre, escortée par shérifs + snipers. Accès via la
-      carte du monde.
-- [x] **Diligence MOBILE** : le convoi (wagon + coffres + snipers à bord + butin)
-      roule le long de la route ; il faut le **rattraper et le piller en mouvement**
-      (le Sang-froid aide à le coller) — vrai feeling d'attaque de convoi.
-- [x] **Coéquipiers vulnérables** : les balles ennemies peuvent les abattre (3 PV,
-      flash de touche, « ALLIÉ À TERRE ! » + corps) → il faut les **protéger** ;
-      chaque allié ramené vivant rapporte un **bonus de score** (+120).
-- [x] **Réputation d'équipe (bande fidèle)** : les coéquipiers ramenés vivants
-      d'une diligence rejoignent une **bande persistante** (`SaveManager.gang`) ;
-      ré-embauche **gratuite** depuis l'écran de recrutement (section dédiée).
+- [ ] **Carte du monde** : lisibilité + progression claire (déblocage).
+- [ ] **Commerces** : armurier (armes), pharmacie (soins), magasin général
+      (consommables) — écrans simples au thème `ui_theme`.
+- [ ] **WantedLevelSystem** : la prime (champ `notoriety` déjà dans la save)
+      a des effets : chasseurs de primes, prix d'entrée en ville.
+- [ ] **JailSystem** : capture → prison → caution ou évasion courte.
+- [ ] **Intérieurs in-map** avec toit transparent (banque d'abord) —
+      remplace progressivement la scène mission dédiée (cf. CLAUDE.md §4).
 
-## Carte du monde — pistes suivantes
-- [x] **Décor de ville unique par biome** (déterministe) : sapins enneigés +
-      plaques de neige, rochers/cactus/crânes de canyon & désert, buissons de
-      plaines, lampadaires de nuit — en plus de la teinte d'ambiance.
-- [ ] Déplacement animé d'un **pion** le long de la piste entre deux villes.
-- [ ] Plus de **gabarits de banque** (varier le rendu mission selon le biome).
+## P2 — polish / contenus suivants
 
-## Fait dans la passe "refonte visuelle de la banque"
-- [x] **Intérieur de banque premium** dessiné en procédural dans `iso_renderer.gd`
-      (remplace les billboards d'atlas placeholder) : parquet bicolore, murs
-      lambrissés (plinthe/corniche) vs murs brique extérieurs.
-- [x] **Comptoir de guichets** continu (base bois moulurée + cage laiton « BANK »).
-- [x] **Grande porte de coffre** : disque acier, couronne de rivets, volant à
-      rayons doré, charnières, plaque « BANQUE » — pièce maîtresse ; intérieur
-      doré révélé à l'ouverture.
-- [x] **Props cohérents cartoon** : caisses (croix + ferrures), tonneaux, bureaux
-      de banquier (feutre vert + lampe + registre), coffre secondaire (strongbox),
-      étagères à registres + sacs d'or, plantes, affiches WANTED, lampes, sacs de
-      butin dorés bien lisibles.
-- [x] **Hiérarchie lisible** entrée → hall → comptoir → coffre → sortie ; décor
-      ajouté sur les 3 niveaux **sans toucher aux collisions** (props décoratifs
-      non bloquants, patrouilles préservées).
+- [ ] **HorseController** seul (montée/descente, vitesse, inertie, poussière).
+- [ ] **RelativeChaseController** générique, puis **refonte diligence** dessus.
+- [ ] **TrainChaseSystem** : wagons, coffre de wagon, gardes de train.
+- [ ] **Saloon : jeu de cartes** arcade simple (blackjack ou poker à 1 manche).
+- [ ] **Audio** : passe d'amélioration (tir plus punchy, galop, train, ambiance).
 
-## Fait dans la passe "game feel combat (cap genre twin-stick)"
-- [x] **Hit-stop** (gel d'image ~30–70 ms) sur impact/kill/dégâts joueur — punch.
-- [x] **Recul caméra directionnel** (kick) au tir + screen-shake retravaillé.
-- [x] **Knockback** des gardes touchés (recul proportionnel, mort = poussée forte).
-- [x] **Sang** directionnel + **corps projeté** dans la direction de la balle.
-- [x] **Traceurs de balles** (traînée + cœur brillant + halo) pour la lisibilité.
+## P3 — plus tard
 
-## Fait dans la passe "arcade V2" (cf. CLAUDE.md §6 bis)
-- [x] Game juice : screen-shake, recul joueur, flash de touche des gardes.
-- [x] Particules : poussière de pas, étincelles, impact de balle, douilles,
-      gerbe dorée au ramassage ; animation de mort des gardes.
-- [x] Vignette d'ambiance + overlay rouge **pulsé** quand l'alarme monte.
-- [x] Tir six-coups (6 balles), recharge auto/manuelle, cadence western.
-- [x] IA gardes : état `SEARCH` + dernière position connue + fouille ; **renfort**
-      déclenché à l'alarme 100 ; gardes à 2 PV.
-- [x] Messages dramatiques : `VU !`, `ALARME !`, `COFFRE OUVERT !`, `FUITE !`.
-- [x] Audio **procédural** (autoload `AudioManager`, aucun asset).
-- [x] Scoring (butin + coffre + bonus discrétion + bonus temps) + **boutique**
-      d'upgrades (vitesse, coffre, recharge, discrétion) persistés dans la save.
-- [x] Rendu adapté à la taille d'écran (zoom auto, mobile + desktop).
-
-## Direction artistique
-- [x] **Cowboy charismatique** dessiné en couches (chapeau, bandana, duster,
-      ceinturon/holster, bottes, visage), directionnel + animé.
-- [x] Gardes shérifs distincts (manteau bleu, étoile).
-- [x] **Contour « encre » + ombre de contact** sur tous les personnages
-      (`character_art`) → silhouettes lisibles, look cartoon premium.
-- [ ] Sprites PNG animés (remplacer le rendu procédural par des planches).
-- [ ] Animation de mort plus riche (le corps reprend le style du cowboy).
-- [x] **Musique western** synthétisée en boucle (thème menus/ville + thème tension
-      en mission) — `AudioManager.play_music()`, sous les bruitages, respecte les réglages.
-- [ ] Vrais samples (remplacer la synthèse) si besoin de plus de cachet.
-
-## Assets & intégration (suite)
-- [x] Intégrer les vraies planches PNG (1254²) + props en régions d'atlas.
-- [ ] **Cadrage précis des régions** au pixel (les `region_rect` sont à l'œil).
-- [ ] Exploiter `western_exterior_sheet.png` (scène d'extérieur / rue).
-- [ ] Créer un **vrai TileSet Godot** (`assets/tilesets/`) pour sol et murs.
-- [ ] **Collisions plus précises** sur les props (formes ajustées au visuel).
-- [ ] **Séparation définitive** props décoratifs / objets gameplay.
-- [ ] **Migrer le rendu de `MissionRoot`** vers les sprites des planches
-      (dessiner les régions d'atlas dans `iso_renderer.gd` au lieu des formes).
-- [x] **Occlusion des cônes de vision par les murs** (découpe visuelle du cône).
-
-## Gameplay & IA
-- [x] **Occlusion des cônes de vision par les murs** : rayons du cône stoppés au
-      premier mur (raycast) — le visuel colle à la détection (déjà en ligne de vue).
-- [x] Mode **tactique ralenti « Sang-froid »** : Maj (clavier) ou bouton ⏳
-      (tactile) ralentit le monde tout en gardant le joueur réactif (vitesse
-      compensée) ; jauge qui se vide/recharge, voile bleuté ; reset propre du
-      time_scale entre scènes.
-- [x] **Shérifs supplémentaires** et renforts quand l'alarme est pleine.
-- [x] Mémoire des gardes (dernière position connue, fouille de zone).
-- [ ] Phase de **fuite à cheval** après le braquage.
-
-## Contenu & progression
-- [x] **3 niveaux** (banques distinctes) pilotés par les données, débloqués au
-      fil des réussites + écran de **sélection de niveau**.
-- [x] **Carte du monde** procédurale (~20 villes) et déblocage séquentiel.
-- [ ] Plus de niveaux + objectifs variés (otages, coffre à temps, etc.).
-- [x] **Boutique** et **upgrades** (vitesse, coffre rapide, recharge, discrétion).
-- [ ] Nouveaux types d'upgrades (leurres, plus de PV, chargeur+).
-- [ ] **Vraie minimap** en jeu.
-
-## Audio
-- [x] **Sons procéduraux** (tir, reload, ramassage, coffre, alarme, hit, fin).
-- [ ] **Vrais bruitages** + **musique** western (ambiance).
-
-## Technique / plateforme
-- [ ] **PWA** (installable, jouable hors-ligne).
-- [ ] Export **Android / iOS** natif.
-- [ ] Réglages : volume, sensibilité du joystick, taille des contrôles tactiles.
-- [ ] Localisation (FR/EN).
+- [ ] **Rotation de vue 45°** (`Iso.yaw` exposé au joueur + assets directionnels).
+- [ ] **Fédéraux / ville principale** (palier de difficulté final).
+- [ ] **Occlusion/transparence avancée** (murs par segments, pas seulement toits).
+- [ ] Localisation EN.
