@@ -12,12 +12,24 @@ func _ready() -> void:
 	theme = UiTheme.build()
 	UiTheme.add_backdrop(self, "menu")
 
+	# Défilable : sur petit écran, tout reste atteignable ; centré quand ça tient.
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
+
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(center)
+
+	var pad := MarginContainer.new()
+	for s in ["top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + s, 24)
+	center.add_child(pad)
 
 	var panel := UiTheme.panel()
-	center.add_child(panel)
+	pad.add_child(panel)
 
 	var box := VBoxContainer.new()
 	box.custom_minimum_size = Vector2(460, 0)
