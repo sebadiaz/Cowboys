@@ -40,7 +40,9 @@ var _target_flavor := ""
 var _target_anchor := Vector2.ZERO   # point MONDE où afficher le logo d'action
 var _interact_was := false
 var _action_btn: Button
-var _horses: Array[Vector2] = []     # chevaux attachés (décor solide + caresse)
+var _horses: Array[Vector2] = []     # chevaux attachés (décor solide + à monter)
+var _horse_ctrl := HorseController.new()   # monture du joueur (lot 16)
+var _ride_walk := 0.0                # phase de galop (balancement du cavalier)
 
 const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
 	"*hennissement* Doux, mon beau...", "Ce cheval ferait une belle monture de fuite."]
@@ -164,12 +166,18 @@ func _physics_process(delta: float) -> void:
 	var dir := Iso.screen_to_world(InputManager.get_move_vector())
 	if dir.length() > 1.0:
 		dir = dir.normalized()
-	if dir.length() > 0.05:
-		_facing = dir.normalized()
-		_walk += delta * 10.0
+	if _horse_ctrl.mounted:
+		# À cheval : vitesse + inertie (le galop se lance et se freine).
+		_body.velocity = _horse_ctrl.compute_velocity(delta, dir)
+		_facing = _horse_ctrl.facing
+		_ride_walk += delta * (4.0 + 14.0 * _horse_ctrl.gallop)
 	else:
-		_walk = 0.0
-	_body.velocity = dir * SPEED
+		if dir.length() > 0.05:
+			_facing = dir.normalized()
+			_walk += delta * 10.0
+		else:
+			_walk = 0.0
+		_body.velocity = dir * SPEED
 	_body.move_and_slide()
 	# Bornage à la carte (au cas où) + synchro de la position de rendu.
 	var p := _body.position
@@ -352,11 +360,23 @@ func _rotate_view(steps: int) -> void:
 
 ## Choisit l'interaction la plus proche (banque, saloon, PNJ, commerce) et gère E.
 func _update_interaction() -> void:
-	_can_enter = _player_pos.distance_to(BANK_DOOR) < DOOR_RADIUS
 	_near_label = ""
 	_target_kind = ""
 	_target_npc = null
 	_target_flavor = ""
+	# À cheval : la seule interaction est de descendre (on lâche les autres).
+	if _horse_ctrl.mounted:
+		_can_enter = false
+		_target_kind = "dismount"
+		_near_label = "Descendre du cheval"
+		_target_anchor = _player_pos
+		var held_d := InputManager.is_interact_held()
+		if held_d and not _interact_was:
+			_do_action()
+		_interact_was = held_d
+		_update_action_button()
+		return
+	_can_enter = _player_pos.distance_to(BANK_DOOR) < DOOR_RADIUS
 	if _can_enter:
 		_target_kind = "bank"
 		_near_label = "ENTRER dans la BANQUE"
@@ -389,13 +409,13 @@ func _update_interaction() -> void:
 					_target_kind = "flavor"
 					_target_flavor = b["flavor"]
 					_near_label = b["label"]
-		# Chevaux à caresser.
+		# Chevaux : monter en selle.
 		for hp in _horses:
 			var d := _player_pos.distance_to(hp)
 			if d < best:
 				best = d
-				_target_kind = "horse"
-				_near_label = "Caresser le cheval"
+				_target_kind = "mount"
+				_near_label = "Monter le cheval"
 				_target_anchor = hp
 	# Touche E (front montant) = même action que le logo cliquable.
 	var held := InputManager.is_interact_held()
@@ -412,8 +432,31 @@ func _do_action() -> void:
 		"saloon": GameManager.goto_saloon()
 		"shop": GameManager.goto_shop_from_town(TOWN_RETURN_MAGASIN)
 		"npc": _talk(_target_npc)
-		"horse": _show_toast(HORSE_LINES[_rng.randi() % HORSE_LINES.size()])
+		"mount": _mount_nearest_horse()
+		"dismount": _dismount_horse()
 		"flavor": _show_toast(_target_flavor)
+
+
+## Monte sur le cheval attaché le plus proche (il quitte le râtelier).
+func _mount_nearest_horse() -> void:
+	var best := 1.0e20
+	var idx := -1
+	for i in range(_horses.size()):
+		var d := _player_pos.distance_to(_horses[i])
+		if d < best:
+			best = d
+			idx = i
+	if idx < 0:
+		return
+	_horses.remove_at(idx)
+	_horse_ctrl.mount()
+	_show_toast("En selle ! (E pour descendre)")
+
+
+## Descend : le cheval reste là où on saute, de nouveau attachable.
+func _dismount_horse() -> void:
+	var rest := _horse_ctrl.dismount(_player_pos)
+	_horses.append(rest)
 
 
 ## Icône d'action (emoji) selon le type de cible.
@@ -422,7 +465,7 @@ func _action_icon() -> String:
 		"bank", "saloon": return "🚪"
 		"shop": return "🛒"
 		"npc": return "💬"
-		"horse": return "🐴"
+		"mount", "dismount": return "🐴"
 		"flavor": return "👁"
 	return ""
 
@@ -1328,8 +1371,51 @@ func _billboard(region: Rect2, world_pos: Vector2, target_h: float, tint: Color)
 
 func _draw_me() -> void:
 	var f := _screen_facing(_player_pos, _facing)
+	if _horse_ctrl.mounted:
+		_draw_mounted(f)
+		return
 	CharacterArt.draw_person(self, Iso.project(_player_pos), f, CharacterArt.hero_palette(),
 			false, false, _walk, 0.0, 0.0)
+
+
+## Joueur à cheval : poussière de galop + cheval orienté + cavalier au-dessus.
+func _draw_mounted(face: Vector2) -> void:
+	var base := Iso.project(_player_pos)
+	var g: float = _horse_ctrl.gallop
+	var bob := sin(_ride_walk) * 2.2 * g
+	# Poussière soulevée derrière la monture au galop.
+	if g > 0.2:
+		var back := -face * 18.0
+		for i in range(2):
+			var pp := base + back + Vector2(_rng.randf_range(-7, 7), _rng.randf_range(-2, 5))
+			draw_circle(pp, _rng.randf_range(3.0, 6.0), Color(0.74, 0.65, 0.49, 0.22 * g))
+	draw_colored_polygon(_diamond_shadow(base, 22.0), Color(0, 0, 0, 0.20))
+	var flip := -1.0 if face.x > 0.1 else 1.0
+	_draw_horse_screen(base + Vector2(0, bob), flip)
+	CharacterArt.draw_person(self, base + Vector2(0, -17 + bob), face,
+			CharacterArt.hero_palette(), false, false, 0.0, 0.0, 0.0)
+
+
+## Cheval dessiné en espace écran (orienté par `flip`), pour la monture du joueur.
+func _draw_horse_screen(base: Vector2, flip: float) -> void:
+	var body := Color(0.36, 0.23, 0.13)
+	var dark := body.darkened(0.28)
+	for dx in [-9.0, -3.0, 4.0, 10.0]:
+		draw_line(base + Vector2(dx * flip, -12), base + Vector2((dx + 1.0) * flip, 2), dark, 3.0)
+	var bl := base + Vector2(-12 * flip, -16)
+	var brr := base + Vector2(12 * flip, -16)
+	draw_line(bl, brr, body, 14.0)
+	draw_circle(bl, 7.0, body)
+	draw_circle(brr, 7.0, body)
+	draw_line(brr + Vector2(3 * flip, -3), base + Vector2(18 * flip, 3), dark, 3.0)
+	var neck := bl + Vector2(1 * flip, -3)
+	var head := bl + Vector2(-11 * flip, -16)
+	draw_line(neck, head, body, 7.0)
+	draw_circle(head, 4.5, body)
+	draw_line(head, head + Vector2(-5 * flip, 2), body, 5.0)
+	draw_line(head + Vector2(1 * flip, -3), head + Vector2(3 * flip, -7), body, 2.0)
+	draw_line(neck + Vector2(-1 * flip, -3), head + Vector2(3 * flip, 3), dark, 3.0)
+	draw_circle(head + Vector2(-2 * flip, -1), 1.0, Color(0.05, 0.04, 0.03))
 
 
 func _screen_facing(world_pos: Vector2, facing: Vector2) -> Vector2:
