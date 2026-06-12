@@ -89,12 +89,14 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
 - **UI** : `hud_controller` + `hud_gfx` (HUD dessiné cuir/or), `ui_theme` +
   `ui_backdrop` (menus western), `mobile_controls`, `result_screen`,
   `shop_screen`, `crew_screen`, `world_map`, `settings_screen`.
+- **Monture** : `horse_controller.gd` (FAIT, lot 16) — système isolé (état
+  monté, vitesse, inertie/galop). Intégré en ville (`town.gd` : monter/descendre
+  E, cavalier dessiné, poussière). Réutilisable pour les poursuites (lots 17-19).
 - **Données** : `data/mission_0N.json`, `data/coach.json`.
   Sprites : `assets/sprites/` (Tiny Town = décor, Tiny Dungeon = personnages).
-- **À créer plus tard (lots dédiés)** : `horse_controller`,
-  `relative_chase_controller`, `train_chase`, `stagecoach_chase` (refonte),
-  `wanted_system`, `jail_system`, `building_interior` (toits transparents),
-  `card_game`, commerces (armurier / pharmacie / magasin).
+- **À créer plus tard (lots dédiés)** : `relative_chase_controller`,
+  `train_chase`, `stagecoach_chase` (refonte), `wanted_system`, `jail_system`,
+  migration mission banque in-map, `card_game`, commerces (armurier / pharmacie / magasin).
 
 ## 8. Interdits (toutes versions)
 

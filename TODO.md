@@ -31,7 +31,9 @@
 
 ## P2 — polish / contenus suivants
 
-- [ ] **HorseController** seul (montée/descente, vitesse, inertie, poussière).
+- [x] **HorseController (Lot 16)** : cheval montable en ville (E pour monter/
+      descendre, vitesse ×1.9, inertie/galop, cavalier dessiné, poussière).
+      Système isolé `horse_controller.gd`, prêt pour les poursuites.
 - [ ] **RelativeChaseController** générique, puis **refonte diligence** dessus.
 - [ ] **TrainChaseSystem** : wagons, coffre de wagon, gardes de train.
 - [ ] **Saloon : jeu de cartes** arcade simple (blackjack ou poker à 1 manche).
