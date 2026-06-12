@@ -740,7 +740,7 @@ func _apply_difficulty(g: Node) -> void:
 		g.alarm_gain_mult *= 0.5     # alarme monte 2x moins vite
 		g.detect_mult = 0.6          # détection plus lente
 		g.chase_mult = 0.85          # poursuite un peu plus lente que le joueur
-		g.fire_mult = 1.7            # tire moins souvent
+		g.fire_mult = 2.0            # tire nettement moins souvent
 		g.lethal_touch = false       # le contact blesse au lieu de tuer net
 
 
@@ -761,6 +761,12 @@ func _spawn_guards() -> void:
 		_apply_difficulty(g)
 		g.visible = false
 		world.add_child(g)
+		# Assist : le tireur posté (sniper) ne doit pas verrouiller le joueur
+		# immobile au coffre. On le rend plus lent et de plus courte portée.
+		if g.kind == "sniper" and GameManager.assist:
+			g.fire_mult = 3.4
+			if g.has_node("VisionCone"):
+				g.get_node("VisionCone").view_distance = 230.0
 		g.player_caught.connect(_on_player_caught)
 		_guards.append(g)
 

@@ -37,6 +37,12 @@ var speed_mult: float = 1.0   # upgrade "vitesse"
 var reload_mult: float = 1.0  # upgrade "recharge"
 var _fire_cd: float = 0.0
 var _reload_t: float = 0.0    # > 0 = rechargement en cours
+var _invuln_t: float = 0.0    # > 0 = invulnérabilité temporaire (anti-rafale)
+
+## Fenêtre d'invulnérabilité après un coup : empêche d'être fondu par plusieurs
+## tireurs simultanés (typique en restant au coffre). Plus longue en assist.
+func _invuln_window() -> float:
+	return 0.8 if GameManager.assist else 0.45
 
 
 func _ready() -> void:
@@ -44,7 +50,7 @@ func _ready() -> void:
 	speed_mult = SaveManager.speed_mult()
 	reload_mult = SaveManager.reload_mult()
 	# Mode assist (prototype) : plus de PV pour une vraie marge d'erreur.
-	max_hp = (5 if GameManager.assist else MAX_HP) + SaveManager.hp_bonus()
+	max_hp = (7 if GameManager.assist else MAX_HP) + SaveManager.hp_bonus()
 	hp = max_hp
 	cap = CYLINDER + SaveManager.ammo_bonus()
 	ammo = cap
@@ -55,6 +61,8 @@ func _reload_time() -> float:
 
 
 func _physics_process(delta: float) -> void:
+	if _invuln_t > 0.0:
+		_invuln_t = max(0.0, _invuln_t - delta)
 	if is_caught:
 		velocity = Vector2.ZERO
 		return
@@ -134,14 +142,21 @@ func _aim_direction() -> Vector2:
 
 
 ## Encaisse un tir de garde. À 0 PV, le joueur tombe (échec).
+## Ignoré pendant la fenêtre d'invulnérabilité (anti-rafale, contre-jeu équitable).
 func take_damage(amount: int = 1) -> void:
-	if is_caught:
+	if is_caught or _invuln_t > 0.0:
 		return
+	_invuln_t = _invuln_window()
 	hp = max(0, hp - amount)
 	health_changed.emit(hp)
 	damaged.emit()
 	if hp <= 0:
 		get_caught()
+
+
+## True pendant l'invulnérabilité (le renderer fait clignoter le joueur).
+func is_invulnerable() -> bool:
+	return _invuln_t > 0.0
 
 
 ## Ajoute un sac de butin (appelé par LootBag via mission_manager).

@@ -6,8 +6,10 @@
       en headless (victoire ET défaite). Chaîne d'objectifs saine. Corrigés :
       spam de hit-stop sous feu nourri (jeu en diaporama), time_scale qui
       pouvait rester gelé après mission, plafond des cœurs HUD.
-- [ ] **Équilibrage V1** : dégâts, vitesse alarme, agressivité — la mission 1
-      doit être finissable par un débutant en mode assist.
+- [x] **Équilibrage assist** : mission 1 finissable par un débutant (75 % de
+      réussite mesurée même pour un bot passif qui ne riposte pas). Ajouts :
+      frames d'invulnérabilité anti-rafale (clignotement), PV assist 5→7, tir
+      des gardes ralenti, tireur posté défangé en assist (portée/cadence).
 - [ ] **Contrôles mobiles** : valider joystick + TIR/RECH/E sur petit écran
       (480×800) ; zones de toucher assez grandes.
 - [ ] **Build web testé sur navigateur réel** (perf, audio, tactile).

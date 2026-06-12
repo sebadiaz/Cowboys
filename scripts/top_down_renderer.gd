@@ -279,7 +279,12 @@ func _draw() -> void:
 				if gk == "sniper":
 					gmod = Color(0.6, 0.62, 0.72)   # manteau sombre du tireur
 				_char(it["o"].global_position, it["o"].get_facing(), gmod, gk, it["o"])
-			"me": _char(player.global_position, player.facing, Color(1.4, 0.95, 0.4), "me", player)
+			"me":
+				var pmod := Color(1.4, 0.95, 0.4)
+				# Clignotement pendant l'invulnérabilité (anti-rafale).
+				if player.has_method("is_invulnerable") and player.is_invulnerable():
+					pmod.a = 0.35 if int(Time.get_ticks_msec() / 70.0) % 2 == 0 else 1.0
+				_char(player.global_position, player.facing, pmod, "me", player)
 
 	_draw_bullets()
 	_draw_focus()
