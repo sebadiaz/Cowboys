@@ -2,8 +2,10 @@
 
 ## P0 — indispensable (V1 solide)
 
-- [ ] **Stabilisation** : jouer les 3 banques + diligence de bout en bout,
-      corriger crashs / softlocks / objectifs bloqués.
+- [x] **Stabilisation (Lot 2)** : 3 banques + diligence jouées de bout en bout
+      en headless (victoire ET défaite). Chaîne d'objectifs saine. Corrigés :
+      spam de hit-stop sous feu nourri (jeu en diaporama), time_scale qui
+      pouvait rester gelé après mission, plafond des cœurs HUD.
 - [ ] **Équilibrage V1** : dégâts, vitesse alarme, agressivité — la mission 1
       doit être finissable par un débutant en mode assist.
 - [ ] **Contrôles mobiles** : valider joystick + TIR/RECH/E sur petit écran
