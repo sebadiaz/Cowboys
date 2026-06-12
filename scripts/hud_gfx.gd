@@ -46,9 +46,15 @@ func _draw() -> void:
 	draw_rect(Rect2(0, bh, w, 2.0), Color(0, 0, 0, 0.35))
 
 	# --- Gauche : cœurs (PV) + barillet (munitions) ---
+	# Plafond d'affichage : au-delà de 10 cœurs on passe en numérique
+	# (sécurité : un max_hp énorme dessinerait des milliers de primitives).
 	var hx := 18.0
-	for i in range(max_hp):
+	var shown := mini(max_hp, 10)
+	for i in range(shown):
 		_heart(Vector2(hx + i * 22.0, 18.0), 8.0, i < hp)
+	if max_hp > 10:
+		_text(font, Vector2(hx + shown * 22.0 + 6.0, 6.0), "%d/%d" % [hp, max_hp], 15,
+				Color(0.95, 0.6, 0.6), HORIZONTAL_ALIGNMENT_LEFT)
 	_cylinder(Vector2(20.0, 44.0))
 
 	# --- Droite : magot + butin ---
