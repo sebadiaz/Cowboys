@@ -16,7 +16,10 @@
 
 ## P1 — important (boucle méta)
 
-- [ ] **Carte du monde** : lisibilité + progression claire (déblocage).
+- [x] **Carte du monde (Lot 12)** : légende des états (conquise / à conquérir /
+      verrouillée + difficulté), pastilles de difficulté par ville, bannière
+      « À CONQUÉRIR » sur la frontière, noms dé-encombrés (placement anti-collision,
+      lignes de rappel, seules les villes pertinentes nommées).
 - [ ] **Commerces** : armurier (armes), pharmacie (soins), magasin général
       (consommables) — écrans simples au thème `ui_theme`.
 - [ ] **WantedLevelSystem** : la prime (champ `notoriety` déjà dans la save)

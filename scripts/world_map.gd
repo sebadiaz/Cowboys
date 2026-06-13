@@ -148,9 +148,14 @@ func _draw() -> void:
 					Color(0.45, 0.30, 0.16, 0.95) if unlocked else Color(0.45, 0.30, 0.16, 0.45),
 					3.0, 11.0)
 
-	# Marqueurs de ville + noms.
+	# Marqueurs de ville (+ pastilles de difficulté).
 	for i in range(1, n + 1):
 		_marker(i)
+	# Noms dé-encombrés (placement anti-collision + lignes de rappel).
+	_draw_town_names()
+	# Légende des états + bannière "à conquérir" sur la frontière.
+	_draw_legend(inner)
+	_draw_frontier_banner()
 
 	# Pion courrier qui chevauche jusqu'à la frontière.
 	var fidx := clampi(SaveManager.towns_unlocked, 1, n)
@@ -201,15 +206,111 @@ func _marker(idx: int) -> void:
 		draw_line(c + Vector2(-1, 4), c + Vector2(5, -4), Color(0.15, 0.35, 0.15), 2.0)
 	elif not unlocked:
 		_text_c("🔒", c + Vector2(0, 4), 12, Color(0.9, 0.9, 0.9))
-	# Nom (alterné au-dessus/au-dessous pour limiter les chevauchements).
-	var t := GameManager.town_def(idx)
-	var below := (idx % 2 == 0)
-	var off := Vector2(0, 26.0 if below else -16.0)
-	var nm_col: Color = Color(0.25, 0.16, 0.08) if unlocked else Color(0.40, 0.36, 0.32)
-	_text_c(str(t["name"]), c + off, 12, nm_col)
-	if frontier:
-		_text_c(str(t["tag"]), c + off + Vector2(0, 13.0 if below else -13.0), 10,
-				Color(0.55, 0.36, 0.12))
+	# Pastilles de difficulté (tier 1-3) sous le marqueur : vert / orange / rouge.
+	var lvl := int(GameManager.town_def(idx).get("level", 1))
+	var pip := Color(0.45, 0.7, 0.35) if lvl == 1 else (Color(0.92, 0.66, 0.25) if lvl == 2 else Color(0.86, 0.32, 0.24))
+	if not unlocked:
+		pip = pip.darkened(0.35)
+	for k in range(lvl):
+		var px := c.x - (lvl - 1) * 4.0 + k * 8.0
+		draw_circle(Vector2(px, c.y + rad + 6.0), 2.6, pip)
+		draw_circle(Vector2(px, c.y + rad + 6.0), 2.6, Color(0, 0, 0, 0.3), false, 1.0)
+
+
+## Noms de ville placés sans chevauchement (glouton, lignes de rappel).
+## On n'étiquette que les villes pertinentes : conquises, frontière et les 3
+## prochaines verrouillées — le reste reste un marqueur (détail au survol/tap).
+func _draw_town_names() -> void:
+	var font := ThemeDB.fallback_font
+	var n := GameManager.TOWNS.size()
+	var frontier := SaveManager.towns_unlocked
+	# Ordre de priorité : frontière d'abord (slot garanti), puis conquises, puis proches.
+	var order: Array[int] = []
+	for i in range(1, n + 1):
+		order.append(i)
+	order.sort_custom(func(a, b): return _name_prio(a) > _name_prio(b))
+	var placed: Array[Rect2] = []
+	for idx in order:
+		var unlocked := GameManager.town_unlocked(idx)
+		if not unlocked and idx > frontier + 3:
+			continue   # villes lointaines verrouillées : pas de nom (désencombrement)
+		var c := _pt(idx)
+		var nm := str(GameManager.town_def(idx)["name"])
+		var is_front := idx == frontier
+		var size := 14 if is_front else 11
+		var w: float = font.get_string_size(nm, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		var h := float(size + 5)
+		var col: Color = Color(0.20, 0.12, 0.05) if is_front else (
+				Color(0.26, 0.17, 0.09) if unlocked else Color(0.42, 0.38, 0.34))
+		var cands := [Vector2(0, -20), Vector2(0, 24), Vector2(0, -34), Vector2(0, 38),
+				Vector2(w * 0.5 + 12, -2), Vector2(-w * 0.5 - 12, -2)]
+		for off in cands:
+			var r := Rect2(c + off - Vector2(w * 0.5, h * 0.5), Vector2(w, h)).grow(3.0)
+			if not _rect_hits(r, placed):
+				placed.append(r)
+				if off.length() > 22.0:
+					draw_line(c, c + off * 0.55, Color(col.r, col.g, col.b, 0.4), 1.0)
+				if is_front:
+					# Cartouche clair derrière le nom de la frontière.
+					draw_rect(Rect2(c + off - Vector2(w * 0.5 + 5, h * 0.5), Vector2(w + 10, h)),
+							Color(1.0, 0.95, 0.75, 0.7))
+				_text_c(nm, c + off, size, col)
+				break
+
+
+func _name_prio(idx: int) -> int:
+	if idx == SaveManager.towns_unlocked:
+		return 100                                   # frontière : priorité max
+	if idx < SaveManager.towns_unlocked:
+		return 60 - idx                              # conquises (les + proches d'abord)
+	return 30 - idx                                  # verrouillées
+
+
+func _rect_hits(r: Rect2, placed: Array[Rect2]) -> bool:
+	for p in placed:
+		if r.intersects(p):
+			return true
+	return false
+
+
+## Légende des états (coin bas, sur cartouche cuir clair).
+func _draw_legend(inner: Rect2) -> void:
+	var x := inner.position.x + 8.0
+	var y := inner.end.y - 64.0
+	draw_rect(Rect2(Vector2(x - 4, y - 8), Vector2(216, 64)), Color(0.96, 0.90, 0.72, 0.82))
+	draw_rect(Rect2(Vector2(x - 4, y - 8), Vector2(216, 64)), Color(0.45, 0.30, 0.16, 0.7), false, 1.5)
+	var rows := [
+		[Color(0.28, 0.55, 0.28), "Conquise"],
+		[Color(0.95, 0.78, 0.28), "À conquérir"],
+		[Color(0.50, 0.48, 0.46), "Verrouillée"],
+	]
+	for i in range(rows.size()):
+		var ry := y + i * 16.0
+		draw_circle(Vector2(x + 8, ry + 6), 5.0, rows[i][0])
+		draw_circle(Vector2(x + 8, ry + 6), 5.0, (rows[i][0] as Color).darkened(0.35), false, 1.0)
+		_text_l(str(rows[i][1]), Vector2(x + 22, ry), 12, Color(0.28, 0.18, 0.10))
+	# Difficulté.
+	_text_l("Difficulté:", Vector2(x + 104, y), 12, Color(0.28, 0.18, 0.10))
+	var tiers := [Color(0.45, 0.7, 0.35), Color(0.92, 0.66, 0.25), Color(0.86, 0.32, 0.24)]
+	for i in range(3):
+		for k in range(i + 1):
+			draw_circle(Vector2(x + 110 + i * 30.0 + k * 7.0, y + 22), 2.6, tiers[i])
+
+
+## Bannière "À CONQUÉRIR" flottante au-dessus de la ville frontière.
+func _draw_frontier_banner() -> void:
+	var fidx := SaveManager.towns_unlocked
+	if fidx < 1 or fidx > GameManager.TOWNS.size():
+		return
+	var c := _pt(fidx)
+	var bob := sin(_t * 3.0) * 3.0
+	var top := c + Vector2(0, -46.0 + bob)
+	var label := "▼ À CONQUÉRIR"
+	var font := ThemeDB.fallback_font
+	var w: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 16.0
+	draw_rect(Rect2(top - Vector2(w * 0.5, 11), Vector2(w, 22)), Color(0.72, 0.16, 0.12, 0.92))
+	draw_rect(Rect2(top - Vector2(w * 0.5, 11), Vector2(w, 22)), Color(0.95, 0.82, 0.35), false, 1.5)
+	_text_c(label, top - Vector2(0, 7), 13, Color(1, 0.96, 0.8))
 
 
 # --- Décor de carte ---
@@ -322,3 +423,7 @@ func _text_c(s: String, center: Vector2, size: int, color: Color) -> void:
 	var font := ThemeDB.fallback_font
 	var w := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	draw_string(font, center - Vector2(w * 0.5, 0), s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
+
+
+func _text_l(s: String, pos: Vector2, size: int, color: Color) -> void:
+	draw_string(ThemeDB.fallback_font, pos + Vector2(0, size), s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
