@@ -110,8 +110,15 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
   hauteur), le wagon d'OR au bout = objectif, gardes postés sur les toits, puis on
   décroche. Lancé par `GameManager.start_train_attack()` (scène `TrainChase.tscn`),
   bouton dédié dans CrewScreen. Réutilise HUD/équipe/résultat/bande comme la diligence.
-- **À créer plus tard (lots dédiés)** : `wanted_system`, `jail_system`,
-  migration mission banque in-map, `card_game`, commerces (armurier / pharmacie / magasin).
+- **Commerces** : `shop_screen.gd` filtré par `GameManager.shop_category` (FAIT,
+  lot 13) — ARMURIER (FORGE), CABINET DU DOC (DOCTEUR), MAGASIN GÉNÉRAL (MAGASIN),
+  enterables en ville via `goto_commerce()`. Catalogue catégorisé (champ `store`).
+- **Prison** : `jail_system.gd` (FAIT, lot 15, scène `Jail.tscn`) — un braquage de
+  banque RATÉ y mène (pris par la loi) ; sortie par caution (magot, scale notoriété)
+  ou crochetage (mini-jeu d'adresse). S'évader augmente la prime. Diligence/train
+  ratés = mort en plein air -> écran de résultat (pas de prison).
+- **À créer plus tard (lots dédiés)** : `wanted_system` (chasseurs de primes),
+  migration mission banque in-map, `card_game` (saloon).
 
 ## 8. Interdits (toutes versions)
 

@@ -27,7 +27,10 @@
       (cadence de tir, durée d'invuln). Réutilise shop_screen + ui_theme.
 - [ ] **WantedLevelSystem** : la prime (champ `notoriety` déjà dans la save)
       a des effets : chasseurs de primes, prix d'entrée en ville.
-- [ ] **JailSystem** : capture → prison → caution ou évasion courte.
+- [x] **JailSystem (Lot 15)** : braquage de banque raté -> prison (`Jail.tscn`),
+      sortie par caution (250 + notoriété×130) ou crochetage (mini-jeu : stopper
+      l'aiguille dans le vert 3×, vigilance du gardien). S'évader augmente la prime.
+      Diligence/train ratés = mort en plein air -> écran de résultat. Vérifié.
 - [x] **Occlusion-transparence (Lot 7)** : en ville, tout bâtiment qui masque
       le joueur devient transparent (toit/murs en alpha, fondu lissé, 8
       rotations). Système réutilisable (`town.gd` `_occlusion_target`/`_fa`).

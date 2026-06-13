@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://c0wb0yjail15cell"]
+
+[ext_resource type="Script" path="res://scripts/jail_system.gd" id="1"]
+
+[node name="Jail" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+script = ExtResource("1")

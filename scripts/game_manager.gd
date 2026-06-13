@@ -9,6 +9,7 @@ const SCENE_SALOON := "res://scenes/levels/Saloon.tscn"
 const SCENE_MISSION := "res://scenes/MissionRoot.tscn"
 const SCENE_STAGECOACH := "res://scenes/levels/StagecoachChase.tscn"
 const SCENE_TRAIN := "res://scenes/levels/TrainChase.tscn"
+const SCENE_JAIL := "res://scenes/levels/Jail.tscn"
 const SCENE_RESULT := "res://scenes/ResultScreen.tscn"
 const SCENE_LEVEL_SELECT := "res://scenes/LevelSelect.tscn"
 const SCENE_SHOP := "res://scenes/ShopScreen.tscn"
@@ -399,6 +400,7 @@ func finish_mission(success: bool, loot_value: int, loot_bags: int, score: Dicti
 		"money_earned": money_earned,
 		"score": score,
 	}
+	var was_coach := coach_mission
 	if success:
 		SaveManager.register_success(money_earned)
 		if not coach_mission:
@@ -413,7 +415,13 @@ func finish_mission(success: bool, loot_value: int, loot_bags: int, score: Dicti
 	if coach_mission:
 		coach_mission = false
 		crew.clear()
-	_change_scene(SCENE_RESULT)
+	# Lot 15 : braquage de banque RATÉ = pris par la loi -> PRISON (caution ou
+	# évasion). La diligence/le train se jouent à cheval en plein air : un échec
+	# y est une mort, pas une arrestation -> écran de résultat normal.
+	if not success and not was_coach:
+		_change_scene(SCENE_JAIL)
+	else:
+		_change_scene(SCENE_RESULT)
 
 
 ## Métadonnées d'un niveau (nom + difficulté) lues dans son fichier de données.
