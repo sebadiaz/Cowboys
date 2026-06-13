@@ -25,8 +25,11 @@
       vitalité, tonique d'invulnérabilité), MAGASIN GÉNÉRAL (bottes, crochets,
       discrétion, sacoches). Catalogue d'upgrades catégorisé + 2 items neufs
       (cadence de tir, durée d'invuln). Réutilise shop_screen + ui_theme.
-- [ ] **WantedLevelSystem** : la prime (champ `notoriety` déjà dans la save)
-      a des effets : chasseurs de primes, prix d'entrée en ville.
+- [x] **WantedLevelSystem (Lot 14)** : `wanted_system.gd` — au-delà d'un seuil de
+      notoriété (4), des chasseurs de primes apparaissent en ville et traquent le
+      joueur (jusqu'à 3). Plus lents qu'à pied / qu'à cheval -> on fuit. Capturé =
+      ils empochent une part de la prime, la traque retombe. Bandeau PRIME + ❗ en
+      ville. Vérifié headless.
 - [x] **JailSystem (Lot 15)** : braquage de banque raté -> prison (`Jail.tscn`),
       sortie par caution (250 + notoriété×130) ou crochetage (mini-jeu : stopper
       l'aiguille dans le vert 3×, vigilance du gardien). S'évader augmente la prime.

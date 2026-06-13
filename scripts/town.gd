@@ -43,6 +43,8 @@ var _action_btn: Button
 var _horses: Array[Vector2] = []     # chevaux attachés (décor solide + à monter)
 var _horse_ctrl := HorseController.new()   # monture du joueur (lot 16)
 var _ride_walk := 0.0                # phase de galop (balancement du cavalier)
+var _wanted := WantedSystem.new()    # chasseurs de primes (lot 14)
+var _wanted_label: Label             # bandeau "PRIME / chasseurs" (CanvasLayer)
 
 const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
 	"*hennissement* Doux, mon beau...", "Ce cheval ferait une belle monture de fuite."]
@@ -306,6 +308,11 @@ func _process(delta: float) -> void:
 		_update_interaction()
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
+	# Chasseurs de primes (lot 14) : traque active si la prime est haute.
+	if not _entered:
+		if _wanted.update(delta, _player_pos, SaveManager.notoriety, FLOOR, _blocked):
+			_on_caught_by_hunter()
+		_update_wanted_label()
 	# Occlusion : un bâtiment qui masque le joueur devient transparent (toit/murs).
 	# Fondu lissé pour éviter le clignotement quand on entre/sort de sa silhouette.
 	var occ := clampf(delta * 9.0, 0.0, 1.0)
@@ -319,6 +326,35 @@ func _process(delta: float) -> void:
 	position = _cam
 	_hint_t += delta
 	queue_redraw()
+
+
+## Bandeau de prime : montant + nombre de chasseurs aux trousses.
+func _update_wanted_label() -> void:
+	if _wanted_label == null:
+		return
+	var noto: int = SaveManager.notoriety
+	if not _wanted.active(noto):
+		_wanted_label.text = ""
+		return
+	var n := _wanted.hunters.size()
+	if n > 0:
+		_wanted_label.text = "⚠ PRIME : %d $   ·   %d chasseur%s à tes trousses — FUIS !" % [
+				_wanted.bounty(noto), n, "s" if n > 1 else ""]
+	else:
+		_wanted_label.text = "⚠ PRIME : %d $   ·   tu es RECHERCHÉ" % _wanted.bounty(noto)
+
+
+## Un chasseur t'a rattrapé : il empoche une part de la prime, la chasse se calme.
+func _on_caught_by_hunter() -> void:
+	var noto: int = SaveManager.notoriety
+	var take: int = mini(_wanted.bounty(noto), int(SaveManager.total_money * 0.4))
+	SaveManager.spend(take)
+	SaveManager.notoriety = maxi(0, noto - 3)   # la traque retombe
+	_wanted.scatter(5.0)
+	if _horse_ctrl.mounted:
+		_dismount_horse()
+	_show_toast("Chasseurs de primes ! Ils empochent %d $ et te laissent filer." % take)
+	AudioManager.play("hit_player", -2.0)
 
 
 ## Couleur teintée par l'opacité du bâtiment courant (occlusion).
@@ -620,6 +656,8 @@ func _draw() -> void:
 		items.append({"d": Iso.depth(hp), "k": "horse", "o": hp})
 	if _coach_active():
 		items.append({"d": Iso.depth(_coach_pos), "k": "coach", "o": null})
+	for h in _wanted.hunters:
+		items.append({"d": Iso.depth(h["pos"]), "k": "hunter", "o": h})
 	items.append({"d": Iso.depth(_player_pos), "k": "me", "o": null})
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
@@ -646,6 +684,7 @@ func _draw() -> void:
 				var f := _screen_facing(n["pos"], n["facing"])
 				CharacterArt.draw_person(self, Iso.project(n["pos"]), f, n["pal"],
 						false, false, float(n.get("walk", 0.0)), 0.0, 0.0)
+			"hunter": _draw_hunter(it["o"])
 			"me": _draw_me()
 
 	# Bulles d'ambiance + marqueur "💬" pour les PNJ.
@@ -1382,6 +1421,28 @@ func _draw_me() -> void:
 			false, false, _walk, 0.0, 0.0)
 
 
+## Chasseur de primes : silhouette en manteau sombre + étoile/marqueur rouge.
+func _draw_hunter(h: Dictionary) -> void:
+	var pos: Vector2 = h["pos"]
+	var f := _screen_facing(pos, h["facing"])
+	CharacterArt.draw_person(self, Iso.project(pos), f, _hunter_palette(), true, true, _hint_t * 6.0, 0.0, 0.0)
+	# Marqueur de menace flottant.
+	var head := Iso.project(pos) + Vector2(0, -54)
+	var bob := sin(_hint_t * 5.0 + pos.x) * 2.0
+	_text(head + Vector2(0, bob), "❗", 18, Color(1.0, 0.3, 0.25))
+
+
+func _hunter_palette() -> Dictionary:
+	return {
+		"hat": Color(0.16, 0.14, 0.16), "hat_band": Color(0.5, 0.12, 0.10),
+		"coat": Color(0.20, 0.18, 0.22), "coat_dark": Color(0.12, 0.11, 0.14),
+		"shirt": Color(0.32, 0.16, 0.16), "pants": Color(0.16, 0.15, 0.17),
+		"skin": Color(0.82, 0.62, 0.46), "bandana": Color(0.6, 0.15, 0.13),
+		"belt": Color(0.10, 0.09, 0.08), "buckle": Color(0.85, 0.78, 0.4),
+		"boots": Color(0.12, 0.10, 0.09), "hair": Color(0.12, 0.10, 0.08),
+	}
+
+
 ## Joueur à cheval : poussière de galop + cheval orienté + cavalier au-dessus.
 func _draw_mounted(face: Vector2) -> void:
 	var base := Iso.project(_player_pos)
@@ -1523,6 +1584,18 @@ func _build_ui() -> void:
 	_toast.modulate.a = 0.0
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_toast)
+
+	# Bandeau PRIME / chasseurs de primes (lot 14), centré en haut.
+	_wanted_label = Label.new()
+	_wanted_label.add_theme_font_size_override("font_size", 18)
+	_wanted_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.35))
+	_wanted_label.add_theme_color_override("font_outline_color", Color(0.1, 0.02, 0.02))
+	_wanted_label.add_theme_constant_override("outline_size", 5)
+	_wanted_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_wanted_label.position = Vector2(0, 44)
+	_wanted_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_wanted_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_wanted_label)
 
 	# Mobile : joystick seul (l'action passe par le logo cliquable près des portes).
 	var mc := Control.new()

@@ -117,7 +117,12 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
   banque RATÉ y mène (pris par la loi) ; sortie par caution (magot, scale notoriété)
   ou crochetage (mini-jeu d'adresse). S'évader augmente la prime. Diligence/train
   ratés = mort en plein air -> écran de résultat (pas de prison).
-- **À créer plus tard (lots dédiés)** : `wanted_system` (chasseurs de primes),
+- **Prime** : `wanted_system.gd` (FAIT, lot 14) — système isolé : au-delà d'un seuil
+  de notoriété (4), des chasseurs de primes apparaissent en ville et traquent le
+  joueur (seek + évitement via `_blocked`). Plus lents qu'à pied, bien plus lents
+  que le cheval -> on peut fuir. Capturé = ils empochent une part de la prime et la
+  traque retombe. Intégré dans `town.gd` (rendu + bandeau PRIME + conséquence).
+- **À créer plus tard (lots dédiés)** : 
   migration mission banque in-map, `card_game` (saloon).
 
 ## 8. Interdits (toutes versions)
