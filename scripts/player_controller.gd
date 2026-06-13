@@ -42,7 +42,7 @@ var _invuln_t: float = 0.0    # > 0 = invulnérabilité temporaire (anti-rafale)
 ## Fenêtre d'invulnérabilité après un coup : empêche d'être fondu par plusieurs
 ## tireurs simultanés (typique en restant au coffre). Plus longue en assist.
 func _invuln_window() -> float:
-	return 0.8 if GameManager.assist else 0.45
+	return (0.8 if GameManager.assist else 0.45) * SaveManager.invuln_mult()
 
 
 func _ready() -> void:
@@ -114,7 +114,7 @@ func _handle_fire(delta: float) -> void:
 		recoil = 1.0
 		ammo_changed.emit(ammo, cap, false)
 		fired.emit(global_position + dir * MUZZLE, dir)
-		_fire_cd = FIRE_RATE
+		_fire_cd = FIRE_RATE * SaveManager.firerate_mult()
 
 
 func _start_reload() -> void:

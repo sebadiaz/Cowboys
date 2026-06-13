@@ -11,16 +11,18 @@ signal settings_changed(new_settings: Dictionary)
 
 ## Définition des upgrades : nom, description, coûts par niveau (taille = max).
 const UPGRADE_DEFS := {
-	"speed":   {"name": "Bottes véloces",  "desc": "Vitesse +6% / niveau",        "cost": [300, 600, 1000, 1600]},
-	"reload":  {"name": "Barillet huilé",  "desc": "Recharge -12% / niveau",      "cost": [300, 600, 1000]},
-	"safe":    {"name": "Crochets fins",   "desc": "Coffre -15% plus vite / niv", "cost": [350, 700, 1200]},
-	"stealth": {"name": "Pas feutrés",     "desc": "Alarme monte -15% / niveau",  "cost": [350, 700, 1200, 1800]},
-	"vitality":{"name": "Gilet épais",     "desc": "+1 PV max / niveau",          "cost": [400, 800, 1400]},
-	"ammo":    {"name": "Barillet allongé", "desc": "+1 balle au barillet / niv",  "cost": [450, 1000]},
-	"fortune": {"name": "Flair du magot",  "desc": "Butin +8% / niveau",          "cost": [500, 1000, 1700]},
+	"speed":   {"name": "Bottes véloces",  "desc": "Vitesse +6% / niveau",        "cost": [300, 600, 1000, 1600], "store": "store"},
+	"reload":  {"name": "Barillet huilé",  "desc": "Recharge -12% / niveau",      "cost": [300, 600, 1000], "store": "gunsmith"},
+	"safe":    {"name": "Crochets fins",   "desc": "Coffre -15% plus vite / niv", "cost": [350, 700, 1200], "store": "store"},
+	"stealth": {"name": "Pas feutrés",     "desc": "Alarme monte -15% / niveau",  "cost": [350, 700, 1200, 1800], "store": "store"},
+	"vitality":{"name": "Gilet épais",     "desc": "+1 PV max / niveau",          "cost": [400, 800, 1400], "store": "pharmacy"},
+	"ammo":    {"name": "Barillet allongé", "desc": "+1 balle au barillet / niv",  "cost": [450, 1000], "store": "gunsmith"},
+	"fortune": {"name": "Flair du magot",  "desc": "Butin +8% / niveau",          "cost": [500, 1000, 1700], "store": "store"},
+	"firerate":{"name": "Détente affûtée", "desc": "Cadence de tir +9% / niveau", "cost": [400, 900], "store": "gunsmith"},
+	"tonic":   {"name": "Tonique du Doc",  "desc": "Invulnérabilité +18% / niv",  "cost": [400, 800], "store": "pharmacy"},
 }
 ## Ordre d'affichage stable dans la boutique.
-const UPGRADE_ORDER := ["speed", "reload", "safe", "stealth", "vitality", "ammo", "fortune"]
+const UPGRADE_ORDER := ["reload", "ammo", "firerate", "vitality", "tonic", "speed", "safe", "stealth", "fortune"]
 
 var total_money: int = 0
 var missions_completed: int = 0
@@ -243,6 +245,14 @@ func ammo_bonus() -> int:
 
 func loot_mult() -> float:
 	return 1.0 + 0.08 * get_level("fortune")
+
+func firerate_mult() -> float:
+	# Cadence : <1 raccourcit le délai entre deux tirs (armurier).
+	return maxf(0.5, 1.0 - 0.09 * get_level("firerate"))
+
+func invuln_mult() -> float:
+	# Durée d'invulnérabilité après un coup (pharmacie).
+	return 1.0 + 0.18 * get_level("tonic")
 
 
 # --- Réglages persistants ---

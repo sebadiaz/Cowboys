@@ -199,7 +199,7 @@ func _build_town() -> void:
 	_add_building(R_HOUSE, Vector2(760, 900), 195.0, "HÔTEL", Color(0.92, 0.96, 1.0),
 			"Hôtel de la Frontière — chambres à l'étage, 2 $ la nuit.", Vector2(180, 120))
 	_add_building(R_SHED, Vector2(760, 1240), 185.0, "MAGASIN", Color(1.0, 0.96, 0.85),
-			"Magasin général — améliore ton équipement.", Vector2(170, 115), "shop")
+			"Magasin général — bottes, crochets, sacoches.", Vector2(170, 115), "store")
 	_add_building(R_HOUSE, Vector2(760, 1560), 190.0, "ÉGLISE", Color(0.95, 0.95, 1.0),
 			"Petite église en bois — une prière avant le casse ?", Vector2(170, 115))
 	# Côté est de la rue (x ~ 1440).
@@ -210,10 +210,10 @@ func _build_town() -> void:
 	_add_building(R_SALOON, Vector2(1440, 1240), 205.0, "POSTE", Color(0.9, 1.0, 0.9),
 			"Poste & télégraphe — « STOP braquage en cours STOP ».", Vector2(180, 120))
 	_add_building(R_SHED, Vector2(1440, 1560), 185.0, "FORGE", Color(1.0, 0.9, 0.8),
-			"Forge du maréchal-ferrant — l'odeur du fer chaud.", Vector2(170, 115))
+			"Armurier & forge — recharge, barillet, cadence.", Vector2(170, 115), "gunsmith")
 	# Ruelle est (au-delà de la place).
 	_add_building(R_HOUSE, Vector2(1820, 1020), 190.0, "DOCTEUR", Color(0.9, 1.0, 0.95),
-			"Cabinet du Doc — whisky en guise d'anesthésie.", Vector2(170, 115))
+			"Cabinet du Doc — vitalité, tonique anti-balles.", Vector2(170, 115), "pharmacy")
 	_add_building(R_SHED, Vector2(360, 1020), 185.0, "MAISON", Color(0.95, 0.92, 0.85),
 			"Maison de ville — volets clos.", Vector2(170, 115))
 
@@ -430,7 +430,9 @@ func _do_action() -> void:
 	match _target_kind:
 		"bank": _enter_bank()
 		"saloon": GameManager.goto_saloon()
-		"shop": GameManager.goto_shop_from_town(TOWN_RETURN_MAGASIN)
+		"shop", "store": GameManager.goto_commerce("store", _player_pos)
+		"gunsmith": GameManager.goto_commerce("gunsmith", _player_pos)
+		"pharmacy": GameManager.goto_commerce("pharmacy", _player_pos)
 		"npc": _talk(_target_npc)
 		"mount": _mount_nearest_horse()
 		"dismount": _dismount_horse()
@@ -463,7 +465,9 @@ func _dismount_horse() -> void:
 func _action_icon() -> String:
 	match _target_kind:
 		"bank", "saloon": return "🚪"
-		"shop": return "🛒"
+		"store", "shop": return "🛒"
+		"gunsmith": return "🔫"
+		"pharmacy": return "➕"
 		"npc": return "💬"
 		"mount", "dismount": return "🐴"
 		"flavor": return "👁"

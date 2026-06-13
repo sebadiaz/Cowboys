@@ -292,15 +292,29 @@ func goto_saloon() -> void:
 	_change_scene(SCENE_SALOON)
 
 
-## Ouvre la boutique d'upgrades (depuis le menu / l'écran de résultat).
+## Catégorie de commerce ouverte : "" = boutique générale (tout), sinon
+## "gunsmith" / "pharmacy" / "store" (filtre le catalogue). Lot 13.
+var shop_category := ""
+
+## Ouvre la boutique d'upgrades (depuis le menu / l'écran de résultat) : tout.
 func goto_shop() -> void:
 	shop_from_town = false
+	shop_category = ""
 	_change_scene(SCENE_SHOP)
 
 
 ## Ouvre la boutique depuis le Magasin de la ville (le retour ramène en ville).
 func goto_shop_from_town(pos := Vector2.ZERO) -> void:
 	shop_from_town = true
+	shop_category = ""
+	town_return_pos = pos
+	_change_scene(SCENE_SHOP)
+
+
+## Ouvre un commerce thématique de la ville (armurier / pharmacie / magasin).
+func goto_commerce(category: String, pos := Vector2.ZERO) -> void:
+	shop_from_town = true
+	shop_category = category
 	town_return_pos = pos
 	_change_scene(SCENE_SHOP)
 

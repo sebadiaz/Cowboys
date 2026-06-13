@@ -20,8 +20,11 @@
       verrouillée + difficulté), pastilles de difficulté par ville, bannière
       « À CONQUÉRIR » sur la frontière, noms dé-encombrés (placement anti-collision,
       lignes de rappel, seules les villes pertinentes nommées).
-- [ ] **Commerces** : armurier (armes), pharmacie (soins), magasin général
-      (consommables) — écrans simples au thème `ui_theme`.
+- [x] **Commerces (Lot 13)** : 3 boutiques thématiques enterables depuis la ville
+      — ARMURIER (FORGE : recharge, barillet, cadence), CABINET DU DOC (DOCTEUR :
+      vitalité, tonique d'invulnérabilité), MAGASIN GÉNÉRAL (bottes, crochets,
+      discrétion, sacoches). Catalogue d'upgrades catégorisé + 2 items neufs
+      (cadence de tir, durée d'invuln). Réutilise shop_screen + ui_theme.
 - [ ] **WantedLevelSystem** : la prime (champ `notoriety` déjà dans la save)
       a des effets : chasseurs de primes, prix d'entrée en ville.
 - [ ] **JailSystem** : capture → prison → caution ou évasion courte.

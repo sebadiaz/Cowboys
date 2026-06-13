@@ -23,7 +23,8 @@ func _ready() -> void:
 	col.add_theme_constant_override("separation", 12)
 	margin.add_child(col)
 
-	col.add_child(_title("🛒 BOUTIQUE DU HORS-LA-LOI", 38, Color(0.95, 0.8, 0.35)))
+	col.add_child(_title(_shop_title(), 36, Color(0.95, 0.8, 0.35)))
+	col.add_child(_title(_shop_sub(), 16, Color(0.82, 0.78, 0.6)))
 	_money_label = _title("Magot : %d $" % SaveManager.total_money, 22, Color(0.9, 0.9, 0.6))
 	col.add_child(_money_label)
 
@@ -51,8 +52,28 @@ func _rebuild() -> void:
 	for c in _rows.get_children():
 		c.queue_free()
 	_money_label.text = "Magot : %d $" % SaveManager.total_money
+	var cat := GameManager.shop_category
 	for key in SaveManager.UPGRADE_ORDER:
+		if cat != "" and str(SaveManager.UPGRADE_DEFS[key].get("store", "")) != cat:
+			continue
 		_rows.add_child(_make_row(key))
+
+
+## Titre / sous-titre / sortie selon le commerce (lot 13).
+func _shop_title() -> String:
+	match GameManager.shop_category:
+		"gunsmith": return "🔫 ARMURIER"
+		"pharmacy": return "➕ CABINET DU DOC"
+		"store": return "🛒 MAGASIN GÉNÉRAL"
+		_: return "🛒 BOUTIQUE DU HORS-LA-LOI"
+
+
+func _shop_sub() -> String:
+	match GameManager.shop_category:
+		"gunsmith": return "Armes & munitions — recharge, barillet, cadence"
+		"pharmacy": return "Soins — vitalité, résistance aux balles"
+		"store": return "Équipement — bottes, crochets, discrétion, sacoches"
+		_: return "Tout l'équipement du hors-la-loi"
 
 
 func _make_row(key: String) -> Control:
