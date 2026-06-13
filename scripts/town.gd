@@ -274,18 +274,20 @@ func _build_town() -> void:
 func _add_building(region: Rect2, pos: Vector2, h: float, label: String, tint: Color,
 		flavor: String, foot: Vector2, enter := "") -> void:
 	var foot_rect := Rect2(pos - Vector2(foot.x * 0.5, foot.y * 0.6), foot)
+	# TOUT bâtiment est ENTRABLE (rue et intérieur sur le même plan), banque comprise.
+	var enterable := true
 	_buildings.append({"region": region, "pos": pos, "h": h, "label": label,
-			"tint": tint, "flavor": flavor, "enter": enter, "foot": foot_rect})
-	if enter != "":
-		# Bâtiment ENTRABLE : collision en 3 murs (fond + côtés), FRONT ouvert
-		# (porte) -> on entre depuis la rue sans changer de scène.
+			"tint": tint, "flavor": flavor, "enter": enter, "foot": foot_rect, "enterable": enterable})
+	if enterable:
+		# Collision en 3 murs (fond + côtés), FRONT ouvert (porte) -> on entre
+		# depuis la rue sans changer de scène ni de décor.
 		var t := 16.0
 		var r := foot_rect
 		_foots.append(Rect2(r.position, Vector2(r.size.x, t)))                       # fond
 		_foots.append(Rect2(r.position, Vector2(t, r.size.y)))                       # gauche
 		_foots.append(Rect2(Vector2(r.end.x - t, r.position.y), Vector2(t, r.size.y)))  # droite
 	else:
-		_foots.append(foot_rect)   # bâtiment plein (banque, maison)
+		_foots.append(foot_rect)   # banque pleine
 
 
 func _add_prop(region: Rect2, pos: Vector2, h: float) -> void:
@@ -383,7 +385,7 @@ func _fa(c: Color) -> Color:
 func _occlusion_target(b: Dictionary) -> float:
 	var fr: Rect2 = b["foot"]
 	# ENTRABLE : le joueur est DEDANS -> toit/murs très transparents (on voit l'intérieur).
-	if str(b.get("enter", "")) != "" and fr.has_point(_player_pos):
+	if bool(b.get("enterable", false)) and fr.has_point(_player_pos):
 		return 0.18
 	# Dessiné AVANT le joueur (derrière lui) -> ne peut pas le masquer.
 	if Iso.depth(b["pos"]) - 40.0 <= Iso.depth(_player_pos):
@@ -430,10 +432,11 @@ func _update_interaction() -> void:
 		_interact_was = held_d
 		_update_action_button()
 		return
-	_can_enter = _player_pos.distance_to(BANK_DOOR) < DOOR_RADIUS
+	var in_bank := _inside_bank()
+	_can_enter = in_bank or _player_pos.distance_to(BANK_DOOR) < DOOR_RADIUS
 	if _can_enter:
 		_target_kind = "bank"
-		_near_label = "ENTRER dans la BANQUE"
+		_near_label = "FORCER LE COFFRE (E)" if in_bank else "ENTRER dans la BANQUE"
 		_target_anchor = BANK_DOOR
 	else:
 		var best := TALK_RADIUS
@@ -493,6 +496,14 @@ func _do_action() -> void:
 		"mount": _mount_nearest_horse()
 		"dismount": _dismount_horse()
 		"flavor": _show_toast(_target_flavor)
+
+
+## Vrai si le joueur est dans le footprint de la banque (hall in-map).
+func _inside_bank() -> bool:
+	for b in _buildings:
+		if str(b["label"]) == "★ BANQUE ★":
+			return (b["foot"] as Rect2).has_point(_player_pos)
+	return false
 
 
 ## Bâtiment-commerce dont le footprint contient le joueur (ou null).
@@ -1191,6 +1202,9 @@ func _building_style(label: String) -> Dictionary:
 func _draw_bank(b: Dictionary) -> void:
 	var fr: Rect2 = b["foot"]
 	var U := Vector2(0, -1)
+	# Hall in-map : visible à mesure que le toit devient transparent (on entre).
+	if _fade < 0.92:
+		_draw_interior(b, 1.0 - _fade)
 	# Occlusion : couleurs sources teintées par _fade (transparence du toit/murs).
 	var stone := _fa(Color(0.82, 0.74, 0.57))
 	var side := stone.darkened(0.24)
@@ -1377,35 +1391,98 @@ func _draw_interior(b: Dictionary, vis: float) -> void:
 	var b1 := Iso.project(Vector2(fr.end.x, fr.position.y))
 	var b2 := Iso.project(fr.end)
 	var b3 := Iso.project(Vector2(fr.position.x, fr.end.y))
-	# Sol en planches.
+	var label := str(b["label"])
+	# BANQUE : hall en marbre + comptoir de caisse + grande porte de coffre au fond.
+	if label == "★ BANQUE ★":
+		draw_colored_polygon(PackedVector2Array([b0, b1, b2, b3]), _va(Color(0.78, 0.74, 0.66), vis))
+		for k in range(1, 7):
+			var tt := float(k) / 7.0
+			draw_line(b0.lerp(b1, tt), b3.lerp(b2, tt), _va(Color(0.62, 0.58, 0.5), vis * 0.7), 1.0)
+		# Porte de coffre (cercle doré) au fond.
+		var vault := _bil(b0, b1, b2, b3, 0.5, 0.16) + Vector2(0, -1) * 18.0
+		draw_circle(vault, 22.0, _va(Color(0.45, 0.35, 0.2), vis))
+		draw_circle(vault, 22.0, _va(Color(0.85, 0.68, 0.28), vis), false, 3.0)
+		draw_circle(vault, 9.0, _va(Color(0.9, 0.78, 0.4), vis))
+		for a in range(8):
+			var ang := TAU * a / 8.0
+			draw_line(vault, vault + Vector2.RIGHT.rotated(ang) * 9.0, _va(Color(0.6, 0.45, 0.2), vis), 1.5)
+		# Comptoir de caisse + caissier.
+		var cl := b0.lerp(b3, 0.5)
+		var cr := b1.lerp(b2, 0.5)
+		draw_colored_polygon(PackedVector2Array([cl, cr, cr + Vector2(0, -14), cl + Vector2(0, -14)]),
+				_va(Color(0.40, 0.28, 0.16), vis))
+		if vis > 0.45:
+			var teller := Vector2(fr.get_center().x, fr.position.y + fr.size.y * 0.30)
+			CharacterArt.draw_person(self, Iso.project(teller), Vector2.DOWN, _keeper_palette("bank"),
+					false, false, 0.0, 0.0, 0.0)
+		return
+	# Sol en planches (autres bâtiments).
 	draw_colored_polygon(PackedVector2Array([b0, b1, b2, b3]), _va(Color(0.52, 0.37, 0.22), vis))
 	for k in range(1, 6):
 		var t := float(k) / 6.0
 		draw_line(b0.lerp(b1, t), b3.lerp(b2, t), _va(Color(0.40, 0.28, 0.16), vis * 0.8), 1.0)
-	# Comptoir (bande à ~30-42 % depuis le fond) : face avant + dessus.
-	var fl := b0.lerp(b3, 0.46)
-	var fri := b1.lerp(b2, 0.46)
-	var bl := b0.lerp(b3, 0.32)
-	var br := b1.lerp(b2, 0.32)
-	var ch := 16.0
-	draw_colored_polygon(PackedVector2Array([fl, fri, fri + U * ch, fl + U * ch]), _va(Color(0.34, 0.22, 0.12), vis))
-	draw_colored_polygon(PackedVector2Array([fl + U * ch, fri + U * ch, br + U * ch, bl + U * ch]),
-			_va(Color(0.55, 0.40, 0.24), vis))
-	draw_line(fl + U * ch, fri + U * ch, _va(Color(0.7, 0.55, 0.3), vis), 1.5)
-	# Accents par type de commerce sur le mur du fond (entre b0 et b1, surélevé).
 	var enter := str(b.get("enter", ""))
-	var wall_y := 40.0
-	for j in range(5):
-		var p := b0.lerp(b1, 0.16 + j * 0.17) + U * wall_y
-		match enter:
-			"gunsmith": draw_line(p, p + U * 22.0, _va(Color(0.3, 0.22, 0.14), vis), 3.0)         # râtelier de fusils
-			"pharmacy": draw_circle(p, 4.0, _va([Color(0.5,0.8,0.5),Color(0.8,0.4,0.4),Color(0.5,0.6,0.9)][j % 3], vis))
-			_: draw_rect(Rect2(p - Vector2(7, 7), Vector2(14, 14)), _va(Color(0.5, 0.36, 0.2), vis))  # caisses
-	# Tenancier derrière le comptoir (quand on est bien entré).
-	if vis > 0.45:
+	var service := label in ["FORGE", "DOCTEUR", "MAGASIN", "SALOON", "HÔTEL", "POSTE"]
+	# Comptoir (service uniquement) : face avant + dessus.
+	if service:
+		var fl := b0.lerp(b3, 0.46)
+		var fri := b1.lerp(b2, 0.46)
+		var bl := b0.lerp(b3, 0.32)
+		var br := b1.lerp(b2, 0.32)
+		var ch := 16.0
+		draw_colored_polygon(PackedVector2Array([fl, fri, fri + U * ch, fl + U * ch]), _va(Color(0.34, 0.22, 0.12), vis))
+		draw_colored_polygon(PackedVector2Array([fl + U * ch, fri + U * ch, br + U * ch, bl + U * ch]),
+				_va(Color(0.55, 0.40, 0.24), vis))
+		draw_line(fl + U * ch, fri + U * ch, _va(Color(0.7, 0.55, 0.3), vis), 1.5)
+	# Mobilier / accents selon le bâtiment.
+	match label:
+		"FORGE":
+			for j in range(5):
+				var p := b0.lerp(b1, 0.16 + j * 0.17) + U * 40.0
+				draw_line(p, p + U * 22.0, _va(Color(0.3, 0.22, 0.14), vis), 3.0)   # râteliers de fusils
+		"DOCTEUR":
+			for j in range(5):
+				var p := b0.lerp(b1, 0.16 + j * 0.17) + U * 40.0
+				draw_circle(p, 4.0, _va([Color(0.5,0.8,0.5),Color(0.8,0.4,0.4),Color(0.5,0.6,0.9)][j % 3], vis))
+		"SALOON":
+			for uv in [Vector2(0.32, 0.72), Vector2(0.7, 0.74)]:
+				var c := _bil(b0, b1, b2, b3, uv.x, uv.y)
+				draw_colored_polygon(_ellipse(c, 14.0, 7.0), _va(Color(0.42, 0.28, 0.16), vis))   # tables rondes
+				draw_circle(c + U * 4.0, 10.0, _va(Color(0.5, 0.34, 0.2), vis))
+			for j in range(4):
+				draw_circle(b0.lerp(b1, 0.2 + j * 0.18) + U * 44.0, 3.5, _va(Color(0.7, 0.6, 0.3), vis))  # bouteilles
+		"ÉGLISE":
+			for r in range(3):
+				var v := 0.5 + r * 0.16
+				draw_line(_bil(b0, b1, b2, b3, 0.2, v), _bil(b0, b1, b2, b3, 0.8, v), _va(Color(0.45, 0.32, 0.2), vis), 5.0)  # bancs
+			var cr := _bil(b0, b1, b2, b3, 0.5, 0.12) + U * 36.0
+			draw_line(cr, cr + U * 18.0, _va(Color(0.7, 0.6, 0.4), vis), 3.0)
+			draw_line(cr + U * 12.0 + Vector2(-6, 0), cr + U * 12.0 + Vector2(6, 0), _va(Color(0.7, 0.6, 0.4), vis), 3.0)
+		"SHÉRIF":
+			var desk := _bil(b0, b1, b2, b3, 0.5, 0.4)
+			draw_colored_polygon(PackedVector2Array([desk + Vector2(-22, 0), desk + Vector2(22, 0),
+					desk + Vector2(22, 0) + U * 12.0, desk + Vector2(-22, 0) + U * 12.0]), _va(Color(0.36, 0.24, 0.14), vis))
+			for j in range(4):  # barreaux de cellule à gauche
+				var bx := _bil(b0, b1, b2, b3, 0.14, 0.35 + j * 0.14)
+				draw_line(bx, bx + U * 30.0, _va(Color(0.5, 0.5, 0.55), vis), 2.5)
+		"ÉCURIE":
+			for uv in [Vector2(0.3, 0.6), Vector2(0.68, 0.66)]:
+				var hay := _bil(b0, b1, b2, b3, uv.x, uv.y)
+				draw_rect(Rect2(hay - Vector2(12, 10), Vector2(24, 14)), _va(Color(0.82, 0.7, 0.3), vis))   # bottes de foin
+		_:
+			for j in range(4):
+				var p := b0.lerp(b1, 0.2 + j * 0.2) + U * 40.0
+				draw_rect(Rect2(p - Vector2(7, 7), Vector2(14, 14)), _va(Color(0.5, 0.36, 0.2), vis))   # caisses/étagères
+	# Tenancier derrière le comptoir (commerces & lieux de service).
+	if service and vis > 0.45:
 		var keeper := Vector2(fr.get_center().x, fr.position.y + fr.size.y * 0.22)
 		CharacterArt.draw_person(self, Iso.project(keeper), Vector2.DOWN, _keeper_palette(enter),
 				false, false, 0.0, 0.0, 0.0)
+
+
+## Point sur le sol du footprint en coordonnées (u = largeur, v = profondeur).
+func _bil(b0: Vector2, b1: Vector2, b2: Vector2, b3: Vector2, u: float, v: float) -> Vector2:
+	return b0.lerp(b1, u).lerp(b3.lerp(b2, u), v)
 
 
 func _va(c: Color, vis: float) -> Color:
@@ -1435,7 +1512,7 @@ func _draw_building(b: Dictionary) -> void:
 	var fr: Rect2 = b["foot"]
 	# Intérieur in-map : dessiné AVANT les murs ; il apparaît à mesure que le toit
 	# devient transparent (alpha = 1 - opacité du bâtiment).
-	if str(b.get("enter", "")) != "" and _fade < 0.92:
+	if bool(b.get("enterable", false)) and _fade < 0.92:
 		_draw_interior(b, 1.0 - _fade)
 	var s := _building_style(str(b["label"]))
 	# Occlusion : on fade les couleurs sources ; tout ce qui en dérive (darkened/
