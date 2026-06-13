@@ -51,9 +51,15 @@ saloon. Missions **courtes (2–5 min)**, rejouables, lisibles. Construit par
   passe en alpha ~0.3, fondu lissé, valable aux 8 rotations. Voir
   `_occlusion_target()` + `_fade`/`_fa()`. Réutilisable pour tout bâtiment posé
   sur la carte.
-- État actuel : la mission banque est encore une scène dédiée (`MissionRoot`).
-  Acceptable en V1 ; la migration de la mission vers un intérieur in-map (avec
-  cette transparence) reste un **lot dédié** (ne pas la faire en douce).
+- **FAIT (commerces in-map)** : les 3 commerces (FORGE=armurier, DOCTEUR=pharmacie,
+  MAGASIN=magasin) sont sur le MÊME PLAN que la rue — collision en 3 murs (front
+  ouvert), on entre par la porte, le toit passe en alpha ~0.18 (footprint), un
+  intérieur est dessiné (sol bois, comptoir, tenancier, accents métier) et une
+  **carte d'achat NON-MODALE** s'ouvre seule à droite (ville visible derrière, pas
+  de changement de scène) puis se ferme quand on ressort. Voir `_draw_interior`,
+  `_update_commerce_card`, `_building_inside`.
+- État actuel : la mission banque reste une scène dédiée (`MissionRoot`) — c'est le
+  braquage, pas un commerce. Le saloon reste aussi une scène à part pour l'instant.
 
 ## 5. Règle cheval / train / diligence (poursuites)
 

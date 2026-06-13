@@ -40,6 +40,11 @@ var _target_flavor := ""
 var _target_anchor := Vector2.ZERO   # point MONDE où afficher le logo d'action
 var _interact_was := false
 var _action_btn: Button
+var _shopping := false                # boutique ouverte EN OVERLAY (lot intérieurs)
+var _shop_layer: CanvasLayer
+var _shop_cat := ""
+var _shop_rows: VBoxContainer
+var _shop_money: Label
 var _horses: Array[Vector2] = []     # chevaux attachés (décor solide + à monter)
 var _horse_ctrl := HorseController.new()   # monture du joueur (lot 16)
 var _ride_walk := 0.0                # phase de galop (balancement du cavalier)
@@ -271,7 +276,16 @@ func _add_building(region: Rect2, pos: Vector2, h: float, label: String, tint: C
 	var foot_rect := Rect2(pos - Vector2(foot.x * 0.5, foot.y * 0.6), foot)
 	_buildings.append({"region": region, "pos": pos, "h": h, "label": label,
 			"tint": tint, "flavor": flavor, "enter": enter, "foot": foot_rect})
-	_foots.append(foot_rect)
+	if enter != "":
+		# Bâtiment ENTRABLE : collision en 3 murs (fond + côtés), FRONT ouvert
+		# (porte) -> on entre depuis la rue sans changer de scène.
+		var t := 16.0
+		var r := foot_rect
+		_foots.append(Rect2(r.position, Vector2(r.size.x, t)))                       # fond
+		_foots.append(Rect2(r.position, Vector2(t, r.size.y)))                       # gauche
+		_foots.append(Rect2(Vector2(r.end.x - t, r.position.y), Vector2(t, r.size.y)))  # droite
+	else:
+		_foots.append(foot_rect)   # bâtiment plein (banque, maison)
 
 
 func _add_prop(region: Rect2, pos: Vector2, h: float) -> void:
@@ -306,6 +320,7 @@ func _process(delta: float) -> void:
 	# Le déplacement du joueur (collision moteur) est dans _physics_process.
 	if not _entered:
 		_update_interaction()
+		_update_commerce_card()
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
 	# Chasseurs de primes (lot 14) : traque active si la prime est haute.
@@ -366,10 +381,13 @@ func _fa(c: Color) -> Color:
 ## à l'écran tout en étant dessiné par-dessus lui (donc en train de le masquer).
 ## Fonctionne à toutes les rotations (project/depth intègrent déjà le yaw).
 func _occlusion_target(b: Dictionary) -> float:
+	var fr: Rect2 = b["foot"]
+	# ENTRABLE : le joueur est DEDANS -> toit/murs très transparents (on voit l'intérieur).
+	if str(b.get("enter", "")) != "" and fr.has_point(_player_pos):
+		return 0.18
 	# Dessiné AVANT le joueur (derrière lui) -> ne peut pas le masquer.
 	if Iso.depth(b["pos"]) - 40.0 <= Iso.depth(_player_pos):
 		return 1.0
-	var fr: Rect2 = b["foot"]
 	var ps := Iso.project(_player_pos)
 	var corners := [Iso.project(fr.position), Iso.project(Vector2(fr.end.x, fr.position.y)),
 			Iso.project(fr.end), Iso.project(Vector2(fr.position.x, fr.end.y))]
@@ -430,16 +448,21 @@ func _update_interaction() -> void:
 				_target_npc = n
 				_near_label = "Parler à %s" % n["name"]
 				_target_anchor = n["pos"]
-		# Commerces : entrer (saloon) ou observer (texte d'ambiance).
+		# Commerces : SALOON s'entre (scène) ; les boutiques (gunsmith/pharmacy/store)
+		# s'explorent au même plan -> pas de prompt E, la carte d'achat s'ouvre seule
+		# quand on est dedans. Les bâtiments d'ambiance affichent leur texte.
 		for b in _buildings:
-			if b["flavor"] == "" and b["enter"] == "":
+			var en := str(b["enter"])
+			if en in ["gunsmith", "pharmacy", "store"]:
+				continue
+			if b["flavor"] == "" and en == "":
 				continue
 			var d := _player_pos.distance_to(b["pos"] + Vector2(0, 60))
 			if d < best:
 				best = d
 				_target_anchor = b["pos"] + Vector2(0, 60)
-				if b["enter"] != "":
-					_target_kind = b["enter"]   # "saloon" | "shop"
+				if en != "":
+					_target_kind = en   # "saloon"
 					_near_label = "Entrer au %s" % b["label"]
 				else:
 					_target_kind = "flavor"
@@ -466,13 +489,142 @@ func _do_action() -> void:
 	match _target_kind:
 		"bank": _enter_bank()
 		"saloon": GameManager.goto_saloon()
-		"shop", "store": GameManager.goto_commerce("store", _player_pos)
-		"gunsmith": GameManager.goto_commerce("gunsmith", _player_pos)
-		"pharmacy": GameManager.goto_commerce("pharmacy", _player_pos)
 		"npc": _talk(_target_npc)
 		"mount": _mount_nearest_horse()
 		"dismount": _dismount_horse()
 		"flavor": _show_toast(_target_flavor)
+
+
+## Bâtiment-commerce dont le footprint contient le joueur (ou null).
+func _building_inside() -> Variant:
+	for b in _buildings:
+		if str(b.get("enter", "")) in ["gunsmith", "pharmacy", "store"] \
+				and (b["foot"] as Rect2).has_point(_player_pos):
+			return b
+	return null
+
+
+## Carte d'achat NON-MODALE : s'ouvre seule quand on entre dans un commerce,
+## se ferme quand on en sort. La ville reste visible (pas de fond noir, pas de
+## changement de scène) -> rue et intérieurs sur le même plan.
+func _update_commerce_card() -> void:
+	var inside = _building_inside()
+	var cat := ""
+	if inside != null:
+		cat = str(inside["enter"])
+	if cat == "":
+		if _shop_layer != null:
+			_close_commerce()
+		return
+	if _shop_layer == null or _shop_cat != cat:
+		_shop_cat = cat
+		_build_commerce_card()
+
+
+func _close_commerce() -> void:
+	_shopping = false
+	_shop_cat = ""
+	if _shop_layer != null:
+		_shop_layer.queue_free()
+		_shop_layer = null
+
+
+func _build_commerce_card() -> void:
+	if _shop_layer != null:
+		_shop_layer.queue_free()
+	_shopping = true
+	_shop_layer = CanvasLayer.new()
+	_shop_layer.layer = 4
+	add_child(_shop_layer)
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE   # NON-MODAL : la ville reste cliquable
+	root.theme = UiTheme.build()
+	_shop_layer.add_child(root)
+	# Petite carte ancrée à droite (la ville reste visible derrière).
+	var panel := UiTheme.panel()
+	panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	panel.position = Vector2(-372, 0)
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	root.add_child(panel)
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(330, 0)
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var titles := {"gunsmith": "🔫 ARMURIER", "pharmacy": "➕ CABINET DU DOC", "store": "🛒 MAGASIN GÉNÉRAL"}
+	box.add_child(UiTheme.title(str(titles.get(_shop_cat, "BOUTIQUE")), 24))
+	_shop_money = UiTheme.title("Magot : %d $" % SaveManager.total_money, 16, Color(0.9, 0.9, 0.6))
+	box.add_child(_shop_money)
+	_shop_rows = VBoxContainer.new()
+	_shop_rows.add_theme_constant_override("separation", 6)
+	box.add_child(_shop_rows)
+	_fill_commerce_rows()
+	var hint := UiTheme.title("Éloigne-toi pour ressortir", 13, Color(0.78, 0.74, 0.6))
+	box.add_child(hint)
+	AudioManager.play("click")
+
+
+func _fill_commerce_rows() -> void:
+	for c in _shop_rows.get_children():
+		c.queue_free()
+	_shop_money.text = "Magot : %d $" % SaveManager.total_money
+	for key in SaveManager.UPGRADE_ORDER:
+		if str(SaveManager.UPGRADE_DEFS[key].get("store", "")) != _shop_cat:
+			continue
+		_shop_rows.add_child(_commerce_row(key))
+
+
+func _commerce_row(key: String) -> Control:
+	var def: Dictionary = SaveManager.UPGRADE_DEFS[key]
+	var lvl := SaveManager.get_level(key)
+	var maxl := SaveManager.max_level(key)
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.14, 0.09, 0.06, 0.92)
+	sb.set_corner_radius_all(8)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0.5, 0.8, 0.4) if SaveManager.can_buy(key) else Color(0.5, 0.38, 0.22)
+	sb.set_content_margin_all(9)
+	panel.add_theme_stylebox_override("panel", sb)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	panel.add_child(row)
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(info)
+	var dots := ""
+	for i in range(maxl):
+		dots += "●" if i < lvl else "○"
+	info.add_child(_ui_lbl("%s  %s" % [str(def["name"]), dots], 16, Color(1, 1, 1)))
+	var desc := _ui_lbl(str(def["desc"]), 12, Color(0.82, 0.78, 0.68))
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.custom_minimum_size = Vector2(150, 0)
+	info.add_child(desc)
+	var buy := Button.new()
+	buy.custom_minimum_size = Vector2(96, 48)
+	var cost := SaveManager.next_cost(key)
+	if cost < 0:
+		buy.text = "MAX"
+		buy.disabled = true
+	else:
+		buy.text = "Acheter\n%d $" % cost
+		buy.disabled = not SaveManager.can_buy(key)
+		buy.pressed.connect(func() -> void:
+			if SaveManager.buy(key):
+				AudioManager.play("pickup")
+			_fill_commerce_rows())
+	row.add_child(buy)
+	return panel
+
+
+func _ui_lbl(text: String, fs: int, col: Color) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", fs)
+	l.add_theme_color_override("font_color", col)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
 
 
 ## Monte sur le cheval attaché le plus proche (il quitte le râtelier).
@@ -1216,11 +1368,75 @@ func _bank_win(L: Vector2, R: Vector2, ax: Vector2, U: Vector2, u: float, half: 
 
 ## Bâtiment style "Almería" : murs plâtre/bois, étage + galerie sur poteaux,
 ## volets colorés, parapet, enseigne. Base = empreinte de collision exacte.
+## Intérieur visible in-map (sol bois + comptoir + tenancier + accents métier).
+## `vis` = 0..1 : visibilité (1 = on est dedans, toit transparent).
+func _draw_interior(b: Dictionary, vis: float) -> void:
+	var fr: Rect2 = b["foot"]
+	var U := Vector2(0, -1)
+	var b0 := Iso.project(fr.position)
+	var b1 := Iso.project(Vector2(fr.end.x, fr.position.y))
+	var b2 := Iso.project(fr.end)
+	var b3 := Iso.project(Vector2(fr.position.x, fr.end.y))
+	# Sol en planches.
+	draw_colored_polygon(PackedVector2Array([b0, b1, b2, b3]), _va(Color(0.52, 0.37, 0.22), vis))
+	for k in range(1, 6):
+		var t := float(k) / 6.0
+		draw_line(b0.lerp(b1, t), b3.lerp(b2, t), _va(Color(0.40, 0.28, 0.16), vis * 0.8), 1.0)
+	# Comptoir (bande à ~30-42 % depuis le fond) : face avant + dessus.
+	var fl := b0.lerp(b3, 0.46)
+	var fri := b1.lerp(b2, 0.46)
+	var bl := b0.lerp(b3, 0.32)
+	var br := b1.lerp(b2, 0.32)
+	var ch := 16.0
+	draw_colored_polygon(PackedVector2Array([fl, fri, fri + U * ch, fl + U * ch]), _va(Color(0.34, 0.22, 0.12), vis))
+	draw_colored_polygon(PackedVector2Array([fl + U * ch, fri + U * ch, br + U * ch, bl + U * ch]),
+			_va(Color(0.55, 0.40, 0.24), vis))
+	draw_line(fl + U * ch, fri + U * ch, _va(Color(0.7, 0.55, 0.3), vis), 1.5)
+	# Accents par type de commerce sur le mur du fond (entre b0 et b1, surélevé).
+	var enter := str(b.get("enter", ""))
+	var wall_y := 40.0
+	for j in range(5):
+		var p := b0.lerp(b1, 0.16 + j * 0.17) + U * wall_y
+		match enter:
+			"gunsmith": draw_line(p, p + U * 22.0, _va(Color(0.3, 0.22, 0.14), vis), 3.0)         # râtelier de fusils
+			"pharmacy": draw_circle(p, 4.0, _va([Color(0.5,0.8,0.5),Color(0.8,0.4,0.4),Color(0.5,0.6,0.9)][j % 3], vis))
+			_: draw_rect(Rect2(p - Vector2(7, 7), Vector2(14, 14)), _va(Color(0.5, 0.36, 0.2), vis))  # caisses
+	# Tenancier derrière le comptoir (quand on est bien entré).
+	if vis > 0.45:
+		var keeper := Vector2(fr.get_center().x, fr.position.y + fr.size.y * 0.22)
+		CharacterArt.draw_person(self, Iso.project(keeper), Vector2.DOWN, _keeper_palette(enter),
+				false, false, 0.0, 0.0, 0.0)
+
+
+func _va(c: Color, vis: float) -> Color:
+	return Color(c.r, c.g, c.b, c.a * clampf(vis, 0.0, 1.0))
+
+
+func _keeper_palette(enter: String) -> Dictionary:
+	var coat := Color(0.4, 0.3, 0.2)
+	match enter:
+		"gunsmith": coat = Color(0.35, 0.3, 0.28)
+		"pharmacy": coat = Color(0.85, 0.85, 0.8)
+		"store": coat = Color(0.4, 0.45, 0.3)
+	return {
+		"hat": coat.darkened(0.2), "hat_band": Color(0.4, 0.25, 0.15),
+		"coat": coat, "coat_dark": coat.darkened(0.25),
+		"shirt": Color(0.8, 0.75, 0.6), "pants": Color(0.3, 0.26, 0.2),
+		"skin": Color(0.88, 0.68, 0.5), "bandana": Color(0.7, 0.5, 0.3),
+		"belt": Color(0.2, 0.14, 0.09), "buckle": Color(0.85, 0.75, 0.4),
+		"boots": Color(0.25, 0.17, 0.1), "hair": Color(0.2, 0.14, 0.09),
+	}
+
+
 func _draw_building(b: Dictionary) -> void:
 	if str(b["label"]) == "★ BANQUE ★":
 		_draw_bank(b)
 		return
 	var fr: Rect2 = b["foot"]
+	# Intérieur in-map : dessiné AVANT les murs ; il apparaît à mesure que le toit
+	# devient transparent (alpha = 1 - opacité du bâtiment).
+	if str(b.get("enter", "")) != "" and _fade < 0.92:
+		_draw_interior(b, 1.0 - _fade)
 	var s := _building_style(str(b["label"]))
 	# Occlusion : on fade les couleurs sources ; tout ce qui en dérive (darkened/
 	# lightened) hérite de l'alpha, donc le bâtiment devient transparent d'un coup.

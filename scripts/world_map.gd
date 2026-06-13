@@ -6,7 +6,7 @@ extends Control
 ## séquentiel. UI construite en code (desktop + mobile tactile).
 
 const MARGIN := Vector2(0.055, 0.165)    # marges normalisées autour de la zone carte
-const TAP := Vector2(48.0, 48.0)         # cible tactile par ville
+const TAP := Vector2(74.0, 74.0)         # cible tactile par ville (grosse = mobile-friendly)
 
 var _t := 0.0
 var _btns: Array[Dictionary] = []        # { "idx", "btn" }
@@ -183,23 +183,29 @@ func _marker(idx: int) -> void:
 	var done := idx < SaveManager.towns_unlocked
 	var frontier := idx == SaveManager.towns_unlocked
 	var col: Color
-	var rad := 11.0
+	var rad := 16.0
 	if done:
 		col = Color(0.28, 0.55, 0.28)
 	elif frontier:
 		col = Color(0.95, 0.78, 0.28)
-		rad = 12.0 + sin(_t * 4.0) * 2.0
+		rad = 19.0 + sin(_t * 4.0) * 3.0
 		# Halo pulsé "tu es ici / à conquérir".
-		draw_circle(c, rad + 9.0, Color(1.0, 0.85, 0.35, 0.18))
+		draw_circle(c, rad + 12.0, Color(1.0, 0.85, 0.35, 0.18))
 	elif unlocked:
 		col = Color(0.70, 0.45, 0.22)
 	else:
 		col = Color(0.46, 0.44, 0.42)
-		rad = 8.0
-	draw_circle(c + Vector2(1, 2), rad, Color(0, 0, 0, 0.20))     # ombre
+		rad = 13.0
+	draw_circle(c + Vector2(2, 3), rad, Color(0, 0, 0, 0.22))     # ombre
 	draw_circle(c, rad, col)
-	draw_arc(c, rad, 0, TAU, 20, col.darkened(0.35), 2.0)
-	draw_circle(c, rad * 0.45, Color(1, 1, 1, 0.85))
+	draw_arc(c, rad, 0, TAU, 24, col.darkened(0.35), 3.0)
+	draw_circle(c, rad * 0.42, Color(1, 1, 1, 0.9))
+	# Petit toit/bâtiment dessiné sur le marqueur (ville reconnaissable).
+	if unlocked:
+		var rf := rad * 0.6
+		draw_colored_polygon(PackedVector2Array([
+			c + Vector2(-rf, -rf * 0.1), c + Vector2(0, -rf * 0.9), c + Vector2(rf, -rf * 0.1)]),
+			col.darkened(0.45))
 	if done:
 		# Petit check.
 		draw_line(c + Vector2(-4, 0), c + Vector2(-1, 4), Color(0.15, 0.35, 0.15), 2.0)
