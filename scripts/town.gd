@@ -19,15 +19,16 @@ const R_BARREL := Rect2(40, 800, 120, 130)
 const R_SIGN := Rect2(360, 800, 120, 160)
 
 const SPEED := 250.0
-const FLOOR := Rect2(0, 0, 2200, 1760)
-const BANK_DOOR := Vector2(1100, 430)
+const FLOOR := Rect2(0, 0, 4350, 1500)
+const TOWN_CENTER := Vector2(2170, 1150)   # la rue : les portes s'ouvrent vers elle (vers le bas)
+const BANK_DOOR := Vector2(2170, 815)
 const DOOR_RADIUS := 95.0
 const PLAYER_RADIUS := 15.0
 const TALK_RADIUS := 95.0
-const WELL := Vector2(1100, 980)
+const WELL := Vector2(2170, 1330)
 const TOWN_RETURN_MAGASIN := Vector2(760, 1360)   # réapparition devant le Magasin
 
-var _player_pos := Vector2(1100, 1620)
+var _player_pos := Vector2(2170, 1130)
 var _facing := Vector2.UP
 var _walk := 0.0
 var _entered := false
@@ -69,10 +70,10 @@ var _yaw_target := 0.0      # angle de vue visé (la vue s'y rend en douceur)
 var _toast: Label
 var _rng := RandomNumberGenerator.new()
 
-# Diligence qui traverse la grande rue (ambiance).
-const COACH_A := Vector2(1010, 120)
-const COACH_B := Vector2(1010, 1720)
-const COACH_SPEED := 135.0
+# Diligence qui remonte la grand-rue (ambiance).
+const COACH_A := Vector2(-150, 1250)
+const COACH_B := Vector2(4500, 1250)
+const COACH_SPEED := 200.0
 var _coach_pos := COACH_A
 var _coach_wait := 2.5
 var _dust_t := 0.0
@@ -197,97 +198,113 @@ func _physics_process(delta: float) -> void:
 # --- Construction du village ---
 
 func _build_town() -> void:
-	# Bâtiment cible, au fond de la grand-rue.
-	_add_building(R_BANK, Vector2(1100, 230), 250.0, "★ BANQUE ★", Color(1, 1, 1),
-			"", Vector2(256, 168))
-	# Côté ouest de la rue (x ~ 760). Le SALOON est ENTRABLE.
-	_add_building(R_SALOON, Vector2(760, 560), 210.0, "SALOON", Color(1.0, 0.92, 0.9),
-			"Saloon Le Cactus — pousse les portes battantes.", Vector2(180, 120), "saloon")
-	_add_building(R_HOUSE, Vector2(760, 900), 195.0, "HÔTEL", Color(0.92, 0.96, 1.0),
-			"Hôtel de la Frontière — chambres à l'étage, 2 $ la nuit.", Vector2(180, 120))
-	_add_building(R_SHED, Vector2(760, 1240), 185.0, "MAGASIN", Color(1.0, 0.96, 0.85),
-			"Magasin général — bottes, crochets, sacoches.", Vector2(170, 115), "store")
-	_add_building(R_HOUSE, Vector2(760, 1560), 190.0, "ÉGLISE", Color(0.95, 0.95, 1.0),
-			"Petite église en bois — une prière avant le casse ?", Vector2(170, 115))
-	# Côté est de la rue (x ~ 1440).
-	_add_building(R_HOUSE, Vector2(1440, 560), 195.0, "SHÉRIF", Color(0.85, 0.9, 1.0),
-			"Bureau du shérif — mieux vaut filer avant qu'il ne rentre.", Vector2(180, 120))
-	_add_building(R_SHED, Vector2(1440, 900), 185.0, "ÉCURIE", Color(0.95, 0.88, 0.78),
-			"Écurie — ton cheval est sellé, prêt pour la fuite.", Vector2(170, 115))
-	_add_building(R_SALOON, Vector2(1440, 1240), 205.0, "POSTE", Color(0.9, 1.0, 0.9),
-			"Poste & télégraphe — « STOP braquage en cours STOP ».", Vector2(180, 120))
-	_add_building(R_SHED, Vector2(1440, 1560), 185.0, "FORGE", Color(1.0, 0.9, 0.8),
-			"Armurier & forge — recharge, barillet, cadence.", Vector2(170, 115), "gunsmith")
-	# Ruelle est (au-delà de la place).
-	_add_building(R_HOUSE, Vector2(1820, 1020), 190.0, "DOCTEUR", Color(0.9, 1.0, 0.95),
-			"Cabinet du Doc — vitalité, tonique anti-balles.", Vector2(170, 115), "pharmacy")
-	_add_building(R_SHED, Vector2(360, 1020), 185.0, "MAISON", Color(0.95, 0.92, 0.85),
-			"Maison de ville — volets clos.", Vector2(170, 115))
+	# GRAND-RUE : une rangée de GROS bâtiments alignés en haut (y≈680), tous
+	# tournés vers la rue (en bas). On longe la rue et on entre par la porte.
+	# [region, label, bigger-foot, flavor, enter]
+	var row := [
+		[R_SHED,   "MAISON",     Vector2(210, 175), "Maison de ville — volets clos.", ""],
+		[R_HOUSE,  "ÉGLISE",     Vector2(210, 175), "Église en bois — une prière avant le casse ?", ""],
+		[R_HOUSE,  "HÔTEL",      Vector2(220, 180), "Hôtel de la Frontière — 2 $ la nuit.", ""],
+		[R_SALOON, "SALOON",     Vector2(230, 185), "Saloon Le Cactus — entre boire un coup.", ""],
+		[R_SHED,   "MAGASIN",    Vector2(220, 180), "Magasin général — bottes, crochets, sacoches.", "store"],
+		[R_BANK,   "★ BANQUE ★", Vector2(270, 205), "", ""],
+		[R_HOUSE,  "SHÉRIF",     Vector2(220, 180), "Bureau du shérif — file avant qu'il ne rentre.", ""],
+		[R_SHED,   "FORGE",      Vector2(220, 180), "Armurier & forge — recharge, barillet, cadence.", "gunsmith"],
+		[R_SHED,   "ÉCURIE",     Vector2(220, 180), "Écurie — ton cheval, prêt pour la fuite.", ""],
+		[R_SALOON, "POSTE",      Vector2(220, 180), "Poste & télégraphe — « STOP braquage STOP ».", ""],
+		[R_HOUSE,  "DOCTEUR",    Vector2(220, 180), "Cabinet du Doc — vitalité, tonique anti-balles.", "pharmacy"],
+	]
+	var x0 := 420.0
+	var dx := 350.0
+	var ry := 680.0
+	var tints := [Color(0.95,0.92,0.85), Color(0.95,0.95,1.0), Color(0.92,0.96,1.0),
+		Color(1.0,0.92,0.9), Color(1.0,0.96,0.85), Color(1,1,1), Color(0.85,0.9,1.0),
+		Color(1.0,0.9,0.8), Color(0.95,0.88,0.78), Color(0.9,1.0,0.9), Color(0.9,1.0,0.95)]
+	var ecurie_x := x0
+	for i in range(row.size()):
+		var e: Array = row[i]
+		var px := x0 + i * dx
+		_add_building(e[0], Vector2(px, ry), 200.0, e[1], tints[i], e[3], e[2], e[4])
+		if e[1] == "ÉCURIE":
+			ecurie_x = px
 
-	# Mobilier de rue (décor, sans collision).
-	_add_prop(R_WAGON, Vector2(940, 760), 150.0)
-	_add_prop(R_WAGON, Vector2(1280, 1360), 150.0)
-	_add_prop(R_SIGN, Vector2(1100, 640), 100.0)
-	_add_prop(R_BARREL, Vector2(960, 480), 78.0)
-	_add_prop(R_BARREL, Vector2(1240, 520), 78.0)
-	_add_prop(R_BARREL, Vector2(960, 1180), 78.0)
-	_add_prop(R_BARREL, Vector2(1250, 1120), 78.0)
-	for c in [Vector2(180, 560), Vector2(2020, 700), Vector2(160, 1480),
-			Vector2(2040, 1500), Vector2(120, 900), Vector2(2080, 1100)]:
+	# Mobilier de rue (devant les bâtiments, sur la grand-rue y≈1050-1300).
+	_add_prop(R_SIGN, Vector2(x0 + 5 * dx, 1000.0), 100.0)   # panneau devant la banque
+	for i in range(row.size()):
+		var px := x0 + i * dx
+		if i % 2 == 0:
+			_add_prop(R_BARREL, Vector2(px - 90.0, 1010.0), 78.0)
+		else:
+			_add_prop(R_WAGON, Vector2(px + 40.0, 1120.0), 150.0)
+	for c in [Vector2(180, 1380), Vector2(4150, 1360), Vector2(180, 380),
+			Vector2(4150, 420), Vector2(2170, 1420)]:
 		_add_prop(R_CACTUS, c, 130.0)
 
-	# Habitants : cowboys aux palettes variées, chacun a quelques répliques.
-	_add_npc(Vector2(980, 1080), Vector2(1, 0.2), Color(0.30, 0.45, 0.55), Color(0.85, 0.8, 0.7),
-			"Vieux Hank", ["La banque ? Personne n'a jamais réussi à la braquer...",
-			"Le shérif a la gâchette facile, méfie-toi.",
-			"De mon temps, l'or coulait à flots dans cette ville."])
-	_add_npc(Vector2(1230, 880), Vector2(-1, 0.2), Color(0.45, 0.30, 0.45), Color(0.9, 0.85, 0.5),
-			"Rosita", ["Tu as l'air d'un homme à histoires, étranger.",
-			"Le coffre de la banque ? On dit qu'il faut un moment pour l'ouvrir."])
-	_add_npc(Vector2(1100, 1180), Vector2(0, 1), Color(0.25, 0.35, 0.25), Color(0.8, 0.7, 0.55),
-			"Petit Joe", ["Wow, t'as vu son flingue ?!", "Un jour je serai un hors-la-loi, moi aussi !"])
-	_add_npc(Vector2(1180, 700), Vector2(-0.4, 1), Color(0.5, 0.4, 0.2), Color(0.95, 0.7, 0.2),
-			"Marshal à la retraite", ["Range ce six-coups avant de t'attirer des ennuis.",
-			"J'ai accroché mon étoile. La ville se débrouillera."])
-	_add_npc(Vector2(1000, 1380), Vector2(1, -0.3), Color(0.5, 0.2, 0.2), Color(0.8, 0.75, 0.7),
-			"Veuve Carson", ["Les temps sont durs depuis la fermeture de la mine.",
-			"Garde tes distances, jeune homme."])
-	_add_npc(Vector2(1300, 1480), Vector2(-1, -0.2), Color(0.2, 0.3, 0.5), Color(0.9, 0.9, 0.8),
-			"Doc Whitman", ["Si tu te prends une balle, tu sais où me trouver.",
-			"Le whisky soigne tout, ou presque."])
-	_add_npc(Vector2(1700, 1080), Vector2(-1, 0.1), Color(0.4, 0.45, 0.3), Color(0.85, 0.6, 0.4),
-			"Palefrenier", ["Ton cheval est sellé à l'écurie, prêt pour la fuite.",
-			"File vite après le coup, ils lanceront une battue."])
-	_add_npc(Vector2(520, 1080), Vector2(1, 0.1), Color(0.35, 0.3, 0.45), Color(0.9, 0.8, 0.6),
-			"Prêcheur", ["Repens-toi, pécheur, avant qu'il ne soit trop tard !",
-			"Que le Seigneur ait pitié de ton âme... et de ton butin."])
+	# Habitants sur la grand-rue.
+	var names := [
+		["Vieux Hank", ["La banque ? Personne ne l'a jamais braquée...", "Le shérif a la gâchette facile."]],
+		["Rosita", ["Tu as l'air d'un homme à histoires, étranger.", "Le coffre prend un moment à ouvrir."]],
+		["Petit Joe", ["Wow, t'as vu son flingue ?!", "Un jour je serai un hors-la-loi !"]],
+		["Veuve Carson", ["Les temps sont durs depuis la mine.", "Garde tes distances, jeune homme."]],
+		["Palefrenier", ["Ton cheval est à l'écurie, prêt à filer.", "File vite, ils lanceront une battue."]],
+		["Prêcheur", ["Repens-toi, pécheur !", "Que le Seigneur ait pitié de ton butin."]],
+	]
+	for i in range(names.size()):
+		var nx := x0 + 60.0 + i * (dx * 1.7)
+		_add_npc(Vector2(nx, 1120.0 + (i % 3) * 80.0), Vector2(1, 0.2).rotated(i),
+				Color(0.3 + 0.1 * (i % 3), 0.4, 0.4 + 0.1 * (i % 2)), Color(0.9, 0.8, 0.6),
+				names[i][0], names[i][1])
 
-	# Puits central (collision).
+	# Puits (collision) un peu à l'écart pour ne pas gêner la rue.
 	_foots.append(Rect2(WELL - Vector2(40, 36), Vector2(80, 72)))
 
-	# Chevaux attachés devant l'ÉCURIE (décor solide + on peut les caresser).
-	for hp in [Vector2(1360, 1030), Vector2(1440, 1040), Vector2(1520, 1030)]:
+	# Chevaux attachés devant l'ÉCURIE.
+	for k in range(3):
+		var hp := Vector2(ecurie_x - 80.0 + k * 80.0, 1000.0)
 		_horses.append(hp)
 		_foots.append(Rect2(hp - Vector2(17, 12), Vector2(34, 24)))
 
 
 func _add_building(region: Rect2, pos: Vector2, h: float, label: String, tint: Color,
 		flavor: String, foot: Vector2, enter := "") -> void:
+	# Bâtiments AGRANDIS (on doit pouvoir marcher dedans confortablement).
+	foot = foot * 1.35
 	var foot_rect := Rect2(pos - Vector2(foot.x * 0.5, foot.y * 0.6), foot)
-	# TOUT bâtiment est ENTRABLE (rue et intérieur sur le même plan), banque comprise.
-	var enterable := true
+	# TOUT est ENTRABLE, sur le même plan (banque comprise).
 	_buildings.append({"region": region, "pos": pos, "h": h, "label": label,
-			"tint": tint, "flavor": flavor, "enter": enter, "foot": foot_rect, "enterable": enterable})
-	if enterable:
-		# Collision en 3 murs (fond + côtés), FRONT ouvert (porte) -> on entre
-		# depuis la rue sans changer de scène ni de décor.
-		var t := 16.0
-		var r := foot_rect
-		_foots.append(Rect2(r.position, Vector2(r.size.x, t)))                       # fond
-		_foots.append(Rect2(r.position, Vector2(t, r.size.y)))                       # gauche
-		_foots.append(Rect2(Vector2(r.end.x - t, r.position.y), Vector2(t, r.size.y)))  # droite
+			"tint": tint, "flavor": flavor, "enter": enter, "foot": foot_rect, "enterable": true})
+	# Tous les bâtiments bordent la grand-rue (en bas) et lui FONT FACE : la porte
+	# (ouverture de collision) est sur le côté +y, côté rue = côté de la façade.
+	_add_walls(foot_rect, 0)
+
+
+## 4 murs de collision avec une ouverture (porte) centrée sur le côté `open`
+## (0=+y, 1=-y, 2=+x, 3=-x). Le joueur entre par cette porte.
+func _add_walls(r: Rect2, open: int) -> void:
+	var t := 18.0
+	var gap := 0.42                      # part centrale ouverte (porte)
+	_h_wall(r, r.position.y, t, open == 1, gap)        # mur haut (-y)
+	_h_wall(r, r.end.y - t, t, open == 0, gap)         # mur bas (+y)
+	_v_wall(r, r.position.x, t, open == 3, gap)        # mur gauche (-x)
+	_v_wall(r, r.end.x - t, t, open == 2, gap)         # mur droit (+x)
+
+
+func _h_wall(r: Rect2, y: float, t: float, opened: bool, gap: float) -> void:
+	if not opened:
+		_foots.append(Rect2(Vector2(r.position.x, y), Vector2(r.size.x, t)))
 	else:
-		_foots.append(foot_rect)   # banque pleine
+		var s := r.size.x * (1.0 - gap) * 0.5
+		_foots.append(Rect2(Vector2(r.position.x, y), Vector2(s, t)))
+		_foots.append(Rect2(Vector2(r.end.x - s, y), Vector2(s, t)))
+
+
+func _v_wall(r: Rect2, x: float, t: float, opened: bool, gap: float) -> void:
+	if not opened:
+		_foots.append(Rect2(Vector2(x, r.position.y), Vector2(t, r.size.y)))
+	else:
+		var s := r.size.y * (1.0 - gap) * 0.5
+		_foots.append(Rect2(Vector2(x, r.position.y), Vector2(t, s)))
+		_foots.append(Rect2(Vector2(x, r.end.y - s), Vector2(t, s)))
 
 
 func _add_prop(region: Rect2, pos: Vector2, h: float) -> void:
@@ -432,11 +449,12 @@ func _update_interaction() -> void:
 		_interact_was = held_d
 		_update_action_button()
 		return
-	var in_bank := _inside_bank()
-	_can_enter = in_bank or _player_pos.distance_to(BANK_DOOR) < DOOR_RADIUS
+	# On ENTRE dans la banque en marchant (porte ouverte) ; le braquage se lance
+	# une fois DANS le hall, au coffre (E).
+	_can_enter = _inside_bank()
 	if _can_enter:
 		_target_kind = "bank"
-		_near_label = "FORCER LE COFFRE (E)" if in_bank else "ENTRER dans la BANQUE"
+		_near_label = "FORCER LE COFFRE (E)"
 		_target_anchor = BANK_DOOR
 	else:
 		var best := TALK_RADIUS
@@ -491,7 +509,6 @@ func _update_interaction() -> void:
 func _do_action() -> void:
 	match _target_kind:
 		"bank": _enter_bank()
-		"saloon": GameManager.goto_saloon()
 		"npc": _talk(_target_npc)
 		"mount": _mount_nearest_horse()
 		"dismount": _dismount_horse()
