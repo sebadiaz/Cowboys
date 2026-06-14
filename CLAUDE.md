@@ -58,8 +58,13 @@ saloon. Missions **courtes (2–5 min)**, rejouables, lisibles. Construit par
   **carte d'achat NON-MODALE** s'ouvre seule à droite (ville visible derrière, pas
   de changement de scène) puis se ferme quand on ressort. Voir `_draw_interior`,
   `_update_commerce_card`, `_building_inside`.
-- État actuel : la mission banque reste une scène dédiée (`MissionRoot`) — c'est le
-  braquage, pas un commerce. Le saloon reste aussi une scène à part pour l'instant.
+- **FAIT (banque in-map)** : le BRAQUAGE est désormais sur le MÊME PLAN que la rue
+  (plus de scène `MissionRoot` ni de carré vert) : on entre par la porte (toit
+  transparent), on force le coffre dans le hall (E -> crochetage auto, barre de
+  progression), on encaisse le butin + déblocage de la ville suivante, la notoriété
+  monte (les chasseurs de primes peuvent débarquer) puis on ressort par la rue —
+  linéaire, sans changement de scène. Voir `_update_bank_heist`, `_crack_vault`,
+  `_vault_world`. La scène `MissionRoot` reste pour les niveaux rapides/sélection.
 
 ## 5. Règle cheval / train / diligence (poursuites)
 

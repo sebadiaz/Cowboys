@@ -51,6 +51,15 @@ var _horse_ctrl := HorseController.new()   # monture du joueur (lot 16)
 var _ride_walk := 0.0                # phase de galop (balancement du cavalier)
 var _wanted := WantedSystem.new()    # chasseurs de primes (lot 14)
 var _wanted_label: Label             # bandeau "PRIME / chasseurs" (CanvasLayer)
+# Braquage de banque IN-MAP (même plan, linéaire) : on force le coffre dans le
+# hall, l'alarme sonne, la loi débarque, on file par la rue.
+var _vault_cracking := false
+var _vault_prog := 0.0
+var _heist_done := false
+var _posse: Array[Dictionary] = []   # lois lancées à ta poursuite {pos, facing}
+var _escape_t := 0.0
+var _posse_grace := 0.0              # répit juste après le coffre (le temps de filer)
+const LAWMAN_SPEED := 178.0
 
 const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
 	"*hennissement* Doux, mon beau...", "Ce cheval ferait une belle monture de fuite."]
@@ -340,6 +349,7 @@ func _process(delta: float) -> void:
 	if not _entered:
 		_update_interaction()
 		_update_commerce_card()
+		_update_bank_heist(delta)
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
 	# Chasseurs de primes (lot 14) : traque active si la prime est haute.
@@ -451,11 +461,18 @@ func _update_interaction() -> void:
 		return
 	# On ENTRE dans la banque en marchant (porte ouverte) ; le braquage se lance
 	# une fois DANS le hall, au coffre (E).
-	_can_enter = _inside_bank()
-	if _can_enter:
+	# Dans le hall de la banque, près du coffre, pas encore forcé : prompt braquage.
+	var bank = _bank_dict()
+	_can_enter = false
+	if bank != null and not _heist_done and not _vault_cracking \
+			and (bank["foot"] as Rect2).has_point(_player_pos) \
+			and _player_pos.distance_to(_vault_world(bank)) < 130.0:
+		_can_enter = true
 		_target_kind = "bank"
 		_near_label = "FORCER LE COFFRE (E)"
-		_target_anchor = BANK_DOOR
+		_target_anchor = _vault_world(bank)
+	if _can_enter:
+		pass
 	else:
 		var best := TALK_RADIUS
 		# Habitants à qui parler (priorité au plus proche).
@@ -745,10 +762,61 @@ func _blocked(pos: Vector2) -> bool:
 	return false
 
 
+## Le braquage est désormais IN-MAP (pas de scène) : forcer le coffre démarre le
+## crochetage automatique dans le hall.
 func _enter_bank() -> void:
-	_entered = true
-	AudioManager.play("click")
-	GameManager.start_mission()
+	if _heist_done or _vault_cracking:
+		return
+	_vault_cracking = true
+	AudioManager.play("safe")
+	_show_toast("Tu forces le coffre... reste discret !")
+
+
+## Position MONDE du coffre (fond-centre du footprint de la banque).
+func _vault_world(b: Dictionary) -> Vector2:
+	var fr: Rect2 = b["foot"]
+	return Vector2(fr.position.x + fr.size.x * 0.5, fr.position.y + fr.size.y * 0.18)
+
+
+func _bank_dict() -> Variant:
+	for b in _buildings:
+		if str(b["label"]) == "★ BANQUE ★":
+			return b
+	return null
+
+
+## Boucle du braquage in-map : crochetage du coffre puis poursuite de la loi.
+func _update_bank_heist(delta: float) -> void:
+	var bank = _bank_dict()
+	if bank == null:
+		return
+	if _vault_cracking and not _heist_done:
+		# Il faut rester près du coffre pour continuer le crochetage.
+		if _player_pos.distance_to(_vault_world(bank)) < 130.0:
+			_vault_prog = minf(1.0, _vault_prog + delta / (3.0 * SaveManager.safe_mult()))
+			if _vault_prog >= 1.0:
+				_crack_vault(bank)
+
+
+## Avance vers une direction en contournant les obstacles (poursuite de la loi).
+func _try_move(pos: Vector2, dir: Vector2, dist: float, blocked: Callable) -> Vector2:
+	for ang in [0.0, 0.6, -0.6, 1.2, -1.2]:
+		var np: Vector2 = pos + dir.rotated(ang) * dist
+		if not blocked.call(np):
+			return np
+	return pos
+
+
+func _crack_vault(bank: Dictionary) -> void:
+	_heist_done = true
+	_vault_cracking = false
+	var tier: int = int(GameManager.current_town_def().get("level", 1))
+	var reward := 700 + tier * 500 + _rng.randi_range(0, 200)
+	GameManager.bank_robbed_in_town(reward)
+	_show_toast("COFFRE FORCÉ ! +%d $ — file avant que la prime ne grimpe !" % reward)
+	AudioManager.play("safe")
+	# La notoriété grimpe (via bank_robbed_in_town) : si la prime devient haute, les
+	# chasseurs de primes (WantedSystem) débarquent en ville -> danger géré ailleurs.
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -838,6 +906,8 @@ func _draw() -> void:
 		items.append({"d": Iso.depth(_coach_pos), "k": "coach", "o": null})
 	for h in _wanted.hunters:
 		items.append({"d": Iso.depth(h["pos"]), "k": "hunter", "o": h})
+	for p in _posse:
+		items.append({"d": Iso.depth(p["pos"]), "k": "law", "o": p})
 	items.append({"d": Iso.depth(_player_pos), "k": "me", "o": null})
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
@@ -865,7 +935,10 @@ func _draw() -> void:
 				CharacterArt.draw_person(self, Iso.project(n["pos"]), f, n["pal"],
 						false, false, float(n.get("walk", 0.0)), 0.0, 0.0)
 			"hunter": _draw_hunter(it["o"])
+			"law": _draw_lawman(it["o"])
 			"me": _draw_me()
+	# Barre de crochetage du coffre, au-dessus de la banque.
+	_draw_vault_progress()
 
 	# Bulles d'ambiance + marqueur "💬" pour les PNJ.
 	for n in _npcs:
@@ -1740,6 +1813,41 @@ func _draw_hunter(h: Dictionary) -> void:
 	var head := Iso.project(pos) + Vector2(0, -54)
 	var bob := sin(_hint_t * 5.0 + pos.x) * 2.0
 	_text(head + Vector2(0, bob), "❗", 18, Color(1.0, 0.3, 0.25))
+
+
+## Homme de loi (shérif) lancé après le braquage.
+func _draw_lawman(p: Dictionary) -> void:
+	var pos: Vector2 = p["pos"]
+	var f := _screen_facing(pos, p["facing"])
+	CharacterArt.draw_person(self, Iso.project(pos), f, _lawman_palette(), true, true, _hint_t * 7.0, 0.0, 0.0)
+	var head := Iso.project(pos) + Vector2(0, -54)
+	_text(head, "★", 18, Color(0.95, 0.85, 0.3))
+
+
+func _lawman_palette() -> Dictionary:
+	return {
+		"hat": Color(0.20, 0.22, 0.30), "hat_band": Color(0.7, 0.6, 0.2),
+		"coat": Color(0.24, 0.30, 0.45), "coat_dark": Color(0.15, 0.20, 0.32),
+		"shirt": Color(0.55, 0.18, 0.16), "pants": Color(0.20, 0.22, 0.30),
+		"skin": Color(0.85, 0.65, 0.47), "bandana": Color(0.8, 0.75, 0.7),
+		"belt": Color(0.16, 0.12, 0.09), "buckle": Color(0.9, 0.82, 0.4),
+		"boots": Color(0.18, 0.13, 0.09), "hair": Color(0.18, 0.13, 0.09),
+	}
+
+
+## Barre de crochetage du coffre (au-dessus de la banque) + "VIDÉ" après.
+func _draw_vault_progress() -> void:
+	var bank = _bank_dict()
+	if bank == null:
+		return
+	var head := Iso.project(_vault_world(bank)) + Vector2(0, -70)
+	if _vault_cracking and _vault_prog < 1.0:
+		var w := 90.0
+		draw_rect(Rect2(head + Vector2(-w * 0.5, -6), Vector2(w, 12)), Color(0, 0, 0, 0.7))
+		draw_rect(Rect2(head + Vector2(-w * 0.5, -6), Vector2(w * _vault_prog, 12)), Color(0.95, 0.8, 0.2))
+		_text(head + Vector2(0, -14), "CROCHETAGE…", 13, Color(1, 0.9, 0.5))
+	elif _heist_done:
+		_text(head, "COFFRE VIDÉ", 13, Color(0.95, 0.85, 0.4))
 
 
 func _hunter_palette() -> Dictionary:

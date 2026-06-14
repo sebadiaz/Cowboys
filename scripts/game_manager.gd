@@ -346,6 +346,22 @@ func goto_world_map() -> void:
 	_change_scene(SCENE_WORLD_MAP)
 
 
+## Prison (braquage in-map raté en ville).
+func go_to_jail() -> void:
+	_change_scene(SCENE_JAIL)
+
+
+## Braquage de banque RÉUSSI in-map (depuis la ville) : récompense + déblocage,
+## sans écran de résultat (on reste en ville, c'est linéaire).
+func bank_robbed_in_town(reward: int) -> void:
+	SaveManager.register_success(reward)
+	SaveManager.gain_notoriety()
+	if current_town < TOWNS.size():
+		SaveManager.unlock_town(current_town + 1)
+	if current_level < LEVEL_COUNT:
+		SaveManager.unlock_level(current_level + 1)
+
+
 ## Définition d'une ville (index 1-based, borné).
 func town_def(idx: int) -> Dictionary:
 	return TOWNS[clampi(idx - 1, 0, TOWNS.size() - 1)]
