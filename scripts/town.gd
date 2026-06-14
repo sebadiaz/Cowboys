@@ -19,7 +19,7 @@ const R_BARREL := Rect2(40, 800, 120, 130)
 const R_SIGN := Rect2(360, 800, 120, 160)
 
 const SPEED := 250.0
-const FLOOR := Rect2(0, 0, 4350, 1500)
+const FLOOR := Rect2(0, 0, 5300, 1500)
 const TOWN_CENTER := Vector2(2170, 1150)   # la rue : les portes s'ouvrent vers elle (vers le bas)
 const BANK_DOOR := Vector2(2170, 815)
 const DOOR_RADIUS := 95.0
@@ -51,6 +51,7 @@ var _horse_ctrl := HorseController.new()   # monture du joueur (lot 16)
 var _ride_walk := 0.0                # phase de galop (balancement du cavalier)
 var _wanted := WantedSystem.new()    # chasseurs de primes (lot 14)
 var _wanted_label: Label             # bandeau "PRIME / chasseurs" (CanvasLayer)
+var _bank_center := Vector2(2170, 680)   # centre de la banque (placement séquentiel)
 # Braquage de banque IN-MAP (même plan, linéaire) : on force le coffre dans le
 # hall, l'alarme sonne, la loi débarque, on file par la rue.
 var _vault_cracking := false
@@ -92,12 +93,15 @@ func _ready() -> void:
 	_rng.randomize()
 	Iso.yaw = 0.0
 	_yaw_target = 0.0
-	# Réapparition à la sortie du saloon (sinon, entrée du village).
-	if GameManager.town_return_pos != Vector2.ZERO:
+	# Réapparition à la sortie du saloon (sinon, devant la banque).
+	var has_return := GameManager.town_return_pos != Vector2.ZERO
+	if has_return:
 		_player_pos = GameManager.town_return_pos
 		_facing = Vector2.DOWN
 		GameManager.town_return_pos = Vector2.ZERO
 	_build_town()
+	if not has_return:
+		_player_pos = _bank_center + Vector2(0, 430.0)   # spawn dans la rue, devant la banque
 	_make_biome_decor()
 	_build_physics()
 	_apply_zoom()
@@ -212,39 +216,46 @@ func _build_town() -> void:
 	# [region, label, bigger-foot, flavor, enter]
 	var row := [
 		[R_SHED,   "MAISON",     Vector2(210, 175), "Maison de ville — volets clos.", ""],
-		[R_HOUSE,  "ÉGLISE",     Vector2(210, 175), "Église en bois — une prière avant le casse ?", ""],
-		[R_HOUSE,  "HÔTEL",      Vector2(220, 180), "Hôtel de la Frontière — 2 $ la nuit.", ""],
-		[R_SALOON, "SALOON",     Vector2(230, 185), "Saloon Le Cactus — entre boire un coup.", ""],
-		[R_SHED,   "MAGASIN",    Vector2(220, 180), "Magasin général — bottes, crochets, sacoches.", "store"],
-		[R_BANK,   "★ BANQUE ★", Vector2(270, 205), "", ""],
-		[R_HOUSE,  "SHÉRIF",     Vector2(220, 180), "Bureau du shérif — file avant qu'il ne rentre.", ""],
-		[R_SHED,   "FORGE",      Vector2(220, 180), "Armurier & forge — recharge, barillet, cadence.", "gunsmith"],
-		[R_SHED,   "ÉCURIE",     Vector2(220, 180), "Écurie — ton cheval, prêt pour la fuite.", ""],
-		[R_SALOON, "POSTE",      Vector2(220, 180), "Poste & télégraphe — « STOP braquage STOP ».", ""],
-		[R_HOUSE,  "DOCTEUR",    Vector2(220, 180), "Cabinet du Doc — vitalité, tonique anti-balles.", "pharmacy"],
+		[R_HOUSE,  "ÉGLISE",     Vector2(215, 178), "Église en bois — une prière avant le casse ?", ""],
+		[R_HOUSE,  "HÔTEL",      Vector2(225, 182), "Hôtel de la Frontière — 2 $ la nuit.", ""],
+		[R_SALOON, "SALOON",     Vector2(245, 195), "Saloon Le Cactus — entre boire un coup.", ""],
+		[R_SHED,   "MAGASIN",    Vector2(225, 182), "Magasin général — bottes, crochets, sacoches.", "store"],
+		[R_BANK,   "★ BANQUE ★", Vector2(440, 330), "", ""],   # LA PLUS GROSSE : on la braque
+		[R_HOUSE,  "SHÉRIF",     Vector2(225, 182), "Bureau du shérif — file avant qu'il ne rentre.", ""],
+		[R_SHED,   "FORGE",      Vector2(225, 182), "Armurier & forge — recharge, barillet, cadence.", "gunsmith"],
+		[R_SHED,   "ÉCURIE",     Vector2(225, 182), "Écurie — ton cheval, prêt pour la fuite.", ""],
+		[R_SALOON, "POSTE",      Vector2(225, 182), "Poste & télégraphe — « STOP braquage STOP ».", ""],
+		[R_HOUSE,  "DOCTEUR",    Vector2(225, 182), "Cabinet du Doc — vitalité, tonique anti-balles.", "pharmacy"],
 	]
-	var x0 := 420.0
-	var dx := 350.0
-	var ry := 680.0
+	var ry := 700.0
 	var tints := [Color(0.95,0.92,0.85), Color(0.95,0.95,1.0), Color(0.92,0.96,1.0),
 		Color(1.0,0.92,0.9), Color(1.0,0.96,0.85), Color(1,1,1), Color(0.85,0.9,1.0),
 		Color(1.0,0.9,0.8), Color(0.95,0.88,0.78), Color(0.9,1.0,0.9), Color(0.9,1.0,0.95)]
-	var ecurie_x := x0
+	# Placement SÉQUENTIEL par largeur (la grosse banque obtient automatiquement sa
+	# place, sans chevaucher ses voisins). _add_building agrandit le footprint x1.35.
+	var x := 300.0
+	var margin := 110.0
+	var ecurie_x := x
+	var centers: Array[float] = []
 	for i in range(row.size()):
 		var e: Array = row[i]
-		var px := x0 + i * dx
-		_add_building(e[0], Vector2(px, ry), 200.0, e[1], tints[i], e[3], e[2], e[4])
+		var w: float = (e[2] as Vector2).x * 1.35
+		var cx := x + w * 0.5
+		_add_building(e[0], Vector2(cx, ry), 200.0, e[1], tints[i], e[3], e[2], e[4])
+		centers.append(cx)
+		if e[1] == "★ BANQUE ★":
+			_bank_center = Vector2(cx, ry)
 		if e[1] == "ÉCURIE":
-			ecurie_x = px
+			ecurie_x = cx
+		x += w + margin
 
-	# Mobilier de rue (devant les bâtiments, sur la grand-rue y≈1050-1300).
-	_add_prop(R_SIGN, Vector2(x0 + 5 * dx, 1000.0), 100.0)   # panneau devant la banque
-	for i in range(row.size()):
-		var px := x0 + i * dx
+	# Mobilier de rue (devant les bâtiments, sur la grand-rue y≈1000-1200).
+	_add_prop(R_SIGN, Vector2(_bank_center.x, 1020.0), 100.0)   # panneau devant la banque
+	for i in range(centers.size()):
 		if i % 2 == 0:
-			_add_prop(R_BARREL, Vector2(px - 90.0, 1010.0), 78.0)
+			_add_prop(R_BARREL, Vector2(centers[i] - 100.0, 1030.0), 78.0)
 		else:
-			_add_prop(R_WAGON, Vector2(px + 40.0, 1120.0), 150.0)
+			_add_prop(R_WAGON, Vector2(centers[i] + 40.0, 1150.0), 150.0)
 	for c in [Vector2(180, 1380), Vector2(4150, 1360), Vector2(180, 380),
 			Vector2(4150, 420), Vector2(2170, 1420)]:
 		_add_prop(R_CACTUS, c, 130.0)
@@ -259,7 +270,7 @@ func _build_town() -> void:
 		["Prêcheur", ["Repens-toi, pécheur !", "Que le Seigneur ait pitié de ton butin."]],
 	]
 	for i in range(names.size()):
-		var nx := x0 + 60.0 + i * (dx * 1.7)
+		var nx: float = centers[mini(i * 2, centers.size() - 1)] + 40.0
 		_add_npc(Vector2(nx, 1120.0 + (i % 3) * 80.0), Vector2(1, 0.2).rotated(i),
 				Color(0.3 + 0.1 * (i % 3), 0.4, 0.4 + 0.1 * (i % 2)), Color(0.9, 0.8, 0.6),
 				names[i][0], names[i][1])
@@ -880,8 +891,8 @@ func _draw() -> void:
 	_draw_ground()
 	_draw_well()
 	_draw_hitch()
-	# Repère banque : halo doré + flèche flottante.
-	var d := Iso.project(BANK_DOOR)
+	# Repère banque : halo doré + flèche flottante (devant la grosse banque).
+	var d := Iso.project(_bank_center + Vector2(0, 170.0))
 	for i in range(4):
 		draw_circle(d + Vector2(0, -6), 70.0 - i * 14.0, Color(1.0, 0.85, 0.35, 0.10))
 	var bob := sin(_hint_t * 3.0) * 4.0
@@ -1484,27 +1495,7 @@ func _draw_interior(b: Dictionary, vis: float) -> void:
 	var label := str(b["label"])
 	# BANQUE : hall en marbre + comptoir de caisse + grande porte de coffre au fond.
 	if label == "★ BANQUE ★":
-		draw_colored_polygon(PackedVector2Array([b0, b1, b2, b3]), _va(Color(0.78, 0.74, 0.66), vis))
-		for k in range(1, 7):
-			var tt := float(k) / 7.0
-			draw_line(b0.lerp(b1, tt), b3.lerp(b2, tt), _va(Color(0.62, 0.58, 0.5), vis * 0.7), 1.0)
-		# Porte de coffre (cercle doré) au fond.
-		var vault := _bil(b0, b1, b2, b3, 0.5, 0.16) + Vector2(0, -1) * 18.0
-		draw_circle(vault, 22.0, _va(Color(0.45, 0.35, 0.2), vis))
-		draw_circle(vault, 22.0, _va(Color(0.85, 0.68, 0.28), vis), false, 3.0)
-		draw_circle(vault, 9.0, _va(Color(0.9, 0.78, 0.4), vis))
-		for a in range(8):
-			var ang := TAU * a / 8.0
-			draw_line(vault, vault + Vector2.RIGHT.rotated(ang) * 9.0, _va(Color(0.6, 0.45, 0.2), vis), 1.5)
-		# Comptoir de caisse + caissier.
-		var cl := b0.lerp(b3, 0.5)
-		var cr := b1.lerp(b2, 0.5)
-		draw_colored_polygon(PackedVector2Array([cl, cr, cr + Vector2(0, -14), cl + Vector2(0, -14)]),
-				_va(Color(0.40, 0.28, 0.16), vis))
-		if vis > 0.45:
-			var teller := Vector2(fr.get_center().x, fr.position.y + fr.size.y * 0.30)
-			CharacterArt.draw_person(self, Iso.project(teller), Vector2.DOWN, _keeper_palette("bank"),
-					false, false, 0.0, 0.0, 0.0)
+		_draw_bank_interior(fr, b0, b1, b2, b3, vis)
 		return
 	# Sol en planches (autres bâtiments).
 	draw_colored_polygon(PackedVector2Array([b0, b1, b2, b3]), _va(Color(0.52, 0.37, 0.22), vis))
@@ -1573,6 +1564,85 @@ func _draw_interior(b: Dictionary, vis: float) -> void:
 ## Point sur le sol du footprint en coordonnées (u = largeur, v = profondeur).
 func _bil(b0: Vector2, b1: Vector2, b2: Vector2, b3: Vector2, u: float, v: float) -> Vector2:
 	return b0.lerp(b1, u).lerp(b3.lerp(b2, u), v)
+
+
+## Hall de banque riche (sol marbre + dallage, comptoir à guichets, gros coffre
+## blindé au fond, colonnes, bureaux, piles d'or, lustre, caissier + garde).
+func _draw_bank_interior(fr: Rect2, b0: Vector2, b1: Vector2, b2: Vector2, b3: Vector2, vis: float) -> void:
+	var U := Vector2(0, -1)
+	# Sol marbre + damier.
+	draw_colored_polygon(PackedVector2Array([b0, b1, b2, b3]), _va(Color(0.80, 0.76, 0.68), vis))
+	for ix in range(6):
+		for iy in range(6):
+			if (ix + iy) % 2 == 0:
+				continue
+			var p0 := _bil(b0, b1, b2, b3, ix / 6.0, iy / 6.0)
+			var p1 := _bil(b0, b1, b2, b3, (ix + 1) / 6.0, iy / 6.0)
+			var p2 := _bil(b0, b1, b2, b3, (ix + 1) / 6.0, (iy + 1) / 6.0)
+			var p3 := _bil(b0, b1, b2, b3, ix / 6.0, (iy + 1) / 6.0)
+			draw_colored_polygon(PackedVector2Array([p0, p1, p2, p3]), _va(Color(0.70, 0.66, 0.58, 0.6), vis))
+	# Tapis rouge central (de la porte au coffre).
+	for v in range(7):
+		var a := _bil(b0, b1, b2, b3, 0.42, v / 7.0)
+		var bb := _bil(b0, b1, b2, b3, 0.58, v / 7.0)
+		var c := _bil(b0, b1, b2, b3, 0.58, (v + 1) / 7.0)
+		var dd := _bil(b0, b1, b2, b3, 0.42, (v + 1) / 7.0)
+		draw_colored_polygon(PackedVector2Array([a, bb, c, dd]), _va(Color(0.55, 0.18, 0.16, 0.85), vis))
+	# Colonnes (4) avec base et chapiteau.
+	for cu in [0.14, 0.86]:
+		for cv in [0.30, 0.62]:
+			var cp := _bil(b0, b1, b2, b3, cu, cv)
+			draw_colored_polygon(PackedVector2Array([cp + Vector2(-6, 0), cp + Vector2(6, 0),
+					cp + Vector2(6, 0) + U * 46.0, cp + Vector2(-6, 0) + U * 46.0]), _va(Color(0.86, 0.82, 0.74), vis))
+			draw_rect(Rect2(cp + Vector2(-9, -50), Vector2(18, 6)), _va(Color(0.7, 0.6, 0.35), vis))
+			draw_rect(Rect2(cp + Vector2(-9, -4), Vector2(18, 6)), _va(Color(0.6, 0.55, 0.45), vis))
+	# GROS coffre blindé au fond (porte ronde + boulons + volant).
+	var vault := _bil(b0, b1, b2, b3, 0.5, 0.12) + U * 26.0
+	draw_colored_polygon(PackedVector2Array([vault + Vector2(-46, 30), vault + Vector2(46, 30),
+			vault + Vector2(46, -34), vault + Vector2(-46, -34)]), _va(Color(0.30, 0.31, 0.36), vis))   # cadre
+	draw_circle(vault, 33.0, _va(Color(0.42, 0.43, 0.49), vis))
+	draw_circle(vault, 33.0, _va(Color(0.86, 0.7, 0.3), vis), false, 4.0)
+	for a in range(10):
+		var ang := TAU * a / 10.0
+		draw_circle(vault + Vector2.RIGHT.rotated(ang) * 27.0, 2.2, _va(Color(0.7, 0.72, 0.78), vis))   # boulons
+	draw_circle(vault, 12.0, _va(Color(0.86, 0.72, 0.34), vis))
+	for a in range(8):
+		var ang2 := TAU * a / 8.0
+		draw_line(vault, vault + Vector2.RIGHT.rotated(ang2) * 16.0, _va(Color(0.55, 0.42, 0.2), vis), 2.0)   # volant
+	# Piles d'or et sacs de butin de part et d'autre du coffre.
+	for su in [0.30, 0.70]:
+		var gp := _bil(b0, b1, b2, b3, su, 0.20)
+		for s in range(3):
+			draw_circle(gp + U * (4.0 + s * 5.0), 7.0, _va(Color(0.95, 0.82, 0.32), vis))
+			draw_arc(gp + U * (4.0 + s * 5.0), 7.0, 0, TAU, 12, _va(Color(0.7, 0.55, 0.2), vis), 1.0)
+		var sk := _bil(b0, b1, b2, b3, su + 0.06, 0.30)
+		draw_colored_polygon(_ellipse(sk + U * 6.0, 9.0, 11.0), _va(Color(0.78, 0.68, 0.5), vis))   # sac
+		_text(sk + U * 12.0, "$", 12, _va(Color(0.5, 0.4, 0.2), vis))
+	# Long COMPTOIR à guichets (avec grille/barreaux) en travers du hall.
+	var cl := _bil(b0, b1, b2, b3, 0.10, 0.52)
+	var cr := _bil(b0, b1, b2, b3, 0.90, 0.52)
+	var ch := 18.0
+	draw_colored_polygon(PackedVector2Array([cl, cr, cr + U * ch, cl + U * ch]), _va(Color(0.34, 0.22, 0.12), vis))   # façade
+	draw_colored_polygon(PackedVector2Array([cl + U * ch, cr + U * ch,
+			cr + U * ch + Vector2(0, -6), cl + U * ch + Vector2(0, -6)]), _va(Color(0.55, 0.40, 0.24), vis))   # plateau
+	draw_line(cl + U * ch, cr + U * ch, _va(Color(0.75, 0.6, 0.32), vis), 1.5)
+	for g in range(7):   # grilles de guichet
+		var gx := cl.lerp(cr, 0.1 + g * 0.13)
+		draw_line(gx + U * ch, gx + U * (ch + 26.0), _va(Color(0.55, 0.5, 0.35), vis), 1.5)
+	draw_line(cl + U * (ch + 26.0), cr + U * (ch + 26.0), _va(Color(0.5, 0.45, 0.3), vis), 1.5)
+	# Lustre central.
+	var lust := _bil(b0, b1, b2, b3, 0.5, 0.42) + U * 70.0
+	draw_circle(lust, 9.0, _va(Color(0.85, 0.7, 0.3, 0.7), vis))
+	for a in range(6):
+		draw_circle(lust + Vector2.RIGHT.rotated(TAU * a / 6.0) * 12.0, 2.5, _va(Color(1.0, 0.9, 0.5), vis))
+	# Caissier derrière le comptoir + garde près du coffre.
+	if vis > 0.45:
+		var teller := Vector2(fr.get_center().x, fr.position.y + fr.size.y * 0.42)
+		CharacterArt.draw_person(self, Iso.project(teller), Vector2.DOWN, _keeper_palette("bank"),
+				false, false, 0.0, 0.0, 0.0)
+		var guard := Vector2(fr.position.x + fr.size.x * 0.74, fr.position.y + fr.size.y * 0.24)
+		CharacterArt.draw_person(self, Iso.project(guard), Vector2.LEFT, _lawman_palette(),
+				true, false, 0.0, 0.0, 0.0)
 
 
 func _va(c: Color, vis: float) -> Color:
