@@ -69,7 +69,9 @@ var _php := 5
 var _pmax := 5
 var _php_dmg_cd := 0.0
 var _fire_cd := 0.0
+var _muzzle_t := 0.0                 # flash de bouche
 var _hp_label: Label
+var _tumble: Array[Dictionary] = []  # tumbleweeds qui roulent (décor mobile)
 
 const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
 	"*hennissement* Doux, mon beau...", "Ce cheval ferait une belle monture de fuite."]
@@ -156,6 +158,12 @@ func _setup_atmosphere() -> void:
 	mat.shader = sh
 	rect.material = mat
 	layer.add_child(rect)
+	# Calque "golden hour" : poussières d'or, halo de soleil, oiseaux, nuit étoilée.
+	var atmo := Control.new()
+	atmo.set_script(load("res://scripts/atmosphere.gd"))
+	atmo.set_anchors_preset(Control.PRESET_FULL_RECT)
+	atmo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(atmo)
 	add_child(layer)
 
 
@@ -293,6 +301,13 @@ func _build_town() -> void:
 		_horses.append(hp)
 		_foots.append(Rect2(hp - Vector2(17, 12), Vector2(34, 24)))
 
+	# Tumbleweeds qui roulent dans la rue (décor mobile, sans collision).
+	for k in range(5):
+		_tumble.append({
+			"pos": Vector2(randf_range(FLOOR.position.x, FLOOR.end.x), randf_range(1150.0, 1420.0)),
+			"vel": Vector2(randf_range(70.0, 150.0) * (1.0 if randf() < 0.7 else -1.0), randf_range(-12.0, 12.0)),
+			"spin": 0.0})
+
 	# Gardes postés DANS la banque (ripostent quand on force le coffre).
 	_pmax = (5 if GameManager.assist else 3) + SaveManager.hp_bonus()
 	_php = _pmax
@@ -381,6 +396,8 @@ func _process(delta: float) -> void:
 		_update_interaction()
 		_update_commerce_card()
 		_update_bank_heist(delta)
+		_update_town_combat(delta)
+	_update_tumble(delta)
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
 	# Chasseurs de primes (lot 14) : traque active si la prime est haute.
@@ -830,11 +847,8 @@ func _update_bank_heist(delta: float) -> void:
 			_vault_prog = minf(1.0, _vault_prog + delta / (3.0 * SaveManager.safe_mult()))
 			if _vault_prog >= 1.0:
 				_crack_vault(bank)
-	# Combat (uniquement si l'alarme a sonné).
+	# Combat des GARDES (uniquement si l'alarme a sonné).
 	if _alarm_on:
-		_php_dmg_cd = maxf(0.0, _php_dmg_cd - delta)
-		_fire_cd = maxf(0.0, _fire_cd - delta)
-		# Gardes : tirent sur le joueur tant qu'il est dans la banque.
 		for g in _bank_guards:
 			if not g["alive"]:
 				continue
@@ -844,15 +858,6 @@ func _update_bank_heist(delta: float) -> void:
 			if in_bank and float(g["fire_cd"]) <= 0.0 and to.length() < 460.0:
 				_town_bullets.append({"pos": g["pos"], "vel": to.normalized() * 620.0, "friendly": false, "life": 1.0})
 				g["fire_cd"] = (2.0 if GameManager.assist else 1.4)
-		# Tir du joueur (clic / espace) vers la souris (ou le cap).
-		if InputManager.is_fire_pressed() and _fire_cd <= 0.0 and not _horse_ctrl.mounted:
-			var aim := _aim_world() - _player_pos
-			if aim.length() < 1.0:
-				aim = _facing
-			_town_bullets.append({"pos": _player_pos + aim.normalized() * 16.0, "vel": aim.normalized() * 760.0, "friendly": true, "life": 1.0})
-			_fire_cd = 0.32
-			AudioManager.play("click")
-		_advance_town_bullets(delta)
 		# L'alarme se calme : tous les gardes au sol, OU coffre fait + loin de la banque.
 		var calm := not _any_guard_alive() and _town_bullets.is_empty()
 		calm = calm or (_heist_done and _player_pos.distance_to(_bank_center) > 750.0)
@@ -867,6 +872,41 @@ func _update_bank_heist(delta: float) -> void:
 			_hp_label.text = s
 		elif _hp_label.text != "":
 			_hp_label.text = ""
+
+
+## Tir LIBRE partout en ville (clic / espace), visée à la souris. Dégaine ton
+## six-coups où tu veux : tu peux descendre gardes, chasseurs de primes, posse.
+func _update_town_combat(delta: float) -> void:
+	_fire_cd = maxf(0.0, _fire_cd - delta)
+	_php_dmg_cd = maxf(0.0, _php_dmg_cd - delta)
+	_muzzle_t = maxf(0.0, _muzzle_t - delta)
+	if InputManager.is_fire_pressed() and _fire_cd <= 0.0 and not _horse_ctrl.mounted and not _shopping:
+		var aim := _aim_world() - _player_pos
+		if aim.length() < 1.0:
+			aim = _facing
+		aim = aim.normalized()
+		_facing = aim
+		_town_bullets.append({"pos": _player_pos + aim * 18.0, "vel": aim * 820.0, "friendly": true, "life": 1.1})
+		_fire_cd = 0.30
+		_muzzle_t = 0.06
+		AudioManager.play("click")
+	if not _town_bullets.is_empty():
+		_advance_town_bullets(delta)
+
+
+## Tumbleweeds : roulent au gré du vent, rebondissent doucement, bouclent aux bords.
+func _update_tumble(delta: float) -> void:
+	for w in _tumble:
+		var p: Vector2 = w["pos"]
+		p += (w["vel"] as Vector2) * delta
+		w["spin"] = float(w["spin"]) + (w["vel"] as Vector2).x * delta * 0.05
+		if p.x < FLOOR.position.x - 60.0:
+			p.x = FLOOR.end.x + 40.0
+			p.y = randf_range(1150.0, 1420.0)
+		elif p.x > FLOOR.end.x + 60.0:
+			p.x = FLOOR.position.x - 40.0
+			p.y = randf_range(1150.0, 1420.0)
+		w["pos"] = p
 
 
 func _aim_world() -> Vector2:
@@ -897,6 +937,21 @@ func _advance_town_bullets(delta: float) -> void:
 					if int(g["hp"]) <= 0:
 						g["alive"] = false
 					break
+			# Chasseurs de primes : une balle bien placée les met en fuite.
+			if not hit:
+				for hu in _wanted.hunters:
+					if (hu["pos"] as Vector2).distance_to(b["pos"]) < 22.0:
+						_wanted.hunters.erase(hu)
+						_wanted.grace = 3.0
+						hit = true
+						break
+			# Posse (lois lancées après un braquage).
+			if not hit:
+				for p in _posse:
+					if (p["pos"] as Vector2).distance_to(b["pos"]) < 22.0:
+						_posse.erase(p)
+						hit = true
+						break
 		else:
 			if _php_dmg_cd <= 0.0 and _player_pos.distance_to(b["pos"]) < 20.0:
 				_hurt_player()
@@ -1040,6 +1095,8 @@ func _draw() -> void:
 	for g in _bank_guards:
 		if g["alive"]:
 			items.append({"d": Iso.depth(g["pos"]), "k": "bankguard", "o": g})
+	for w in _tumble:
+		items.append({"d": Iso.depth(w["pos"]), "k": "tumble", "o": w})
 	items.append({"d": Iso.depth(_player_pos), "k": "me", "o": null})
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
@@ -1069,6 +1126,7 @@ func _draw() -> void:
 			"hunter": _draw_hunter(it["o"])
 			"law": _draw_lawman(it["o"])
 			"bankguard": _draw_bank_guard(it["o"])
+			"tumble": _draw_tumble(it["o"])
 			"me": _draw_me()
 	# Barre de crochetage du coffre, au-dessus de la banque.
 	_draw_vault_progress()
@@ -1999,6 +2057,24 @@ func _draw_me() -> void:
 		return
 	CharacterArt.draw_person(self, Iso.project(_player_pos), f, CharacterArt.hero_palette(),
 			false, false, _walk, 0.0, 0.0)
+	# Flash de bouche quand on tire.
+	if _muzzle_t > 0.0:
+		var mz := Iso.project(_player_pos) + f * 20.0 + Vector2(0, -16)
+		draw_circle(mz, 8.0, Color(1.0, 0.9, 0.5, 0.9))
+		draw_circle(mz, 4.0, Color(1.0, 1.0, 0.8))
+
+
+## Tumbleweed qui roule (boule de brindilles qui tourne).
+func _draw_tumble(w: Dictionary) -> void:
+	var base := Iso.project(w["pos"])
+	var sp: float = w["spin"]
+	draw_colored_polygon(_diamond_shadow(base, 12.0), Color(0, 0, 0, 0.16))
+	var col := Color(0.62, 0.5, 0.28)
+	draw_arc(base + Vector2(0, -10), 11.0, 0, TAU, 14, col, 2.0)
+	for k in range(7):
+		var a := sp + TAU * k / 7.0
+		draw_line(base + Vector2(0, -10), base + Vector2(0, -10) + Vector2.RIGHT.rotated(a) * 11.0,
+				col.lightened(0.1 if k % 2 == 0 else 0.0), 1.5)
 
 
 ## Chasseur de primes : silhouette en manteau sombre + étoile/marqueur rouge.
