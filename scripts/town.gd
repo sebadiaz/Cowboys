@@ -61,6 +61,15 @@ var _posse: Array[Dictionary] = []   # lois lancées à ta poursuite {pos, facin
 var _escape_t := 0.0
 var _posse_grace := 0.0              # répit juste après le coffre (le temps de filer)
 const LAWMAN_SPEED := 178.0
+# Combat in-map du braquage : alarme + gardes qui ripostent dans le hall.
+var _alarm_on := false
+var _bank_guards: Array[Dictionary] = []   # {pos, facing, hp, alive, fire_cd}
+var _town_bullets: Array[Dictionary] = []  # {pos, vel, friendly, life}
+var _php := 5
+var _pmax := 5
+var _php_dmg_cd := 0.0
+var _fire_cd := 0.0
+var _hp_label: Label
 
 const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
 	"*hennissement* Doux, mon beau...", "Ce cheval ferait une belle monture de fuite."]
@@ -283,6 +292,17 @@ func _build_town() -> void:
 		var hp := Vector2(ecurie_x - 80.0 + k * 80.0, 1000.0)
 		_horses.append(hp)
 		_foots.append(Rect2(hp - Vector2(17, 12), Vector2(34, 24)))
+
+	# Gardes postés DANS la banque (ripostent quand on force le coffre).
+	_pmax = (5 if GameManager.assist else 3) + SaveManager.hp_bonus()
+	_php = _pmax
+	var bd = _bank_dict()
+	if bd != null:
+		var bf: Rect2 = bd["foot"]
+		for gu in [0.30, 0.70]:
+			_bank_guards.append({
+				"pos": Vector2(bf.position.x + bf.size.x * gu, bf.position.y + bf.size.y * 0.30),
+				"facing": Vector2.DOWN, "hp": 2, "alive": true, "fire_cd": randf_range(0.4, 1.2)})
 
 
 func _add_building(region: Rect2, pos: Vector2, h: float, label: String, tint: Color,
@@ -779,8 +799,9 @@ func _enter_bank() -> void:
 	if _heist_done or _vault_cracking:
 		return
 	_vault_cracking = true
+	_alarm_on = true                 # l'alarme sonne : les gardes ripostent
 	AudioManager.play("safe")
-	_show_toast("Tu forces le coffre... reste discret !")
+	_show_toast("⚠ ALARME ! Force le coffre et TIRE/FUIS !")
 
 
 ## Position MONDE du coffre (fond-centre du footprint de la banque).
@@ -796,17 +817,101 @@ func _bank_dict() -> Variant:
 	return null
 
 
-## Boucle du braquage in-map : crochetage du coffre puis poursuite de la loi.
+## Boucle du braquage in-map : crochetage du coffre SOUS LE FEU des gardes,
+## tir du joueur, balles, dégâts. Pas de poursuite-piège : les gardes restent
+## dans le hall, on file par la rue.
 func _update_bank_heist(delta: float) -> void:
 	var bank = _bank_dict()
 	if bank == null:
 		return
+	var in_bank: bool = (bank["foot"] as Rect2).has_point(_player_pos)
 	if _vault_cracking and not _heist_done:
-		# Il faut rester près du coffre pour continuer le crochetage.
-		if _player_pos.distance_to(_vault_world(bank)) < 130.0:
+		if _player_pos.distance_to(_vault_world(bank)) < 140.0:
 			_vault_prog = minf(1.0, _vault_prog + delta / (3.0 * SaveManager.safe_mult()))
 			if _vault_prog >= 1.0:
 				_crack_vault(bank)
+	# Combat (uniquement si l'alarme a sonné).
+	if _alarm_on:
+		_php_dmg_cd = maxf(0.0, _php_dmg_cd - delta)
+		_fire_cd = maxf(0.0, _fire_cd - delta)
+		# Gardes : tirent sur le joueur tant qu'il est dans la banque.
+		for g in _bank_guards:
+			if not g["alive"]:
+				continue
+			g["fire_cd"] = float(g["fire_cd"]) - delta
+			var to: Vector2 = _player_pos - (g["pos"] as Vector2)
+			g["facing"] = to.normalized()
+			if in_bank and float(g["fire_cd"]) <= 0.0 and to.length() < 460.0:
+				_town_bullets.append({"pos": g["pos"], "vel": to.normalized() * 620.0, "friendly": false, "life": 1.0})
+				g["fire_cd"] = (2.0 if GameManager.assist else 1.4)
+		# Tir du joueur (clic / espace) vers la souris (ou le cap).
+		if InputManager.is_fire_pressed() and _fire_cd <= 0.0 and not _horse_ctrl.mounted:
+			var aim := _aim_world() - _player_pos
+			if aim.length() < 1.0:
+				aim = _facing
+			_town_bullets.append({"pos": _player_pos + aim.normalized() * 16.0, "vel": aim.normalized() * 760.0, "friendly": true, "life": 1.0})
+			_fire_cd = 0.32
+			AudioManager.play("click")
+		_advance_town_bullets(delta)
+		# L'alarme se calme : tous les gardes au sol, OU coffre fait + loin de la banque.
+		var calm := not _any_guard_alive() and _town_bullets.is_empty()
+		calm = calm or (_heist_done and _player_pos.distance_to(_bank_center) > 750.0)
+		if calm:
+			_alarm_on = false
+	# PV affiché pendant l'alerte.
+	if _hp_label != null:
+		if _alarm_on:
+			var s := "PV  "
+			for i in range(_pmax):
+				s += "♥" if i < _php else "♡"
+			_hp_label.text = s
+		elif _hp_label.text != "":
+			_hp_label.text = ""
+
+
+func _aim_world() -> Vector2:
+	# Souris -> monde (la ville est en iso ; le noeud porte caméra+zoom).
+	return Iso.unproject(get_local_mouse_position())
+
+
+func _any_guard_alive() -> bool:
+	for g in _bank_guards:
+		if g["alive"]:
+			return true
+	return false
+
+
+func _advance_town_bullets(delta: float) -> void:
+	var alive: Array[Dictionary] = []
+	for b in _town_bullets:
+		b["pos"] += (b["vel"] as Vector2) * delta
+		b["life"] = float(b["life"]) - delta
+		if float(b["life"]) <= 0.0:
+			continue
+		var hit := false
+		if b["friendly"]:
+			for g in _bank_guards:
+				if g["alive"] and (g["pos"] as Vector2).distance_to(b["pos"]) < 22.0:
+					g["hp"] = int(g["hp"]) - 1
+					hit = true
+					if int(g["hp"]) <= 0:
+						g["alive"] = false
+					break
+		else:
+			if _php_dmg_cd <= 0.0 and _player_pos.distance_to(b["pos"]) < 20.0:
+				_hurt_player()
+				hit = true
+		if not hit:
+			alive.append(b)
+	_town_bullets = alive
+
+
+func _hurt_player() -> void:
+	_php = maxi(0, _php - 1)
+	_php_dmg_cd = 0.8 if GameManager.assist else 0.5
+	AudioManager.play("hit_player")
+	if _php <= 0:
+		_busted()
 
 
 ## Avance vers une direction en contournant les obstacles (poursuite de la loi).
@@ -824,10 +929,23 @@ func _crack_vault(bank: Dictionary) -> void:
 	var tier: int = int(GameManager.current_town_def().get("level", 1))
 	var reward := 700 + tier * 500 + _rng.randi_range(0, 200)
 	GameManager.bank_robbed_in_town(reward)
-	_show_toast("COFFRE FORCÉ ! +%d $ — file avant que la prime ne grimpe !" % reward)
+	_show_toast("COFFRE FORCÉ ! +%d $ — FILE par la rue avant qu'ils ne t'aient !" % reward)
 	AudioManager.play("safe")
-	# La notoriété grimpe (via bank_robbed_in_town) : si la prime devient haute, les
-	# chasseurs de primes (WantedSystem) débarquent en ville -> danger géré ailleurs.
+	# Les gardes survivants continuent de tirer tant que tu es dans le hall ; sors
+	# par la rue pour échapper au feu (la notoriété monte -> chasseurs ensuite).
+
+
+## Pris/abattu pendant le braquage -> prison (caution ou évasion).
+func _busted() -> void:
+	if _entered:
+		return
+	_entered = true   # gèle la ville
+	_show_toast("Abattu pendant le braquage !")
+	AudioManager.play("lose", 2.0)
+	AudioManager.stop_music()
+	var tw := create_tween()
+	tw.tween_interval(0.9)
+	tw.tween_callback(func() -> void: GameManager.go_to_jail())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -919,6 +1037,9 @@ func _draw() -> void:
 		items.append({"d": Iso.depth(h["pos"]), "k": "hunter", "o": h})
 	for p in _posse:
 		items.append({"d": Iso.depth(p["pos"]), "k": "law", "o": p})
+	for g in _bank_guards:
+		if g["alive"]:
+			items.append({"d": Iso.depth(g["pos"]), "k": "bankguard", "o": g})
 	items.append({"d": Iso.depth(_player_pos), "k": "me", "o": null})
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
@@ -947,9 +1068,17 @@ func _draw() -> void:
 						false, false, float(n.get("walk", 0.0)), 0.0, 0.0)
 			"hunter": _draw_hunter(it["o"])
 			"law": _draw_lawman(it["o"])
+			"bankguard": _draw_bank_guard(it["o"])
 			"me": _draw_me()
 	# Barre de crochetage du coffre, au-dessus de la banque.
 	_draw_vault_progress()
+	# Balles du braquage (traceurs).
+	for b in _town_bullets:
+		var bp: Vector2 = Iso.project(b["pos"])
+		var bdir: Vector2 = (b["vel"] as Vector2).normalized()
+		var bcol := Color(1, 0.9, 0.4) if b["friendly"] else Color(1, 0.45, 0.2)
+		draw_line(bp - bdir * 12.0, bp, Color(bcol.r, bcol.g, bcol.b, 0.5), 3.0)
+		draw_circle(bp, 3.0, bcol)
 
 	# Bulles d'ambiance + marqueur "💬" pour les PNJ.
 	for n in _npcs:
@@ -1635,14 +1764,12 @@ func _draw_bank_interior(fr: Rect2, b0: Vector2, b1: Vector2, b2: Vector2, b3: V
 	draw_circle(lust, 9.0, _va(Color(0.85, 0.7, 0.3, 0.7), vis))
 	for a in range(6):
 		draw_circle(lust + Vector2.RIGHT.rotated(TAU * a / 6.0) * 12.0, 2.5, _va(Color(1.0, 0.9, 0.5), vis))
-	# Caissier derrière le comptoir + garde près du coffre.
+	# Caissier derrière le comptoir (les 2 gardes sont des entités, dessinées via
+	# le tri de profondeur : ils ripostent pendant le braquage).
 	if vis > 0.45:
 		var teller := Vector2(fr.get_center().x, fr.position.y + fr.size.y * 0.42)
 		CharacterArt.draw_person(self, Iso.project(teller), Vector2.DOWN, _keeper_palette("bank"),
 				false, false, 0.0, 0.0, 0.0)
-		var guard := Vector2(fr.position.x + fr.size.x * 0.74, fr.position.y + fr.size.y * 0.24)
-		CharacterArt.draw_person(self, Iso.project(guard), Vector2.LEFT, _lawman_palette(),
-				true, false, 0.0, 0.0, 0.0)
 
 
 func _va(c: Color, vis: float) -> Color:
@@ -1894,6 +2021,15 @@ func _draw_lawman(p: Dictionary) -> void:
 	_text(head, "★", 18, Color(0.95, 0.85, 0.3))
 
 
+## Garde de banque (riposte pendant le braquage).
+func _draw_bank_guard(g: Dictionary) -> void:
+	var pos: Vector2 = g["pos"]
+	var f := _screen_facing(pos, g["facing"])
+	CharacterArt.draw_person(self, Iso.project(pos), f, _lawman_palette(), true, _alarm_on, 0.0, 0.0, 0.0)
+	if _alarm_on:
+		_text(Iso.project(pos) + Vector2(0, -52), "❗", 16, Color(1.0, 0.3, 0.25))
+
+
 func _lawman_palette() -> Dictionary:
 	return {
 		"hat": Color(0.20, 0.22, 0.30), "hat_band": Color(0.7, 0.6, 0.2),
@@ -2084,6 +2220,16 @@ func _build_ui() -> void:
 	_wanted_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_wanted_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_wanted_label)
+
+	# PV (affiché seulement pendant le braquage sous le feu).
+	_hp_label = Label.new()
+	_hp_label.add_theme_font_size_override("font_size", 22)
+	_hp_label.add_theme_color_override("font_color", Color(0.95, 0.25, 0.22))
+	_hp_label.add_theme_color_override("font_outline_color", Color(0.1, 0.02, 0.02))
+	_hp_label.add_theme_constant_override("outline_size", 5)
+	_hp_label.position = Vector2(16, 70)
+	_hp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_hp_label)
 
 	# Mobile : joystick seul (l'action passe par le logo cliquable près des portes).
 	var mc := Control.new()
