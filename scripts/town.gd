@@ -82,6 +82,10 @@ var _streak_t := 0.0                   # temps restant avant reset de la série
 var _shake := 0.0                      # intensité de tremblement caméra (impact)
 var _boss = null                       # mini-boss hors-la-loi RECHERCHÉ (null = aucun)
 var _boss_timer := 26.0                # délai avant la prochaine apparition
+var _rush_active := false              # RUÉE en cours (vague de bandits, primes ×2)
+var _rush_t := 0.0                     # temps restant de la ruée
+var _rush_cd := 40.0                   # délai avant la prochaine ruée
+const RUSH_DURATION := 16.0
 const BANDIT_SPEED := 125.0
 const BOSS_SPEED := 168.0
 const AUTO_RANGE := 460.0
@@ -429,6 +433,7 @@ func _process(delta: float) -> void:
 		_update_bank_heist(delta)
 		_update_bandits(delta)
 		_update_boss(delta)
+		_update_rush(delta)
 		_update_town_combat(delta)
 		_update_floaters(delta)
 		_update_streak(delta)
@@ -1020,10 +1025,40 @@ func _kill_boss() -> void:
 	_boss_timer = _rng.randf_range(28.0, 40.0)
 
 
+## RUÉE : vague de bandits qui déferle, primes ×2 le temps de l'événement.
+func _update_rush(delta: float) -> void:
+	if _rush_active:
+		_rush_t = maxf(0.0, _rush_t - delta)
+		if _rush_t <= 0.0:
+			_rush_active = false
+			_rush_cd = _rng.randf_range(36.0, 52.0)
+	else:
+		_rush_cd = maxf(0.0, _rush_cd - delta)
+		if _rush_cd <= 0.0 and not _horse_ctrl.mounted:
+			_start_rush()
+
+
+func _start_rush() -> void:
+	_rush_active = true
+	_rush_t = RUSH_DURATION
+	for i in range(5):
+		var b := _new_bandit(true)
+		b["rush"] = true
+		_bandits.append(b)
+	_shake = maxf(_shake, 6.0)
+	_floaters.append({"pos": _player_pos + Vector2(0, -40), "t": 0.0, "text": "RUÉE !", "col": Color(1, 0.5, 0.2)})
+	AudioManager.play("alarm", -4.0)
+
+
 ## Bandits : rôdent, tirent parfois sur le joueur ; respawn après mort.
 func _update_bandits(delta: float) -> void:
+	var drop: Array = []
 	for b in _bandits:
 		if not b["alive"]:
+			# Les bandits de RUÉE ne réapparaissent pas une fois la vague finie.
+			if b.get("rush", false) and not _rush_active:
+				drop.append(b)
+				continue
 			b["respawn"] = float(b["respawn"]) - delta
 			if float(b["respawn"]) <= 0.0:
 				var nb := _new_bandit(true)
@@ -1045,6 +1080,8 @@ func _update_bandits(delta: float) -> void:
 		if to_p.length() < 340.0 and float(b["fire_cd"]) <= 0.0:
 			_town_bullets.append({"pos": b["pos"], "vel": to_p.normalized() * 560.0, "friendly": false, "life": 1.0})
 			b["fire_cd"] = _rng.randf_range(1.6, 2.8)
+	for b in drop:
+		_bandits.erase(b)
 
 
 ## Série de kills (combo) + éclats de mort + amortissement du tremblement.
@@ -1069,6 +1106,8 @@ func _reward_kill(at: Vector2) -> void:
 	_streak += 1
 	_streak_t = STREAK_WINDOW
 	var mult := 1.0 + 0.5 * float(_streak - 1)          # x1, x1.5, x2, x2.5...
+	if _rush_active:
+		mult *= 2.0                                     # RUÉE : primes doublées
 	var bounty := int(round((120 + SaveManager.notoriety * 20) * mult))
 	SaveManager.refund(bounty)
 	_shake = maxf(_shake, 7.0)
@@ -1402,6 +1441,16 @@ func _draw() -> void:
 		var gw := 150.0 * (_streak_t / STREAK_WINDOW)
 		draw_rect(Rect2(center + Vector2(-75, 22), Vector2(150, 4)), Color(0, 0, 0, 0.4))
 		draw_rect(Rect2(center + Vector2(-75, 22), Vector2(gw, 4)), bcol)
+
+	# Bandeau « RUÉE » : vague de bandits, primes ×2, jauge de temps restant.
+	if _rush_active:
+		var vpr := get_viewport_rect().size
+		var cr := Vector2(vpr.x * 0.5, 40.0) - position
+		var rp := 0.5 + 0.5 * sin(_hint_t * 6.0)
+		_text(cr, "RUÉE ! primes ×2", int(24 + rp * 3.0), Color(1.0, 0.55 + 0.25 * rp, 0.2))
+		var gw := 180.0 * (_rush_t / RUSH_DURATION)
+		draw_rect(Rect2(cr + Vector2(-90, 18), Vector2(180, 5)), Color(0, 0, 0, 0.4))
+		draw_rect(Rect2(cr + Vector2(-90, 18), Vector2(gw, 5)), Color(1.0, 0.55, 0.2))
 
 	# Bandeau « RECHERCHÉ » quand le mini-boss est en ville (fixe à l'écran).
 	if _boss != null and _boss["alive"]:

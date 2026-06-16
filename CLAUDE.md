@@ -84,6 +84,11 @@ saloon. Missions **courtes (2–5 min)**, rejouables, lisibles. Construit par
   prime** (`650 + notoriété*130`) avec juice marqué (gros `_shake`, gerbe de `_bursts`,
   pop-up). Bandeau écran « ★ RECHERCHÉ ★ » + flèche directionnelle. Voir
   `_update_boss`, `_spawn_boss`, `_kill_boss`, `_draw_boss`.
+- **FAIT (événement RUÉE)** : périodiquement (`_rush_cd`) une **vague de bandits**
+  déferle (`_start_rush` ajoute 5 hostiles marqués `rush`), **primes ×2** pendant
+  `RUSH_DURATION`, bandeau écran « RUÉE ! primes ×2 » + jauge. Les bandits de ruée
+  ne réapparaissent pas une fois la vague finie (nettoyés dans `_update_bandits`).
+  Voir `_update_rush`, `_start_rush`.
 
 ## 5. Règle cheval / train / diligence (poursuites)
 
