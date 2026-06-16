@@ -129,6 +129,9 @@ func _build() -> void:
 	_add_npc(Vector2(700, 430), Vector2(-1, -0.3), Color(0.18, 0.16, 0.2), Color(0.25, 0.2, 0.15),
 			"Pistolero", ["On règle ça dehors ? Le plus rapide rafle la mise.",
 			"T'as la dégaine lente, gamin."], 24.0)
+	_add_npc(Vector2(360, 470), Vector2(0.6, -1), Color(0.4, 0.3, 0.15), Color(0.6, 0.5, 0.3),
+			"Joueur de dés", ["Trois dés, un chiffre, la chance fait le reste.",
+			"Mise sur le 6, on verra bien !"], 20.0)
 
 
 func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color,
@@ -181,6 +184,7 @@ func _update_interaction() -> void:
 				_target_npc = n
 				_near_label = ("JOUER aux cartes (21)" if str(n["name"]) == "Joueur de poker"
 						else "PROVOQUER en duel" if str(n["name"]) == "Pistolero"
+						else "JOUER aux dés" if str(n["name"]) == "Joueur de dés"
 						else "Parler à %s" % n["name"])
 				_target_anchor = n["pos"]
 	var held := InputManager.is_interact_held()
@@ -198,6 +202,8 @@ func _do_action() -> void:
 			_open_card_game()
 		elif str(_target_npc["name"]) == "Pistolero":
 			_open_duel()
+		elif str(_target_npc["name"]) == "Joueur de dés":
+			_open_dice()
 		else:
 			_talk(_target_npc)
 
@@ -233,6 +239,23 @@ func _open_duel() -> void:
 		_card_game = null
 		_interact_was = true)
 	_card_game = dg
+	AudioManager.play("click")
+
+
+## Ouvre le jeu de DÉS (Chuck-a-Luck) par-dessus le saloon (même pause d'overlay).
+func _open_dice() -> void:
+	if _card_game != null:
+		return
+	var layer := CanvasLayer.new()
+	layer.layer = 6
+	add_child(layer)
+	var dc = load("res://scripts/dice_game.gd").new()
+	layer.add_child(dc)
+	dc.closed.connect(func():
+		layer.queue_free()
+		_card_game = null
+		_interact_was = true)
+	_card_game = dc
 	AudioManager.play("click")
 
 

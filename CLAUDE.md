@@ -180,6 +180,12 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
   (Espace/clic/F) ; tirer trop tôt = faux départ, trop lent = l'adversaire t'abat.
   Gagner paie une prime (`220 + notoriété*70` + bonus de dégaine éclair) ; perdre
   coûte le médecin. Adversaire plus rapide à haute notoriété. Tout dessiné.
+- **Jeu de dés** : `dice_game.gd` (FAIT) — **CHUCK-A-LUCK** (cage à oiseaux) au saloon.
+  On parie un chiffre (1–6) + sa mise, trois dés roulent ; le chiffre sort sur 1/2/3
+  dés → payé ×1/×2/×3 (mise rendue en plus), absent → mise perdue. Overlay autonome
+  posé par `saloon.gd` quand on parle au « Joueur de dés ». Argent via
+  `SaveManager.spend/refund`, boutons tactiles + clavier, dés/pips dessinés. Edge
+  maison vérifié (~6% sur 600 lancers). Voir `_open_dice()` dans `saloon.gd`.
 
 ## 8. Interdits (toutes versions)
 
