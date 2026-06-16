@@ -65,6 +65,15 @@ saloon. Missions **courtes (2–5 min)**, rejouables, lisibles. Construit par
   monte (les chasseurs de primes peuvent débarquer) puis on ressort par la rue —
   linéaire, sans changement de scène. Voir `_update_bank_heist`, `_crack_vault`,
   `_vault_world`. La scène `MissionRoot` reste pour les niveaux rapides/sélection.
+- **FAIT (combat ville : auto-visée + tir continu)** : la grand-rue est vivante —
+  des **bandits rôdent** (errance + approche + riposte) qu'on dégomme pour du cash
+  (prime `120 + notoriété*20`, pop-up flottant `+$`). Le tir est **auto-visé** sur
+  l'ennemi le plus proche (rayon `AUTO_RANGE`) et **continu** (mains libres, mobile-
+  friendly) ; le clic/espace force la visée souris. Réticule pulsé sur la cible.
+  Bandits respawn après mort. Voir `_update_town_combat`, `_hostiles`,
+  `_update_bandits`, `_new_bandit`, `_update_floaters`, `_draw_bandit`. Calque
+  d'ambiance cinématographique `atmosphere.gd` (golden hour, god rays, cycle
+  jour/nuit, poussières d'or) posé par-dessus le monde.
 
 ## 5. Règle cheval / train / diligence (poursuites)
 

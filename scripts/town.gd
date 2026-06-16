@@ -71,6 +71,13 @@ var _php_dmg_cd := 0.0
 var _fire_cd := 0.0
 var _muzzle_t := 0.0                 # flash de bouche
 var _hp_label: Label
+# Chasse libre : bandits qui rôdent + auto-visée/tir continu sur le plus proche.
+var _bandits: Array[Dictionary] = []   # {pos, vel, hp, alive, fire_cd, wander_t, respawn}
+var _floaters: Array[Dictionary] = []  # {pos, t, text, col} (pop-ups +$ / coups)
+var _aim_target := Vector2.ZERO
+var _has_target := false
+const BANDIT_SPEED := 125.0
+const AUTO_RANGE := 460.0
 var _tumble: Array[Dictionary] = []  # tumbleweeds qui roulent (décor mobile)
 
 const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
@@ -319,6 +326,20 @@ func _build_town() -> void:
 				"pos": Vector2(bf.position.x + bf.size.x * gu, bf.position.y + bf.size.y * 0.30),
 				"facing": Vector2.DOWN, "hp": 2, "alive": true, "fire_cd": randf_range(0.4, 1.2)})
 
+	# Bandits qui rôdent dans la grand-rue : du gibier à dégommer pour du cash.
+	for i in range(4):
+		_bandits.append(_new_bandit(true))
+
+
+## Crée un bandit (à un point de la rue, loin du joueur si demandé).
+func _new_bandit(at_edge := false) -> Dictionary:
+	var px := _rng.randf_range(FLOOR.position.x + 200.0, FLOOR.end.x - 200.0)
+	if at_edge:
+		px = FLOOR.position.x + 120.0 if _rng.randf() < 0.5 else FLOOR.end.x - 120.0
+	var py := _rng.randf_range(1080.0, 1380.0)
+	return {"pos": Vector2(px, py), "vel": Vector2.RIGHT.rotated(_rng.randf() * TAU) * BANDIT_SPEED,
+			"hp": 2, "alive": true, "fire_cd": _rng.randf_range(1.0, 2.5), "wander_t": 0.0, "respawn": 0.0}
+
 
 func _add_building(region: Rect2, pos: Vector2, h: float, label: String, tint: Color,
 		flavor: String, foot: Vector2, enter := "") -> void:
@@ -396,7 +417,9 @@ func _process(delta: float) -> void:
 		_update_interaction()
 		_update_commerce_card()
 		_update_bank_heist(delta)
+		_update_bandits(delta)
 		_update_town_combat(delta)
+		_update_floaters(delta)
 	_update_tumble(delta)
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
@@ -874,24 +897,93 @@ func _update_bank_heist(delta: float) -> void:
 			_hp_label.text = ""
 
 
-## Tir LIBRE partout en ville (clic / espace), visée à la souris. Dégaine ton
-## six-coups où tu veux : tu peux descendre gardes, chasseurs de primes, posse.
+## Combat ville : AUTO-VISÉE + TIR CONTINU sur l'ennemi le plus proche (mains
+## libres, mobile-friendly). Le clic/espace force le tir vers la souris.
 func _update_town_combat(delta: float) -> void:
 	_fire_cd = maxf(0.0, _fire_cd - delta)
 	_php_dmg_cd = maxf(0.0, _php_dmg_cd - delta)
 	_muzzle_t = maxf(0.0, _muzzle_t - delta)
-	if InputManager.is_fire_pressed() and _fire_cd <= 0.0 and not _horse_ctrl.mounted and not _shopping:
-		var aim := _aim_world() - _player_pos
+	# Cible auto = hostile le plus proche dans le rayon.
+	_has_target = false
+	var best := AUTO_RANGE
+	for h in _hostiles():
+		var d := _player_pos.distance_to(h)
+		if d < best:
+			best = d
+			_aim_target = h
+			_has_target = true
+	var can_shoot := not _horse_ctrl.mounted and not _shopping
+	var manual := InputManager.is_fire_pressed()
+	if can_shoot and _fire_cd <= 0.0 and (manual or _has_target):
+		var aim: Vector2
+		if manual:
+			aim = _aim_world() - _player_pos          # clic = visée souris
+		elif _has_target:
+			aim = _aim_target - _player_pos           # auto = ennemi le plus proche
 		if aim.length() < 1.0:
 			aim = _facing
 		aim = aim.normalized()
 		_facing = aim
-		_town_bullets.append({"pos": _player_pos + aim * 18.0, "vel": aim * 820.0, "friendly": true, "life": 1.1})
-		_fire_cd = 0.30
+		_town_bullets.append({"pos": _player_pos + aim * 18.0, "vel": aim * 860.0, "friendly": true, "life": 1.1})
+		_fire_cd = 0.22 * SaveManager.firerate_mult()   # tir rapide et continu
 		_muzzle_t = 0.06
 		AudioManager.play("click")
 	if not _town_bullets.is_empty():
 		_advance_town_bullets(delta)
+
+
+## Tous les ennemis ciblables (bandits, chasseurs de primes, gardes, posse).
+func _hostiles() -> Array:
+	var out: Array = []
+	for b in _bandits:
+		if b["alive"]:
+			out.append(b["pos"])
+	for hu in _wanted.hunters:
+		out.append(hu["pos"])
+	for g in _bank_guards:
+		if g["alive"] and _alarm_on:
+			out.append(g["pos"])
+	for p in _posse:
+		out.append(p["pos"])
+	return out
+
+
+## Bandits : rôdent, tirent parfois sur le joueur ; respawn après mort.
+func _update_bandits(delta: float) -> void:
+	for b in _bandits:
+		if not b["alive"]:
+			b["respawn"] = float(b["respawn"]) - delta
+			if float(b["respawn"]) <= 0.0:
+				var nb := _new_bandit(true)
+				for k in nb:
+					b[k] = nb[k]
+			continue
+		# Errance : change de cap de temps en temps.
+		b["wander_t"] = float(b["wander_t"]) - delta
+		if float(b["wander_t"]) <= 0.0:
+			b["wander_t"] = _rng.randf_range(0.8, 2.0)
+			b["vel"] = Vector2.RIGHT.rotated(_rng.randf() * TAU) * BANDIT_SPEED
+		# S'approche un peu du joueur s'il est proche (sinon errance).
+		var to_p: Vector2 = _player_pos - (b["pos"] as Vector2)
+		if to_p.length() < 360.0:
+			b["vel"] = (b["vel"] as Vector2).lerp(to_p.normalized() * BANDIT_SPEED, 0.04)
+		b["pos"] = _try_move(b["pos"], (b["vel"] as Vector2).normalized(), BANDIT_SPEED * delta, _blocked)
+		# Riposte.
+		b["fire_cd"] = float(b["fire_cd"]) - delta
+		if to_p.length() < 340.0 and float(b["fire_cd"]) <= 0.0:
+			_town_bullets.append({"pos": b["pos"], "vel": to_p.normalized() * 560.0, "friendly": false, "life": 1.0})
+			b["fire_cd"] = _rng.randf_range(1.6, 2.8)
+
+
+## Pop-ups flottants (+$, "TOUCHÉ"...).
+func _update_floaters(delta: float) -> void:
+	var live: Array[Dictionary] = []
+	for f in _floaters:
+		f["t"] = float(f["t"]) + delta
+		f["pos"] = (f["pos"] as Vector2) + Vector2(0, -26.0 * delta)
+		if float(f["t"]) < 1.1:
+			live.append(f)
+	_floaters = live
 
 
 ## Tumbleweeds : roulent au gré du vent, rebondissent doucement, bouclent aux bords.
@@ -930,13 +1022,26 @@ func _advance_town_bullets(delta: float) -> void:
 			continue
 		var hit := false
 		if b["friendly"]:
-			for g in _bank_guards:
-				if g["alive"] and (g["pos"] as Vector2).distance_to(b["pos"]) < 22.0:
-					g["hp"] = int(g["hp"]) - 1
+			# Bandits d'abord (gibier principal).
+			for bd in _bandits:
+				if bd["alive"] and (bd["pos"] as Vector2).distance_to(b["pos"]) < 22.0:
+					bd["hp"] = int(bd["hp"]) - 1
 					hit = true
-					if int(g["hp"]) <= 0:
-						g["alive"] = false
+					if int(bd["hp"]) <= 0:
+						bd["alive"] = false
+						bd["respawn"] = randf_range(6.0, 10.0)
+						var bounty := 120 + SaveManager.notoriety * 20
+						SaveManager.refund(bounty)
+						_floaters.append({"pos": bd["pos"], "t": 0.0, "text": "+%d $" % bounty, "col": Color(1, 0.9, 0.4)})
 					break
+			if not hit:
+				for g in _bank_guards:
+					if g["alive"] and (g["pos"] as Vector2).distance_to(b["pos"]) < 22.0:
+						g["hp"] = int(g["hp"]) - 1
+						hit = true
+						if int(g["hp"]) <= 0:
+							g["alive"] = false
+						break
 			# Chasseurs de primes : une balle bien placée les met en fuite.
 			if not hit:
 				for hu in _wanted.hunters:
@@ -1097,6 +1202,9 @@ func _draw() -> void:
 			items.append({"d": Iso.depth(g["pos"]), "k": "bankguard", "o": g})
 	for w in _tumble:
 		items.append({"d": Iso.depth(w["pos"]), "k": "tumble", "o": w})
+	for bd in _bandits:
+		if bd["alive"]:
+			items.append({"d": Iso.depth(bd["pos"]), "k": "bandit", "o": bd})
 	items.append({"d": Iso.depth(_player_pos), "k": "me", "o": null})
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
@@ -1126,6 +1234,7 @@ func _draw() -> void:
 			"hunter": _draw_hunter(it["o"])
 			"law": _draw_lawman(it["o"])
 			"bankguard": _draw_bank_guard(it["o"])
+			"bandit": _draw_bandit(it["o"])
 			"tumble": _draw_tumble(it["o"])
 			"me": _draw_me()
 	# Barre de crochetage du coffre, au-dessus de la banque.
@@ -1137,6 +1246,22 @@ func _draw() -> void:
 		var bcol := Color(1, 0.9, 0.4) if b["friendly"] else Color(1, 0.45, 0.2)
 		draw_line(bp - bdir * 12.0, bp, Color(bcol.r, bcol.g, bcol.b, 0.5), 3.0)
 		draw_circle(bp, 3.0, bcol)
+
+	# Réticule de visée auto sur l'ennemi ciblé.
+	if _has_target:
+		var rp := Iso.project(_aim_target) + Vector2(0, -18)
+		var pulse := 9.0 + sin(_hint_t * 8.0) * 2.0
+		draw_arc(rp, pulse, 0, TAU, 20, Color(1.0, 0.3, 0.25, 0.9), 2.0)
+		for a in range(4):
+			var dirr := Vector2.RIGHT.rotated(TAU * a / 4.0)
+			draw_line(rp + dirr * (pulse - 3.0), rp + dirr * (pulse + 4.0), Color(1.0, 0.3, 0.25), 2.0)
+
+	# Pop-ups flottants (+$ / coups).
+	for f in _floaters:
+		var fp := Iso.project(f["pos"]) + Vector2(0, -40)
+		var fa: float = clampf(1.0 - float(f["t"]) / 1.1, 0.0, 1.0)
+		var fc: Color = f["col"]
+		_text(fp, str(f["text"]), 16, Color(fc.r, fc.g, fc.b, fa))
 
 	# Bulles d'ambiance + marqueur "💬" pour les PNJ.
 	for n in _npcs:
@@ -2095,6 +2220,15 @@ func _draw_lawman(p: Dictionary) -> void:
 	CharacterArt.draw_person(self, Iso.project(pos), f, _lawman_palette(), true, true, _hint_t * 7.0, 0.0, 0.0)
 	var head := Iso.project(pos) + Vector2(0, -54)
 	_text(head, "★", 18, Color(0.95, 0.85, 0.3))
+
+
+## Bandit qui rôde (gibier à dégommer).
+func _draw_bandit(b: Dictionary) -> void:
+	var pos: Vector2 = b["pos"]
+	var f := _screen_facing(pos, (b["vel"] as Vector2))
+	CharacterArt.draw_person(self, Iso.project(pos), f, _hunter_palette(), true, true, _hint_t * 8.0, 0.0, 0.0)
+	# Petit chapeau de prime au-dessus.
+	_text(Iso.project(pos) + Vector2(0, -52), "$", 14, Color(0.95, 0.8, 0.3))
 
 
 ## Garde de banque (riposte pendant le braquage).
