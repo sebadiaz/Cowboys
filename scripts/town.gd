@@ -76,8 +76,13 @@ var _bandits: Array[Dictionary] = []   # {pos, vel, hp, alive, fire_cd, wander_t
 var _floaters: Array[Dictionary] = []  # {pos, t, text, col} (pop-ups +$ / coups)
 var _aim_target := Vector2.ZERO
 var _has_target := false
+var _bursts: Array[Dictionary] = []   # éclats de mort (sang/poussière) {pos, vel, t, col}
+var _streak := 0                       # série de kills en cours (combo)
+var _streak_t := 0.0                   # temps restant avant reset de la série
+var _shake := 0.0                      # intensité de tremblement caméra (impact)
 const BANDIT_SPEED := 125.0
 const AUTO_RANGE := 460.0
+const STREAK_WINDOW := 3.2             # fenêtre pour enchaîner les kills
 var _tumble: Array[Dictionary] = []  # tumbleweeds qui roulent (décor mobile)
 
 const HORSE_LINES := ["Un fier mustang, prêt à filer après le coup.",
@@ -420,6 +425,7 @@ func _process(delta: float) -> void:
 		_update_bandits(delta)
 		_update_town_combat(delta)
 		_update_floaters(delta)
+		_update_streak(delta)
 	_update_tumble(delta)
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
@@ -438,7 +444,11 @@ func _process(delta: float) -> void:
 	if absf(angle_difference(Iso.yaw, _yaw_target)) > 0.0005:
 		Iso.yaw = lerp_angle(Iso.yaw, _yaw_target, clampf(delta * 9.0, 0.0, 1.0))
 	_cam = _cam.lerp(_camera_target(), clampf(delta * 8.0, 0.0, 1.0))
-	position = _cam
+	# Tremblement d'impact (kills) : décalage aléatoire qui s'amortit.
+	var shake_off := Vector2.ZERO
+	if _shake > 0.1:
+		shake_off = Vector2(_rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0)) * _shake
+	position = _cam + shake_off
 	_hint_t += delta
 	queue_redraw()
 
@@ -975,6 +985,42 @@ func _update_bandits(delta: float) -> void:
 			b["fire_cd"] = _rng.randf_range(1.6, 2.8)
 
 
+## Série de kills (combo) + éclats de mort + amortissement du tremblement.
+func _update_streak(delta: float) -> void:
+	_shake = maxf(0.0, _shake - delta * 26.0)
+	if _streak_t > 0.0:
+		_streak_t = maxf(0.0, _streak_t - delta)
+		if _streak_t == 0.0:
+			_streak = 0
+	var live: Array[Dictionary] = []
+	for p in _bursts:
+		p["t"] = float(p["t"]) + delta
+		p["pos"] = (p["pos"] as Vector2) + (p["vel"] as Vector2) * delta
+		p["vel"] = (p["vel"] as Vector2) * 0.90
+		if float(p["t"]) < 0.6:
+			live.append(p)
+	_bursts = live
+
+
+## Récompense un kill : avance la série, donne la prime majorée, juice d'impact.
+func _reward_kill(at: Vector2) -> void:
+	_streak += 1
+	_streak_t = STREAK_WINDOW
+	var mult := 1.0 + 0.5 * float(_streak - 1)          # x1, x1.5, x2, x2.5...
+	var bounty := int(round((120 + SaveManager.notoriety * 20) * mult))
+	SaveManager.refund(bounty)
+	_shake = maxf(_shake, 7.0)
+	AudioManager.play("hit_guard")
+	var col := Color(1, 0.9, 0.4) if _streak < 2 else Color(1, 0.6, 0.2)
+	var txt := "+%d $" % bounty
+	if _streak >= 2:
+		txt = "x%d  +%d $" % [_streak, bounty]
+	_floaters.append({"pos": at, "t": 0.0, "text": txt, "col": col})
+	for i in range(10):
+		_bursts.append({"pos": at, "vel": Vector2.RIGHT.rotated(_rng.randf() * TAU) * _rng.randf_range(60, 200),
+				"t": 0.0, "col": Color(0.8, 0.1, 0.08) if i % 2 == 0 else Color(0.5, 0.35, 0.2)})
+
+
 ## Pop-ups flottants (+$, "TOUCHÉ"...).
 func _update_floaters(delta: float) -> void:
 	var live: Array[Dictionary] = []
@@ -1030,9 +1076,7 @@ func _advance_town_bullets(delta: float) -> void:
 					if int(bd["hp"]) <= 0:
 						bd["alive"] = false
 						bd["respawn"] = randf_range(6.0, 10.0)
-						var bounty := 120 + SaveManager.notoriety * 20
-						SaveManager.refund(bounty)
-						_floaters.append({"pos": bd["pos"], "t": 0.0, "text": "+%d $" % bounty, "col": Color(1, 0.9, 0.4)})
+						_reward_kill(bd["pos"])
 					break
 			if not hit:
 				for g in _bank_guards:
@@ -1247,6 +1291,13 @@ func _draw() -> void:
 		draw_line(bp - bdir * 12.0, bp, Color(bcol.r, bcol.g, bcol.b, 0.5), 3.0)
 		draw_circle(bp, 3.0, bcol)
 
+	# Éclats de mort (sang/poussière) projetés à l'impact.
+	for p in _bursts:
+		var pp := Iso.project(p["pos"])
+		var pa: float = clampf(1.0 - float(p["t"]) / 0.6, 0.0, 1.0)
+		var pc: Color = p["col"]
+		draw_circle(pp, 2.0 + pa * 2.0, Color(pc.r, pc.g, pc.b, pa))
+
 	# Réticule de visée auto sur l'ennemi ciblé.
 	if _has_target:
 		var rp := Iso.project(_aim_target) + Vector2(0, -18)
@@ -1262,6 +1313,19 @@ func _draw() -> void:
 		var fa: float = clampf(1.0 - float(f["t"]) / 1.1, 0.0, 1.0)
 		var fc: Color = f["col"]
 		_text(fp, str(f["text"]), 16, Color(fc.r, fc.g, fc.b, fa))
+
+	# Bandeau de série (combo) — fixe à l'écran, monte en intensité.
+	if _streak >= 2:
+		var vp := get_viewport_rect().size
+		var center := Vector2(vp.x * 0.5, 70.0) - position    # écran -> local
+		var grow := 1.0 + clampf(_streak_t / STREAK_WINDOW, 0.0, 1.0) * 0.25
+		var hot := clampf(float(_streak - 2) / 6.0, 0.0, 1.0)
+		var bcol := Color(1.0, 0.85 - hot * 0.5, 0.3 - hot * 0.2)
+		_text(center + Vector2(0, 6), "SÉRIE x%d" % _streak, int(26 * grow), bcol)
+		# Jauge de temps restant avant rupture de la série.
+		var gw := 150.0 * (_streak_t / STREAK_WINDOW)
+		draw_rect(Rect2(center + Vector2(-75, 22), Vector2(150, 4)), Color(0, 0, 0, 0.4))
+		draw_rect(Rect2(center + Vector2(-75, 22), Vector2(gw, 4)), bcol)
 
 	# Bulles d'ambiance + marqueur "💬" pour les PNJ.
 	for n in _npcs:
