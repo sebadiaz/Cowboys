@@ -16,6 +16,9 @@ const LOCO_HALF := 48.0
 const CAR_LEN := 120.0
 const CAR_GAP := 10.0
 const RAIL_HALF := 30.0
+const FIRE_INTERVAL := 0.22       # tir continu auto-visé
+const AUTO_RANGE := 540.0
+const POSSE_FIRE := 1.7
 
 var _chase := RelativeChaseController.new()
 var _horse := HorseController.new()
@@ -38,8 +41,17 @@ var _fire_cd := 0.0
 var _cars: Array[Dictionary] = []      # {along, value, looted, progress, gold}
 var _guards: Array[Dictionary] = []    # {along, side, hp, fire_cd, alive, facing}
 var _allies: Array[Dictionary] = []
+var _posse: Array[Dictionary] = []     # cavaliers ennemis qui longent et chargent
 var _bullets: Array[Dictionary] = []
 var _corpses: Array[Dictionary] = []
+# Juice + immersion (copies isolées).
+var _shake := 0.0
+var _muzzle := 0.0
+var _aim_target = null
+var _scenery: Array[Dictionary] = []
+var _dust: Array[Dictionary] = []
+var _bursts: Array[Dictionary] = []
+var _floaters: Array[Dictionary] = []
 
 var _loot_value := 0
 var _loot_bags := 0
@@ -69,8 +81,36 @@ func _ready() -> void:
 	_scale = clampf(minf(vp.x, vp.y) / 480.0, 1.1, 2.2)
 	scale = Vector2(_scale, _scale)
 	_spawn_allies()
+	_spawn_posse()
+	_build_scenery()
 	_build_hud()
 	AudioManager.play_music("tension")
+
+
+## Posse montée qui longe le convoi et CHARGE le joueur (menace mobile).
+func _spawn_posse() -> void:
+	var n := 2 + clampi(SaveManager.notoriety / 2, 0, 3)
+	for i in range(n):
+		var home := Vector2(-120.0 - 60.0 * i, (-130.0 if i % 2 == 0 else 130.0))
+		_posse.append({"rel": home, "home": home, "hp": 2, "fire_cd": _rng.randf_range(0.6, POSSE_FIRE),
+				"alive": true, "facing": Vector2.LEFT, "charge_t": _rng.randf_range(1.0, 3.0), "charging": false})
+
+
+## Décor de bord de voie : poteaux télégraphiques, rochers, cactus.
+func _build_scenery() -> void:
+	for i in range(18):
+		_scenery.append(_new_prop(_rng.randf_range(-500.0, 1600.0)))
+
+
+func _new_prop(ahead: float) -> Dictionary:
+	var kinds := ["pole", "rock", "cactus", "bush"]
+	var perp := Vector2(-_track_dir.y, _track_dir.x)
+	var side := (1.0 if _rng.randf() < 0.5 else -1.0) * _rng.randf_range(120.0, 480.0)
+	# Les poteaux télégraphiques s'alignent côté voie ; le reste plus loin.
+	var k: String = kinds[_rng.randi() % kinds.size()]
+	if k == "pole":
+		side = (1.0 if _rng.randf() < 0.5 else -1.0) * _rng.randf_range(60.0, 90.0)
+	return {"pos": _loco_pos + _track_dir * ahead + perp * side, "kind": k, "s": _rng.randf_range(0.85, 1.4)}
 
 
 func _build_train() -> void:
@@ -81,10 +121,14 @@ func _build_train() -> void:
 		var along := -(LOCO_HALF + CAR_GAP + CAR_LEN * 0.5 + i * (CAR_LEN + CAR_GAP))
 		var gold := i == n_cargo
 		_cars.append({"along": along, "value": (900 if gold else 280), "looted": false,
-				"progress": 0.0, "gold": gold})
-	_train_len = LOCO_HALF + (n_cargo + 1) * (CAR_LEN + CAR_GAP)
-	# Gardes postés sur les toits (wagon d'or + un wagon de fret), +1 par notoriété.
-	var guard_cars := [n_cargo, 1]
+				"progress": 0.0, "gold": gold, "caboose": false})
+	# Fourgon de queue (caboose) : petit butin + un garde posté dessus.
+	var cab_along := -(LOCO_HALF + CAR_GAP + CAR_LEN * 0.5 + (n_cargo + 1) * (CAR_LEN + CAR_GAP))
+	_cars.append({"along": cab_along, "value": 200, "looted": false, "progress": 0.0,
+			"gold": false, "caboose": true})
+	_train_len = LOCO_HALF + (n_cargo + 2) * (CAR_LEN + CAR_GAP)
+	# Gardes postés sur les toits (wagon d'or + caboose + un fret), +1 par notoriété.
+	var guard_cars := [n_cargo, _cars.size() - 1, 1]
 	var extra := clampi(SaveManager.notoriety / 2, 0, 2)
 	for k in range(extra):
 		guard_cars.append((k * 2) % n_cargo)
@@ -136,6 +180,9 @@ func _process(delta: float) -> void:
 		_facing = mv.normalized()
 	_player_pos = np
 	_ride += delta * 14.0
+	_update_scenery(delta)
+	_update_particles(delta)
+	_update_posse(delta)
 	_update_loot(delta)
 	_update_combat(delta)
 	_advance_bullets(delta)
@@ -145,6 +192,66 @@ func _process(delta: float) -> void:
 		_hud.set_health(_hp, _max_hp)
 		_hud.set_loot(_loot_bags, _loot_value)
 	queue_redraw()
+
+
+## Recycle le décor passé derrière le convoi + poussière de vitesse.
+func _update_scenery(delta: float) -> void:
+	for p in _scenery:
+		var along := (p["pos"] as Vector2 - _loco_pos).dot(_track_dir)
+		if along < -(_train_len + 350.0):
+			var np := _new_prop(_rng.randf_range(900.0, 1600.0))
+			p["pos"] = np["pos"]
+			p["kind"] = np["kind"]
+			p["s"] = np["s"]
+	if _rng.randf() < 0.5:
+		_dust.append({"pos": _player_pos - _track_dir * 16.0, "t": 0.0,
+				"r": _rng.randf_range(3, 6), "vel": -_track_dir * 30.0})
+
+
+func _update_particles(delta: float) -> void:
+	_shake = maxf(0.0, _shake - delta * 24.0)
+	_muzzle = maxf(0.0, _muzzle - delta)
+	var d2: Array[Dictionary] = []
+	for p in _dust:
+		p["t"] = float(p["t"]) + delta
+		p["pos"] = (p["pos"] as Vector2) + (p["vel"] as Vector2) * delta
+		if float(p["t"]) < 0.7:
+			d2.append(p)
+	_dust = d2
+	var b2: Array[Dictionary] = []
+	for p in _bursts:
+		p["t"] = float(p["t"]) + delta
+		p["pos"] = (p["pos"] as Vector2) + (p["vel"] as Vector2) * delta
+		p["vel"] = (p["vel"] as Vector2) * 0.9
+		if float(p["t"]) < 0.55:
+			b2.append(p)
+	_bursts = b2
+	var f2: Array[Dictionary] = []
+	for f in _floaters:
+		f["t"] = float(f["t"]) + delta
+		f["pos"] = (f["pos"] as Vector2) + Vector2(0, -26.0 * delta)
+		if float(f["t"]) < 1.1:
+			f2.append(f)
+	_floaters = f2
+
+
+## Posse : alterne charge vers le joueur et repli.
+func _update_posse(delta: float) -> void:
+	for e in _posse:
+		if not e["alive"]:
+			continue
+		e["charge_t"] = float(e["charge_t"]) - delta
+		if float(e["charge_t"]) <= 0.0:
+			e["charging"] = not bool(e["charging"])
+			e["charge_t"] = _rng.randf_range(1.4, 2.6)
+		var tgt: Vector2 = (_chase.rel + Vector2(-30, 0)) if bool(e["charging"]) else (e["home"] as Vector2)
+		e["rel"] = (e["rel"] as Vector2).lerp(tgt, clampf(delta * 1.6, 0.0, 1.0))
+		var ep := _loco_pos + _rot(e["rel"])
+		e["facing"] = (_player_pos - ep).normalized()
+		e["fire_cd"] = float(e["fire_cd"]) - delta
+		if float(e["fire_cd"]) <= 0.0 and ep.distance_to(_player_pos) < 420.0:
+			_spawn_bullet(ep, (_player_pos - ep), false)
+			e["fire_cd"] = POSSE_FIRE * (1.4 if GameManager.assist else 1.0)
 
 
 # --- Pillage par wagon ---
@@ -184,6 +291,9 @@ func _loot_car(idx: int) -> void:
 	_loot_value += val
 	_loot_bags += 1
 	AudioManager.play("safe")
+	_shake = maxf(_shake, 6.0)
+	_floaters.append({"pos": _loco_pos + _track_dir * float(car["along"]), "t": 0.0,
+			"text": "+%d $" % val, "col": Color(1, 0.9, 0.4)})
 	if bool(car["gold"]):
 		_gold_looted = true
 		_escaping = true
@@ -211,18 +321,26 @@ func _update_combat(delta: float) -> void:
 			continue
 		var ap: Vector2 = _player_pos + _rot(a["off"])
 		a["fire_cd"] = float(a["fire_cd"]) - delta
-		var tgt = _nearest_guard(ap)
+		var tgt = _nearest_hostile(ap)
 		if tgt != null:
 			a["facing"] = (tgt - ap).normalized()
 			if a["fire_cd"] <= 0.0:
 				_spawn_bullet(ap, (tgt - ap), true)
 				a["fire_cd"] = ALLY_FIRE
+	# Tir du joueur : AUTO-VISÉE (garde ou posse le plus proche) + TIR CONTINU.
 	_fire_cd = maxf(0.0, _fire_cd - delta)
-	if InputManager.is_fire_pressed() and _fire_cd <= 0.0:
-		var aim = _nearest_guard(_player_pos)
-		var dir: Vector2 = (aim - _player_pos) if aim != null else _track_dir
+	_aim_target = _nearest_hostile(_player_pos)
+	var locked: bool = _aim_target != null and _player_pos.distance_to(_aim_target) < AUTO_RANGE
+	var manual := InputManager.is_fire_pressed()
+	if _fire_cd <= 0.0 and (locked or manual):
+		var dir: Vector2 = (_aim_target - _player_pos) if locked else _track_dir
+		if dir.length() < 1.0:
+			dir = _track_dir
+		_facing = dir.normalized()
 		_spawn_bullet(_player_pos + dir.normalized() * 18.0, dir, true)
-		_fire_cd = 0.28
+		_fire_cd = FIRE_INTERVAL * SaveManager.firerate_mult()
+		_muzzle = 0.06
+		AudioManager.play("shot", -6.0)
 
 
 func _guard_pos(g: Dictionary) -> Vector2:
@@ -246,10 +364,23 @@ func _advance_bullets(delta: float) -> void:
 				if g["alive"] and _guard_pos(g).distance_to(b["pos"]) < 16.0:
 					g["hp"] = int(g["hp"]) - 1
 					hit = true
+					_spawn_burst(b["pos"], Color(0.8, 0.2, 0.15))
 					if int(g["hp"]) <= 0:
 						g["alive"] = false
 						_corpses.append({"pos": _guard_pos(g), "t": 0.0})
+						_kill_reward(_guard_pos(g))
 					break
+			if not hit:
+				for e in _posse:
+					if e["alive"] and _posse_pos(e).distance_to(b["pos"]) < 16.0:
+						e["hp"] = int(e["hp"]) - 1
+						hit = true
+						_spawn_burst(b["pos"], Color(0.8, 0.2, 0.15))
+						if int(e["hp"]) <= 0:
+							e["alive"] = false
+							_corpses.append({"pos": _posse_pos(e), "t": 0.0})
+							_kill_reward(_posse_pos(e))
+						break
 		else:
 			if not _over and _dmg_cd <= 0.0 and _player_pos.distance_to(b["pos"]) < 15.0:
 				_hurt_player()
@@ -275,9 +406,24 @@ func _advance_bullets(delta: float) -> void:
 func _hurt_player() -> void:
 	_hp = maxi(0, _hp - 1)
 	_dmg_cd = 0.8 if GameManager.assist else 0.45
+	_shake = maxf(_shake, 9.0)
 	AudioManager.play("hit_player", -4.0)
 	if _hud != null and _hp > 0:
 		_hud.flash(Color(1, 0, 0, 0.35))
+
+
+func _spawn_burst(at: Vector2, col: Color) -> void:
+	for i in range(8):
+		_bursts.append({"pos": at, "t": 0.0, "col": col if i % 2 == 0 else Color(0.5, 0.35, 0.2),
+				"vel": Vector2.RIGHT.rotated(_rng.randf() * TAU) * _rng.randf_range(50, 170)})
+
+
+func _kill_reward(at: Vector2) -> void:
+	_shake = maxf(_shake, 7.0)
+	var bounty := 90 + SaveManager.notoriety * 10
+	SaveManager.refund(bounty)
+	AudioManager.play("hit_guard")
+	_floaters.append({"pos": at, "t": 0.0, "text": "+%d $" % bounty, "col": Color(1, 0.85, 0.5)})
 
 
 func _nearest_guard(from: Vector2):
@@ -292,6 +438,27 @@ func _nearest_guard(from: Vector2):
 			best = d
 			pos = gp
 	return pos
+
+
+## Cible la plus proche parmi gardes de toit ET posse montée.
+func _nearest_hostile(from: Vector2):
+	var best := 1.0e20
+	var pos = _nearest_guard(from)
+	if pos != null:
+		best = from.distance_to(pos)
+	for e in _posse:
+		if not e["alive"]:
+			continue
+		var ep := _loco_pos + _rot(e["rel"])
+		var d := from.distance_to(ep)
+		if d < best:
+			best = d
+			pos = ep
+	return pos
+
+
+func _posse_pos(e: Dictionary) -> Vector2:
+	return _loco_pos + _rot(e["rel"])
 
 
 # --- Fin ---
@@ -338,6 +505,9 @@ func _score() -> Dictionary:
 	for g in _guards:
 		if not g["alive"]:
 			kills += 1
+	for e in _posse:
+		if not e["alive"]:
+			kills += 1
 	var time_bonus: int = maxi(0, int(round((150.0 - _elapsed) * 2.0)))
 	var crew := 200 * GameManager.crew_count_role("scout") + 120 * _live_allies()
 	var guard_bonus := 90 * kills
@@ -369,18 +539,30 @@ func _update_camera(delta: float) -> void:
 	var train_mid := _loco_pos + _track_dir * (-_train_len * 0.5)
 	var focus := _player_pos.lerp(train_mid, 0.3)
 	_cam = _cam.lerp(vp * 0.5 - focus * _scale, clampf(delta * 8.0, 0.0, 1.0))
-	position = _cam
+	var sh := Vector2.ZERO
+	if _shake > 0.1:
+		sh = Vector2(_rng.randf_range(-1, 1), _rng.randf_range(-1, 1)) * _shake
+	position = _cam + sh
 
 
 func _draw() -> void:
 	_draw_ground()
 	_draw_rails()
+	for du in _dust:
+		var da: float = clampf(1.0 - float(du["t"]) / 0.7, 0.0, 1.0)
+		draw_circle(du["pos"], float(du["r"]) * (0.6 + da), Color(0.72, 0.6, 0.42, da * 0.5))
 	var items: Array[Dictionary] = []
+	for p in _scenery:
+		items.append({"y": (p["pos"] as Vector2).y, "k": "prop", "o": p})
 	items.append({"y": _loco_pos.y - 9999.0, "k": "train"})   # le train sous tout le monde
 	for g in _guards:
 		if g["alive"]:
 			var gp := _guard_pos(g)
 			items.append({"y": gp.y, "k": "guard", "p": gp, "f": g["facing"]})
+	for e in _posse:
+		if e["alive"]:
+			var pp := _posse_pos(e)
+			items.append({"y": pp.y, "k": "posse", "p": pp, "f": e["facing"]})
 	for a in _allies:
 		if a["alive"]:
 			var ap: Vector2 = _player_pos + _rot(a["off"])
@@ -391,18 +573,52 @@ func _draw() -> void:
 	items.sort_custom(func(a, b): return a["y"] < b["y"])
 	for it in items:
 		match it["k"]:
+			"prop": _draw_prop(it["o"])
 			"train": _draw_train()
 			"guard": _draw_roof_guard(it["p"], it["f"])
+			"posse": _draw_rider(it["p"], it["f"], Color(0.7, 0.78, 1.05), _pal_guard())
 			"ally": _draw_rider(it["p"], it["f"], Color(0.78, 1.05, 0.8), _pal_ally())
 			"corpse": _draw_corpse(it["p"])
 			"me": _draw_rider(_player_pos, _facing, Color(1.0, 0.92, 0.7), CharacterArt.hero_palette(), true)
+	if _muzzle > 0.0:
+		draw_circle(_player_pos + _facing * 20.0 + Vector2(0, -14), 7.0 * (_muzzle / 0.06), Color(1, 0.92, 0.5, 0.9))
 	for b in _bullets:
 		var p: Vector2 = b["pos"]
 		var d: Vector2 = (b["vel"] as Vector2).normalized()
 		var col := Color(1, 0.9, 0.4) if b["friendly"] else Color(1, 0.5, 0.25)
 		draw_line(p - d * 15.0, p, Color(col.r, col.g, col.b, 0.5), 3.0)
 		draw_circle(p, 3.0, col)
+	for bu in _bursts:
+		var ba: float = clampf(1.0 - float(bu["t"]) / 0.55, 0.0, 1.0)
+		var bc: Color = bu["col"]
+		draw_circle(bu["pos"], 2.0 + ba * 2.0, Color(bc.r, bc.g, bc.b, ba))
+	for f in _floaters:
+		var fa: float = clampf(1.0 - float(f["t"]) / 1.1, 0.0, 1.0)
+		var fc: Color = f["col"]
+		_text(f["pos"] + Vector2(0, -34), str(f["text"]), 15, Color(fc.r, fc.g, fc.b, fa))
 	_draw_overlay()
+
+
+## Décor de bord de voie.
+func _draw_prop(p: Dictionary) -> void:
+	var c: Vector2 = p["pos"]
+	var s: float = p["s"]
+	draw_colored_polygon(_diam(c, 12.0 * s), Color(0, 0, 0, 0.16))
+	match p["kind"]:
+		"pole":
+			draw_line(c, c + Vector2(0, -52 * s), Color(0.34, 0.24, 0.14), 4.0 * s)
+			draw_line(c + Vector2(-12 * s, -44 * s), c + Vector2(12 * s, -44 * s), Color(0.28, 0.20, 0.12), 3.0 * s)
+			draw_line(c + Vector2(-12 * s, -38 * s), c + Vector2(12 * s, -38 * s), Color(0.28, 0.20, 0.12), 2.0 * s)
+		"rock":
+			draw_circle(c + Vector2(0, -7 * s), 11.0 * s, Color(0.5, 0.47, 0.43))
+			draw_circle(c + Vector2(-6 * s, -4 * s), 7.0 * s, Color(0.42, 0.39, 0.36))
+		"cactus":
+			draw_line(c, c + Vector2(0, -34 * s), Color(0.27, 0.45, 0.24), 7.0 * s)
+			draw_line(c + Vector2(0, -16 * s), c + Vector2(-11 * s, -22 * s), Color(0.27, 0.45, 0.24), 5.0 * s)
+			draw_line(c + Vector2(0, -24 * s), c + Vector2(10 * s, -30 * s), Color(0.27, 0.45, 0.24), 5.0 * s)
+		"bush":
+			draw_circle(c + Vector2(0, -6 * s), 9.0 * s, Color(0.36, 0.42, 0.22))
+			draw_circle(c + Vector2(7 * s, -4 * s), 6.0 * s, Color(0.32, 0.38, 0.20))
 
 
 func _draw_ground() -> void:
@@ -448,11 +664,14 @@ func _draw_train() -> void:
 
 func _draw_car(car: Dictionary, d: Vector2, perp: Vector2) -> void:
 	var c := _loco_pos + d * float(car["along"])
-	var hl := CAR_LEN * 0.5
+	var caboose: bool = car.get("caboose", false)
+	var hl := CAR_LEN * (0.34 if caboose else 0.5)
 	var hw := 26.0
 	var looted: bool = car["looted"]
 	var gold: bool = car["gold"]
 	var body := Color(0.30, 0.22, 0.14) if not gold else Color(0.42, 0.32, 0.14)
+	if caboose:
+		body = Color(0.46, 0.16, 0.12)   # caboose rouge classique
 	if looted:
 		body = body.darkened(0.25)
 	var poly := PackedVector2Array([
@@ -476,6 +695,8 @@ func _draw_car(car: Dictionary, d: Vector2, perp: Vector2) -> void:
 		var head := c + Vector2(0, -hw - 16.0)
 		draw_rect(Rect2(head + Vector2(-bw * 0.5, -4), Vector2(bw, 6)), Color(0, 0, 0, 0.7))
 		draw_rect(Rect2(head + Vector2(-bw * 0.5, -4), Vector2(bw * float(car["progress"]), 6)), Color(0.95, 0.8, 0.2))
+	if caboose:
+		draw_rect(Rect2(c - Vector2(8, 8), Vector2(16, 16)), body.lightened(0.15))  # cupola
 	if gold and not looted:
 		_text(c + Vector2(0, -hw - 22.0), "WAGON D'OR", 12, Color(1, 0.9, 0.45))
 

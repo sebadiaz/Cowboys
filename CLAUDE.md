@@ -119,20 +119,30 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
   offset du joueur dans le repère de la cible (avancer/reculer + latéral), borné
   à une bande, états à-hauteur / distancé. Banc d'essai `scenes/levels/ChaseTest.tscn`
   (+ bouton menu « POURSUITE (prototype) »).
-- **Diligence** : `stagecoach_chase.gd` (FAIT, lot 18) — vraie poursuite posée sur
-  `RelativeChaseController` + `HorseController` : la diligence roule en continu,
-  on la rattrape, on se met à hauteur pour piller le coffre (maintien E), l'escorte
-  montée riposte, l'équipe (CrewScreen) chevauche et tire, puis on décroche pour
-  fuir. Réutilise le HUD, le flux résultat/score et la promotion en bande fidèle.
-  Lancée par `GameManager.start_coach_attack()` (scène `StagecoachChase.tscn`).
+- **Diligence** : `stagecoach_chase.gd` (FAIT, lot 18 ; REVU — punch & contenu) —
+  poursuite posée sur `RelativeChaseController` + `HorseController` : la diligence
+  roule en continu, on la rattrape et on longe son flanc. **DEUX butins** (coffre-fort
+  d'or + malle arrière, maintien E à hauteur de chacun ; l'or ouvre la fuite, la
+  malle = bonus). **Tir AUTO-VISÉ + continu** (mains libres) sur l'escorte la plus
+  proche. L'escorte montée **CHARGE puis décroche** (`_update_escort_motion`), un
+  **messager au fusil** est posté près du cocher. **Juice** : tremblement caméra
+  `_shake`, éclats `_bursts`, pop-ups `+$`, flash de bouche, **poussière de vitesse**
+  et **décor de bord de piste qui défile** (`_scenery` : cactus, rochers, buissons,
+  poteaux, crânes). Tuer une escorte lâche une prime (`_kill_reward`). L'équipe
+  (CrewScreen) chevauche et tire ; promotion en bande fidèle à la fuite. Lancée par
+  `GameManager.start_coach_attack()` (scène `StagecoachChase.tscn`).
   L'ancien mode coach de `mission_manager` n'est plus routé (conservé, non supprimé).
 - **Données** : `data/mission_0N.json`, `data/coach.json`.
   Sprites : `assets/sprites/` (Tiny Town = décor, Tiny Dungeon = personnages).
-- **Train** : `train_chase.gd` (FAIT, lot 19, sur le chase relatif) — locomotive +
-  wagons en file ; avancer/reculer longe le convoi, on pille chaque wagon (E à
-  hauteur), le wagon d'OR au bout = objectif, gardes postés sur les toits, puis on
-  décroche. Lancé par `GameManager.start_train_attack()` (scène `TrainChase.tscn`),
-  bouton dédié dans CrewScreen. Réutilise HUD/équipe/résultat/bande comme la diligence.
+- **Train** : `train_chase.gd` (FAIT, lot 19 ; REVU — punch & contenu) — locomotive +
+  wagons en file + **caboose rouge** au bout ; on longe le convoi et on pille chaque
+  wagon (E à hauteur), le wagon d'OR = objectif. **Tir AUTO-VISÉ + continu** sur la
+  cible la plus proche (garde de toit OU posse). Gardes postés sur les toits +
+  **POSSE MONTÉE** (`_posse`) qui longe et **CHARGE** le joueur. **Juice** identique à
+  la diligence (`_shake`, `_bursts`, `+$`, flash, poussière) + **poteaux télégraphiques**
+  et décor qui défilent (`_scenery`). Kills (garde/posse) = prime `_kill_reward`. Lancé
+  par `GameManager.start_train_attack()` (scène `TrainChase.tscn`), bouton dédié dans
+  CrewScreen. Réutilise HUD/équipe/résultat/bande comme la diligence.
 - **Commerces** : `shop_screen.gd` filtré par `GameManager.shop_category` (FAIT,
   lot 13) — ARMURIER (FORGE), CABINET DU DOC (DOCTEUR), MAGASIN GÉNÉRAL (MAGASIN),
   enterables en ville via `goto_commerce()`. Catalogue catégorisé (champ `store`).
