@@ -80,8 +80,13 @@ var _bursts: Array[Dictionary] = []   # éclats de mort (sang/poussière) {pos, 
 var _streak := 0                       # série de kills en cours (combo)
 var _streak_t := 0.0                   # temps restant avant reset de la série
 var _shake := 0.0                      # intensité de tremblement caméra (impact)
+var _boss = null                       # mini-boss hors-la-loi RECHERCHÉ (null = aucun)
+var _boss_timer := 26.0                # délai avant la prochaine apparition
 const BANDIT_SPEED := 125.0
+const BOSS_SPEED := 168.0
 const AUTO_RANGE := 460.0
+const BOSS_NAMES := ["Black Jack McGraw", "El Cuervo", "Doc Holloway", "Sundance Kid",
+	"Wild Bill Cassidy", "Coyote Malone"]
 const STREAK_WINDOW := 3.2             # fenêtre pour enchaîner les kills
 var _tumble: Array[Dictionary] = []  # tumbleweeds qui roulent (décor mobile)
 
@@ -423,6 +428,7 @@ func _process(delta: float) -> void:
 		_update_commerce_card()
 		_update_bank_heist(delta)
 		_update_bandits(delta)
+		_update_boss(delta)
 		_update_town_combat(delta)
 		_update_floaters(delta)
 		_update_streak(delta)
@@ -955,7 +961,63 @@ func _hostiles() -> Array:
 			out.append(g["pos"])
 	for p in _posse:
 		out.append(p["pos"])
+	if _boss != null and _boss["alive"]:
+		out.append(_boss["pos"])
 	return out
+
+
+## Mini-boss « RECHERCHÉ » : un hors-la-loi nommé, coriace, grosse prime.
+## Apparaît périodiquement, fonce sur le joueur et lâche des rafales.
+func _update_boss(delta: float) -> void:
+	if _boss == null:
+		_boss_timer = maxf(0.0, _boss_timer - delta)
+		if _boss_timer <= 0.0 and not _horse_ctrl.mounted:
+			_spawn_boss()
+		return
+	if not _boss["alive"]:
+		return
+	var to_p: Vector2 = _player_pos - (_boss["pos"] as Vector2)
+	var want := to_p.normalized() * BOSS_SPEED
+	# Garde ses distances : fonce s'il est loin, tourne autour s'il est proche.
+	if to_p.length() < 220.0:
+		var perp := Vector2(-want.y, want.x)
+		want = (want * 0.2 + perp).normalized() * BOSS_SPEED
+	_boss["vel"] = (_boss["vel"] as Vector2).lerp(want, clampf(delta * 2.0, 0.0, 1.0))
+	_boss["pos"] = _try_move(_boss["pos"], (_boss["vel"] as Vector2).normalized(), BOSS_SPEED * delta, _blocked)
+	_boss["fire_cd"] = float(_boss["fire_cd"]) - delta
+	if to_p.length() < 460.0 and float(_boss["fire_cd"]) <= 0.0:
+		# Rafale de 3 balles en éventail.
+		var base := to_p.normalized()
+		for a in [-0.16, 0.0, 0.16]:
+			var dir := base.rotated(a)
+			_town_bullets.append({"pos": _boss["pos"] + dir * 22.0, "vel": dir * 560.0, "friendly": false, "life": 1.1})
+		_boss["fire_cd"] = _rng.randf_range(1.6, 2.4)
+		AudioManager.play("shot", -8.0)
+
+
+func _spawn_boss() -> void:
+	var hp := 11 + SaveManager.notoriety
+	var px := FLOOR.position.x + 120.0 if _rng.randf() < 0.5 else FLOOR.end.x - 120.0
+	var py := _rng.randf_range(1080.0, 1380.0)
+	_boss = {"pos": Vector2(px, py), "vel": Vector2.ZERO, "hp": hp, "max_hp": hp, "alive": true,
+		"fire_cd": 1.2, "name": BOSS_NAMES[_rng.randi() % BOSS_NAMES.size()],
+		"bounty": 650 + SaveManager.notoriety * 130}
+	_floaters.append({"pos": Vector2(px, py - 30), "t": 0.0, "text": "RECHERCHÉ !", "col": Color(1, 0.3, 0.25)})
+	AudioManager.play("alarm", -6.0)
+
+
+## Le boss est abattu : grosse prime, juice marqué, prochain délai relancé.
+func _kill_boss() -> void:
+	var bounty: int = int(_boss["bounty"])
+	SaveManager.refund(bounty)
+	_shake = maxf(_shake, 12.0)
+	for i in range(20):
+		_bursts.append({"pos": _boss["pos"], "vel": Vector2.RIGHT.rotated(_rng.randf() * TAU) * _rng.randf_range(70, 260),
+			"t": 0.0, "col": Color(0.8, 0.1, 0.08) if i % 2 == 0 else Color(0.95, 0.8, 0.3)})
+	_floaters.append({"pos": _boss["pos"], "t": 0.0, "text": "%s ABATTU  +%d $" % [_boss["name"], bounty], "col": Color(1, 0.9, 0.4)})
+	AudioManager.play("win", -2.0)
+	_boss = null
+	_boss_timer = _rng.randf_range(28.0, 40.0)
 
 
 ## Bandits : rôdent, tirent parfois sur le joueur ; respawn après mort.
@@ -1068,16 +1130,27 @@ func _advance_town_bullets(delta: float) -> void:
 			continue
 		var hit := false
 		if b["friendly"]:
+			# Mini-boss recherché : encaisse plusieurs balles, grosse prime.
+			if _boss != null and _boss["alive"] and (_boss["pos"] as Vector2).distance_to(b["pos"]) < 26.0:
+				_boss["hp"] = int(_boss["hp"]) - 1
+				hit = true
+				_bursts.append({"pos": b["pos"], "vel": Vector2.RIGHT.rotated(_rng.randf() * TAU) * 110.0,
+					"t": 0.0, "col": Color(0.8, 0.2, 0.15)})
+				_shake = maxf(_shake, 3.0)
+				if int(_boss["hp"]) <= 0:
+					_boss["alive"] = false
+					_kill_boss()
 			# Bandits d'abord (gibier principal).
-			for bd in _bandits:
-				if bd["alive"] and (bd["pos"] as Vector2).distance_to(b["pos"]) < 22.0:
-					bd["hp"] = int(bd["hp"]) - 1
-					hit = true
-					if int(bd["hp"]) <= 0:
-						bd["alive"] = false
-						bd["respawn"] = randf_range(6.0, 10.0)
-						_reward_kill(bd["pos"])
-					break
+			if not hit:
+				for bd in _bandits:
+					if bd["alive"] and (bd["pos"] as Vector2).distance_to(b["pos"]) < 22.0:
+						bd["hp"] = int(bd["hp"]) - 1
+						hit = true
+						if int(bd["hp"]) <= 0:
+							bd["alive"] = false
+							bd["respawn"] = randf_range(6.0, 10.0)
+							_reward_kill(bd["pos"])
+						break
 			if not hit:
 				for g in _bank_guards:
 					if g["alive"] and (g["pos"] as Vector2).distance_to(b["pos"]) < 22.0:
@@ -1249,6 +1322,8 @@ func _draw() -> void:
 	for bd in _bandits:
 		if bd["alive"]:
 			items.append({"d": Iso.depth(bd["pos"]), "k": "bandit", "o": bd})
+	if _boss != null and _boss["alive"]:
+		items.append({"d": Iso.depth(_boss["pos"]), "k": "boss", "o": _boss})
 	items.append({"d": Iso.depth(_player_pos), "k": "me", "o": null})
 	items.sort_custom(func(a, b): return a["d"] < b["d"])
 	for it in items:
@@ -1279,6 +1354,7 @@ func _draw() -> void:
 			"law": _draw_lawman(it["o"])
 			"bankguard": _draw_bank_guard(it["o"])
 			"bandit": _draw_bandit(it["o"])
+			"boss": _draw_boss(it["o"])
 			"tumble": _draw_tumble(it["o"])
 			"me": _draw_me()
 	# Barre de crochetage du coffre, au-dessus de la banque.
@@ -1326,6 +1402,17 @@ func _draw() -> void:
 		var gw := 150.0 * (_streak_t / STREAK_WINDOW)
 		draw_rect(Rect2(center + Vector2(-75, 22), Vector2(150, 4)), Color(0, 0, 0, 0.4))
 		draw_rect(Rect2(center + Vector2(-75, 22), Vector2(gw, 4)), bcol)
+
+	# Bandeau « RECHERCHÉ » quand le mini-boss est en ville (fixe à l'écran).
+	if _boss != null and _boss["alive"]:
+		var vpb := get_viewport_rect().size
+		var c := Vector2(vpb.x * 0.5, 116.0) - position
+		var pulse := 0.5 + 0.5 * sin(_hint_t * 4.0)
+		_text(c, "★ RECHERCHÉ ★", 22, Color(1.0, 0.3 + 0.3 * pulse, 0.2))
+		_text(c + Vector2(0, 24), "%s — %d $" % [str(_boss["name"]), int(_boss["bounty"])], 16, Color(1, 0.85, 0.55))
+		# Flèche indiquant la direction du boss.
+		var dir := (Iso.project(_boss["pos"]) - (Vector2(vpb.x * 0.5, vpb.y * 0.5) - position)).normalized()
+		draw_line(c + Vector2(0, 44), c + Vector2(0, 44) + dir * 26.0, Color(1, 0.4, 0.3), 3.0)
 
 	# Bulles d'ambiance + marqueur "💬" pour les PNJ.
 	for n in _npcs:
@@ -2293,6 +2380,34 @@ func _draw_bandit(b: Dictionary) -> void:
 	CharacterArt.draw_person(self, Iso.project(pos), f, _hunter_palette(), true, true, _hint_t * 8.0, 0.0, 0.0)
 	# Petit chapeau de prime au-dessus.
 	_text(Iso.project(pos) + Vector2(0, -52), "$", 14, Color(0.95, 0.8, 0.3))
+
+
+## Mini-boss recherché : silhouette plus grande, manteau noir, barre de vie + nom.
+func _draw_boss(b: Dictionary) -> void:
+	var pos: Vector2 = b["pos"]
+	var sp := Iso.project(pos)
+	var f := _screen_facing(pos, (b["vel"] as Vector2))
+	# Aura rouge menaçante + ombre élargie.
+	draw_circle(sp + Vector2(0, -2), 26.0, Color(0.7, 0.1, 0.1, 0.18))
+	draw_colored_polygon(_diamond_shadow(sp, 16.0), Color(0, 0, 0, 0.28))
+	CharacterArt.draw_person(self, sp, f, _boss_palette(), true, true, _hint_t * 9.0, 0.0, 0.0)
+	# Barre de vie + nom au-dessus.
+	var frac: float = clampf(float(b["hp"]) / float(b["max_hp"]), 0.0, 1.0)
+	var head := sp + Vector2(0, -62)
+	draw_rect(Rect2(head + Vector2(-34, -6), Vector2(68, 7)), Color(0, 0, 0, 0.7))
+	draw_rect(Rect2(head + Vector2(-34, -6), Vector2(68.0 * frac, 7)), Color(0.9, 0.2, 0.2))
+	_text(head + Vector2(0, -10), "☠ %s" % str(b["name"]), 14, Color(1, 0.85, 0.5))
+
+
+func _boss_palette() -> Dictionary:
+	return {
+		"hat": Color(0.07, 0.07, 0.08), "hat_band": Color(0.6, 0.12, 0.12),
+		"coat": Color(0.12, 0.11, 0.13), "coat_dark": Color(0.06, 0.05, 0.07),
+		"shirt": Color(0.30, 0.10, 0.10), "pants": Color(0.10, 0.09, 0.10),
+		"skin": Color(0.82, 0.62, 0.46), "bandana": Color(0.7, 0.12, 0.12),
+		"belt": Color(0.10, 0.08, 0.06), "buckle": Color(0.85, 0.7, 0.3),
+		"boots": Color(0.10, 0.08, 0.07), "hair": Color(0.10, 0.08, 0.06),
+	}
 
 
 ## Garde de banque (riposte pendant le braquage).

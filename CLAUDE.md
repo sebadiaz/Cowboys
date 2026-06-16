@@ -77,6 +77,13 @@ saloon. Missions **courtes (2–5 min)**, rejouables, lisibles. Construit par
   `_reward_kill`, `_update_streak`, `_update_floaters`, `_draw_bandit`. Calque
   d'ambiance cinématographique `atmosphere.gd` (golden hour, god rays, cycle
   jour/nuit, poussières d'or) posé par-dessus le monde.
+- **FAIT (mini-boss « RECHERCHÉ »)** : un hors-la-loi **nommé** (`BOSS_NAMES`),
+  coriace (PV `11 + notoriété`, barre de vie + nom dessinés), apparaît
+  périodiquement (`_boss_timer`), **fonce** sur le joueur et lâche des **rafales en
+  éventail**. Ciblé par l'auto-visée comme tout hostile ; l'abattre paie une **grosse
+  prime** (`650 + notoriété*130`) avec juice marqué (gros `_shake`, gerbe de `_bursts`,
+  pop-up). Bandeau écran « ★ RECHERCHÉ ★ » + flèche directionnelle. Voir
+  `_update_boss`, `_spawn_boss`, `_kill_boss`, `_draw_boss`.
 
 ## 5. Règle cheval / train / diligence (poursuites)
 
