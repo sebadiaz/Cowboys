@@ -155,8 +155,13 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
   joueur (seek + évitement via `_blocked`). Plus lents qu'à pied, bien plus lents
   que le cheval -> on peut fuir. Capturé = ils empochent une part de la prime et la
   traque retombe. Intégré dans `town.gd` (rendu + bandeau PRIME + conséquence).
-- **À créer plus tard (lots dédiés)** : 
-  migration mission banque in-map, `card_game` (saloon).
+- **Jeu de cartes** : `card_game.gd` (FAIT) — table de **VINGT-ET-UN (Blackjack)** au
+  saloon. Système autonome (Control overlay screen-space, posé sous une CanvasLayer
+  par `saloon.gd` quand on parle au « Joueur de poker »). On règle sa MISE, on
+  DISTRIBUE, on TIRE/RESTE ; le croupier joue à 17 ; blackjack naturel paie ×1.5,
+  victoire ×2, égalité = mise rendue. Argent via `SaveManager.spend/refund`, entrées
+  boutons tactiles + clavier (H tirer / S rester / Entrée distribuer / Échap quitter).
+  Tout dessiné (cartes, feutrine) — aucun asset. Voir `_open_card_game()` dans `saloon.gd`.
 
 ## 8. Interdits (toutes versions)
 

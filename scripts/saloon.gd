@@ -23,6 +23,7 @@ var _target_anchor := Vector2.ZERO
 var _can_exit := false
 var _interact_was := false
 var _action_btn: Button
+var _card_game = null          # overlay du jeu de cartes (null = fermé)
 
 var _npcs: Array[Dictionary] = []
 var _foots: Array[Rect2] = []
@@ -81,7 +82,7 @@ func _build_physics() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if _body == null:
+	if _body == null or _card_game != null:
 		return
 	var dir := Iso.screen_to_world(InputManager.get_move_vector())
 	if dir.length() > 1.0:
@@ -144,6 +145,10 @@ func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color,
 
 func _process(delta: float) -> void:
 	# Déplacement du joueur (collision moteur) géré dans _physics_process.
+	if _card_game != null:
+		if _action_btn != null:
+			_action_btn.visible = false
+		return
 	_update_interaction()
 	for n in _npcs:
 		NpcAI.update(n, delta, _blocked, _rng)
@@ -171,7 +176,8 @@ func _update_interaction() -> void:
 				best = d
 				_target_kind = "npc"
 				_target_npc = n
-				_near_label = "Parler à %s" % n["name"]
+				_near_label = ("JOUER aux cartes (21)" if str(n["name"]) == "Joueur de poker"
+						else "Parler à %s" % n["name"])
 				_target_anchor = n["pos"]
 	var held := InputManager.is_interact_held()
 	if held and not _interact_was:
@@ -184,7 +190,27 @@ func _do_action() -> void:
 	if _target_kind == "exit":
 		_leave()
 	elif _target_kind == "npc" and _target_npc != null:
-		_talk(_target_npc)
+		if str(_target_npc["name"]) == "Joueur de poker":
+			_open_card_game()
+		else:
+			_talk(_target_npc)
+
+
+## Ouvre la table de VINGT-ET-UN par-dessus le saloon (overlay screen-space).
+func _open_card_game() -> void:
+	if _card_game != null:
+		return
+	var layer := CanvasLayer.new()
+	layer.layer = 6
+	add_child(layer)
+	var cg = load("res://scripts/card_game.gd").new()
+	layer.add_child(cg)
+	cg.closed.connect(func():
+		layer.queue_free()
+		_card_game = null
+		_interact_was = true)   # évite de rouvrir aussitôt avec la même pression
+	_card_game = cg
+	AudioManager.play("click")
 
 
 func _update_action_button() -> void:
@@ -238,6 +264,8 @@ func _blocked(pos: Vector2) -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _card_game != null:
+		return
 	if event.is_action_pressed("pause"):
 		GameManager.return_to_town(TOWN_EXIT)
 
