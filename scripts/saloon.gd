@@ -126,6 +126,9 @@ func _build() -> void:
 	_add_npc(Vector2(640, 560), Vector2(-0.4, -1), Color(0.5, 0.2, 0.2), Color(0.8, 0.7, 0.6),
 			"Ivrogne", ["*hic* T'as pas une pièce, l'ami ?",
 			"J'ai vu le shérif rentrer son or à la banque... *hic*"], 55.0)
+	_add_npc(Vector2(700, 430), Vector2(-1, -0.3), Color(0.18, 0.16, 0.2), Color(0.25, 0.2, 0.15),
+			"Pistolero", ["On règle ça dehors ? Le plus rapide rafle la mise.",
+			"T'as la dégaine lente, gamin."], 24.0)
 
 
 func _add_npc(pos: Vector2, facing: Vector2, coat: Color, hat: Color,
@@ -177,6 +180,7 @@ func _update_interaction() -> void:
 				_target_kind = "npc"
 				_target_npc = n
 				_near_label = ("JOUER aux cartes (21)" if str(n["name"]) == "Joueur de poker"
+						else "PROVOQUER en duel" if str(n["name"]) == "Pistolero"
 						else "Parler à %s" % n["name"])
 				_target_anchor = n["pos"]
 	var held := InputManager.is_interact_held()
@@ -192,6 +196,8 @@ func _do_action() -> void:
 	elif _target_kind == "npc" and _target_npc != null:
 		if str(_target_npc["name"]) == "Joueur de poker":
 			_open_card_game()
+		elif str(_target_npc["name"]) == "Pistolero":
+			_open_duel()
 		else:
 			_talk(_target_npc)
 
@@ -210,6 +216,23 @@ func _open_card_game() -> void:
 		_card_game = null
 		_interact_was = true)   # évite de rouvrir aussitôt avec la même pression
 	_card_game = cg
+	AudioManager.play("click")
+
+
+## Ouvre le DUEL au pistolet par-dessus le saloon (même pause d'overlay).
+func _open_duel() -> void:
+	if _card_game != null:
+		return
+	var layer := CanvasLayer.new()
+	layer.layer = 6
+	add_child(layer)
+	var dg = load("res://scripts/duel_game.gd").new()
+	layer.add_child(dg)
+	dg.closed.connect(func():
+		layer.queue_free()
+		_card_game = null
+		_interact_was = true)
+	_card_game = dg
 	AudioManager.play("click")
 
 

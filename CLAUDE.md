@@ -174,6 +174,12 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
   victoire ×2, égalité = mise rendue. Argent via `SaveManager.spend/refund`, entrées
   boutons tactiles + clavier (H tirer / S rester / Entrée distribuer / Échap quitter).
   Tout dessiné (cartes, feutrine) — aucun asset. Voir `_open_card_game()` dans `saloon.gd`.
+- **Duel au pistolet** : `duel_game.gd` (FAIT) — mini-jeu de **réflexe quick-draw**
+  (high-noon) au saloon. Overlay autonome posé par `saloon.gd` quand on parle au
+  « Pistolero ». États INTRO→WAIT→DRAW→RESULT : on attend le signal puis on DÉGAINE
+  (Espace/clic/F) ; tirer trop tôt = faux départ, trop lent = l'adversaire t'abat.
+  Gagner paie une prime (`220 + notoriété*70` + bonus de dégaine éclair) ; perdre
+  coûte le médecin. Adversaire plus rapide à haute notoriété. Tout dessiné.
 
 ## 8. Interdits (toutes versions)
 
