@@ -931,7 +931,7 @@ func _update_town_combat(delta: float) -> void:
 	_muzzle_t = maxf(0.0, _muzzle_t - delta)
 	# Cible auto = hostile le plus proche dans le rayon.
 	_has_target = false
-	var best := AUTO_RANGE
+	var best := AUTO_RANGE * SaveManager.aim_range_mult()
 	for h in _hostiles():
 		var d := _player_pos.distance_to(h)
 		if d < best:
@@ -1011,7 +1011,7 @@ func _spawn_boss() -> void:
 	var py := _rng.randf_range(1080.0, 1380.0)
 	_boss = {"pos": Vector2(px, py), "vel": Vector2.ZERO, "hp": hp, "max_hp": hp, "alive": true,
 		"fire_cd": 1.2, "name": BOSS_NAMES[_rng.randi() % BOSS_NAMES.size()],
-		"bounty": 650 + SaveManager.notoriety * 130}
+		"bounty": int(round((650 + SaveManager.notoriety * 130) * SaveManager.bounty_mult()))}
 	_floaters.append({"pos": Vector2(px, py - 30), "t": 0.0, "text": "RECHERCHÉ !", "col": Color(1, 0.3, 0.25)})
 	AudioManager.play("alarm", -6.0)
 
@@ -1147,7 +1147,7 @@ func _reward_kill(at: Vector2) -> void:
 	var mult := 1.0 + 0.5 * float(_streak - 1)          # x1, x1.5, x2, x2.5...
 	if _rush_active:
 		mult *= 2.0                                     # RUÉE : primes doublées
-	var bounty := int(round((120 + SaveManager.notoriety * 20) * mult))
+	var bounty := int(round((120 + SaveManager.notoriety * 20) * mult * SaveManager.bounty_mult()))
 	SaveManager.refund(bounty)
 	_shake = maxf(_shake, 7.0)
 	AudioManager.play("hit_guard")

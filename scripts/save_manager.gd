@@ -20,9 +20,11 @@ const UPGRADE_DEFS := {
 	"fortune": {"name": "Flair du magot",  "desc": "Butin +8% / niveau",          "cost": [500, 1000, 1700], "store": "store"},
 	"firerate":{"name": "Détente affûtée", "desc": "Cadence de tir +9% / niveau", "cost": [400, 900], "store": "gunsmith"},
 	"tonic":   {"name": "Tonique du Doc",  "desc": "Invulnérabilité +18% / niv",  "cost": [400, 800], "store": "pharmacy"},
+	"eagle":   {"name": "Œil de lynx",     "desc": "Portée d'auto-visée +16% / niv", "cost": [400, 850, 1500], "store": "gunsmith"},
+	"renown":  {"name": "Renom de pistolero", "desc": "Primes de kill +12% / niveau", "cost": [500, 1100, 1800], "store": "store"},
 }
 ## Ordre d'affichage stable dans la boutique.
-const UPGRADE_ORDER := ["reload", "ammo", "firerate", "vitality", "tonic", "speed", "safe", "stealth", "fortune"]
+const UPGRADE_ORDER := ["reload", "ammo", "firerate", "eagle", "vitality", "tonic", "speed", "safe", "stealth", "fortune", "renown"]
 
 var total_money: int = 0
 var missions_completed: int = 0
@@ -253,6 +255,14 @@ func firerate_mult() -> float:
 func invuln_mult() -> float:
 	# Durée d'invulnérabilité après un coup (pharmacie).
 	return 1.0 + 0.18 * get_level("tonic")
+
+func aim_range_mult() -> float:
+	# Portée de l'auto-visée (armurier, « Œil de lynx »).
+	return 1.0 + 0.16 * get_level("eagle")
+
+func bounty_mult() -> float:
+	# Majore les primes de kill en combat libre (magasin, « Renom de pistolero »).
+	return 1.0 + 0.12 * get_level("renown")
 
 
 # --- Réglages persistants ---

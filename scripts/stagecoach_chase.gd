@@ -307,7 +307,7 @@ func _update_combat(delta: float) -> void:
 	# Tir du joueur : AUTO-VISÉE sur l'escorte la plus proche + TIR CONTINU.
 	_fire_cd = maxf(0.0, _fire_cd - delta)
 	_aim_target = _nearest_escort(_player_pos)
-	var locked: bool = _aim_target != null and _player_pos.distance_to(_aim_target) < AUTO_RANGE
+	var locked: bool = _aim_target != null and _player_pos.distance_to(_aim_target) < AUTO_RANGE * SaveManager.aim_range_mult()
 	var manual := InputManager.is_fire_pressed()
 	if _fire_cd <= 0.0 and (locked or manual):
 		var dir: Vector2 = (_aim_target - _player_pos) if locked else _track_dir
@@ -383,7 +383,7 @@ func _spawn_burst(at: Vector2, col: Color) -> void:
 ## Une escorte tombée lâche une petite bourse (récompense + juice).
 func _kill_reward(at: Vector2) -> void:
 	_shake = maxf(_shake, 7.0)
-	var bounty := 90 + SaveManager.notoriety * 10
+	var bounty := int(round((90 + SaveManager.notoriety * 10) * SaveManager.bounty_mult()))
 	SaveManager.refund(bounty)
 	AudioManager.play("hit_guard")
 	_floaters.append({"pos": at, "t": 0.0, "text": "+%d $" % bounty, "col": Color(1, 0.85, 0.5)})

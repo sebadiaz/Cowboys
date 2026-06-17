@@ -164,6 +164,9 @@ mobile). **NE PAS refaire ; stabiliser et polir seulement.**
 - **Commerces** : `shop_screen.gd` filtré par `GameManager.shop_category` (FAIT,
   lot 13) — ARMURIER (FORGE), CABINET DU DOC (DOCTEUR), MAGASIN GÉNÉRAL (MAGASIN),
   enterables en ville via `goto_commerce()`. Catalogue catégorisé (champ `store`).
+  **Upgrades liés au combat** : « Œil de lynx » (`aim_range_mult`, portée d'auto-visée,
+  armurier) et « Renom de pistolero » (`bounty_mult`, primes de kill, magasin) —
+  câblés dans la ville ET les poursuites (auto-visée + `_reward_kill`/boss).
 - **Prison** : `jail_system.gd` (FAIT, lot 15, scène `Jail.tscn`) — un braquage de
   banque RATÉ y mène (pris par la loi) ; sortie par caution (magot, scale notoriété)
   ou crochetage (mini-jeu d'adresse). S'évader augmente la prime. Diligence/train
