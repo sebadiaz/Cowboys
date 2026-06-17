@@ -89,6 +89,12 @@ saloon. Missions **courtes (2–5 min)**, rejouables, lisibles. Construit par
   `RUSH_DURATION`, bandeau écran « RUÉE ! primes ×2 » + jauge. Les bandits de ruée
   ne réapparaissent pas une fois la vague finie (nettoyés dans `_update_bandits`).
   Voir `_update_rush`, `_start_rush`.
+- **FAIT (événement DESCENTE DE LA LOI)** : au-delà de `RAID_MIN_NOTORIETY` (3),
+  une escouade de **lois** (bandits marqués `law`, PV 3, étoile ✦, palette shérif)
+  prend la ville d'assaut (`_start_raid`). Les **abattre fait RETOMBER la notoriété**
+  (`SaveManager.lose_notoriety()`, −2) une fois la descente nettoyée — gestion du
+  « chaud » au flingue. Ne réapparaissent jamais (nettoyés comme la ruée). Bandeau
+  écran « ✦ DESCENTE DE LA LOI ✦ » + compteur. Voir `_update_raid`, `_start_raid`.
 
 ## 5. Règle cheval / train / diligence (poursuites)
 

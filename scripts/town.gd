@@ -85,7 +85,11 @@ var _boss_timer := 26.0                # délai avant la prochaine apparition
 var _rush_active := false              # RUÉE en cours (vague de bandits, primes ×2)
 var _rush_t := 0.0                     # temps restant de la ruée
 var _rush_cd := 40.0                   # délai avant la prochaine ruée
+var _raid_active := false              # DESCENTE DE LA LOI (à haute notoriété)
+var _raid_cd := 30.0                   # délai avant la prochaine descente
+var _raid_left := 0                    # lois encore debout dans la descente
 const RUSH_DURATION := 16.0
+const RAID_MIN_NOTORIETY := 3
 const BANDIT_SPEED := 125.0
 const BOSS_SPEED := 168.0
 const AUTO_RANGE := 460.0
@@ -434,6 +438,7 @@ func _process(delta: float) -> void:
 		_update_bandits(delta)
 		_update_boss(delta)
 		_update_rush(delta)
+		_update_raid(delta)
 		_update_town_combat(delta)
 		_update_floaters(delta)
 		_update_streak(delta)
@@ -1050,13 +1055,47 @@ func _start_rush() -> void:
 	AudioManager.play("alarm", -4.0)
 
 
+## DESCENTE DE LA LOI : à haute notoriété, une escouade de lois prend la ville
+## d'assaut. Les nettoyer FAIT RETOMBER la notoriété (gestion du « chaud » au flingue).
+func _update_raid(delta: float) -> void:
+	if _raid_active:
+		if _raid_left <= 0:
+			_raid_active = false
+			_raid_cd = _rng.randf_range(40.0, 60.0)
+			SaveManager.lose_notoriety()
+			_shake = maxf(_shake, 8.0)
+			_floaters.append({"pos": _player_pos + Vector2(0, -46), "t": 0.0, "text": "LOI REPOUSSÉE — notoriété ↓", "col": Color(0.6, 1.0, 0.7)})
+		return
+	if SaveManager.notoriety < RAID_MIN_NOTORIETY:
+		return
+	_raid_cd = maxf(0.0, _raid_cd - delta)
+	if _raid_cd <= 0.0 and not _horse_ctrl.mounted:
+		_start_raid()
+
+
+func _start_raid() -> void:
+	_raid_active = true
+	var n := 4 + clampi(SaveManager.notoriety / 2, 0, 4)
+	_raid_left = n
+	for i in range(n):
+		var b := _new_bandit(true)
+		b["law"] = true
+		b["hp"] = 3                       # lois plus coriaces
+		b["respawn"] = 999999.0           # ne réapparaissent jamais
+		_bandits.append(b)
+	_shake = maxf(_shake, 6.0)
+	_floaters.append({"pos": _player_pos + Vector2(0, -40), "t": 0.0, "text": "DESCENTE DE LA LOI !", "col": Color(0.5, 0.7, 1.0)})
+	AudioManager.play("alarm", -3.0)
+
+
 ## Bandits : rôdent, tirent parfois sur le joueur ; respawn après mort.
 func _update_bandits(delta: float) -> void:
 	var drop: Array = []
 	for b in _bandits:
 		if not b["alive"]:
-			# Les bandits de RUÉE ne réapparaissent pas une fois la vague finie.
-			if b.get("rush", false) and not _rush_active:
+			# Les bandits de RUÉE ne réapparaissent pas une fois la vague finie ;
+			# les LOIS d'une descente ne réapparaissent jamais.
+			if (b.get("rush", false) and not _rush_active) or b.get("law", false):
 				drop.append(b)
 				continue
 			b["respawn"] = float(b["respawn"]) - delta
@@ -1188,6 +1227,8 @@ func _advance_town_bullets(delta: float) -> void:
 						if int(bd["hp"]) <= 0:
 							bd["alive"] = false
 							bd["respawn"] = randf_range(6.0, 10.0)
+							if bd.get("law", false):
+								_raid_left -= 1   # un de moins dans la descente
 							_reward_kill(bd["pos"])
 						break
 			if not hit:
@@ -1451,6 +1492,14 @@ func _draw() -> void:
 		var gw := 180.0 * (_rush_t / RUSH_DURATION)
 		draw_rect(Rect2(cr + Vector2(-90, 18), Vector2(180, 5)), Color(0, 0, 0, 0.4))
 		draw_rect(Rect2(cr + Vector2(-90, 18), Vector2(gw, 5)), Color(1.0, 0.55, 0.2))
+
+	# Bandeau « DESCENTE DE LA LOI » : escouade à repousser, notoriété ↓ à la clé.
+	if _raid_active:
+		var vpl := get_viewport_rect().size
+		var cl := Vector2(vpl.x * 0.5, 78.0) - position
+		var lp := 0.5 + 0.5 * sin(_hint_t * 5.0)
+		_text(cl, "✦ DESCENTE DE LA LOI ✦", 22, Color(0.55 + 0.3 * lp, 0.75, 1.0))
+		_text(cl + Vector2(0, 22), "Lois debout : %d  —  les abattre fait retomber ta prime" % _raid_left, 15, Color(0.8, 0.9, 1.0))
 
 	# Bandeau « RECHERCHÉ » quand le mini-boss est en ville (fixe à l'écran).
 	if _boss != null and _boss["alive"]:
@@ -2426,9 +2475,14 @@ func _draw_lawman(p: Dictionary) -> void:
 func _draw_bandit(b: Dictionary) -> void:
 	var pos: Vector2 = b["pos"]
 	var f := _screen_facing(pos, (b["vel"] as Vector2))
-	CharacterArt.draw_person(self, Iso.project(pos), f, _hunter_palette(), true, true, _hint_t * 8.0, 0.0, 0.0)
-	# Petit chapeau de prime au-dessus.
-	_text(Iso.project(pos) + Vector2(0, -52), "$", 14, Color(0.95, 0.8, 0.3))
+	var law: bool = b.get("law", false)
+	var pal := _lawman_palette() if law else _hunter_palette()
+	CharacterArt.draw_person(self, Iso.project(pos), f, pal, true, true, _hint_t * 8.0, 0.0, 0.0)
+	# Marqueur au-dessus : étoile de shérif pour les lois, $ pour les bandits.
+	if law:
+		_text(Iso.project(pos) + Vector2(0, -52), "✦", 15, Color(0.7, 0.85, 1.0))
+	else:
+		_text(Iso.project(pos) + Vector2(0, -52), "$", 14, Color(0.95, 0.8, 0.3))
 
 
 ## Mini-boss recherché : silhouette plus grande, manteau noir, barre de vie + nom.
