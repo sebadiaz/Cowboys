@@ -73,6 +73,8 @@ var _muzzle_t := 0.0                 # flash de bouche
 var _hp_label: Label
 # Chasse libre : bandits qui rôdent + auto-visée/tir continu sur le plus proche.
 var _bandits: Array[Dictionary] = []   # {pos, vel, hp, alive, fire_cd, wander_t, respawn}
+var _barrels: Array[Dictionary] = []   # tonneaux de TNT explosifs {pos, alive, respawn}
+const BARREL_RADIUS := 140.0           # rayon de l'explosion
 var _floaters: Array[Dictionary] = []  # {pos, t, text, col} (pop-ups +$ / coups)
 var _aim_target := Vector2.ZERO
 var _has_target := false
@@ -348,6 +350,11 @@ func _build_town() -> void:
 	for i in range(4):
 		_bandits.append(_new_bandit(true))
 
+	# Tonneaux de TNT le long de la rue : à faire péter au milieu d'un groupe.
+	for i in range(3):
+		var bx := FLOOR.position.x + (i + 1) * (FLOOR.size.x / 4.0) + _rng.randf_range(-120, 120)
+		_barrels.append({"pos": Vector2(bx, _rng.randf_range(1120.0, 1360.0)), "alive": true, "respawn": 0.0})
+
 
 ## Crée un bandit (à un point de la rue, loin du joueur si demandé).
 func _new_bandit(at_edge := false) -> Dictionary:
@@ -436,6 +443,7 @@ func _process(delta: float) -> void:
 		_update_commerce_card()
 		_update_bank_heist(delta)
 		_update_bandits(delta)
+		_update_barrels(delta)
 		_update_boss(delta)
 		_update_rush(delta)
 		_update_raid(delta)
@@ -1088,6 +1096,55 @@ func _start_raid() -> void:
 	AudioManager.play("alarm", -3.0)
 
 
+## Tonneaux de TNT : réapparaissent un moment après avoir explosé.
+func _update_barrels(delta: float) -> void:
+	for bl in _barrels:
+		if not bl["alive"]:
+			bl["respawn"] = float(bl["respawn"]) - delta
+			if float(bl["respawn"]) <= 0.0:
+				bl["alive"] = true
+				bl["pos"] = Vector2(_rng.randf_range(FLOOR.position.x + 200.0, FLOOR.end.x - 200.0),
+						_rng.randf_range(1120.0, 1360.0))
+
+
+## Explosion d'un tonneau : dégâts de zone à tous les hostiles proches (+ risque
+## pour le joueur s'il est trop près). Réutilise les récompenses de kill.
+func _explode(at: Vector2) -> void:
+	_shake = maxf(_shake, 14.0)
+	AudioManager.play("explosion", -2.0)
+	for i in range(26):
+		_bursts.append({"pos": at, "vel": Vector2.RIGHT.rotated(_rng.randf() * TAU) * _rng.randf_range(90, 320),
+			"t": 0.0, "col": Color(1.0, 0.6, 0.15) if i % 2 == 0 else Color(0.5, 0.3, 0.2)})
+	# Bandits/lois pris dans le souffle : mort + récompense.
+	for bd in _bandits:
+		if bd["alive"] and (bd["pos"] as Vector2).distance_to(at) < BARREL_RADIUS:
+			bd["hp"] = 0
+			bd["alive"] = false
+			bd["respawn"] = randf_range(6.0, 10.0)
+			if bd.get("law", false):
+				_raid_left -= 1
+			_reward_kill(bd["pos"])
+	# Chasseurs de primes soufflés.
+	for hu in _wanted.hunters.duplicate():
+		if (hu["pos"] as Vector2).distance_to(at) < BARREL_RADIUS:
+			_wanted.hunters.erase(hu)
+	# Mini-boss : gros dégâts (pas one-shot).
+	if _boss != null and _boss["alive"] and (_boss["pos"] as Vector2).distance_to(at) < BARREL_RADIUS:
+		_boss["hp"] = int(_boss["hp"]) - 5
+		if int(_boss["hp"]) <= 0:
+			_boss["alive"] = false
+			_kill_boss()
+	# Réaction en chaîne : les autres tonneaux dans le rayon sautent aussi.
+	for ob in _barrels:
+		if ob["alive"] and (ob["pos"] as Vector2).distance_to(at) > 1.0 and (ob["pos"] as Vector2).distance_to(at) < BARREL_RADIUS:
+			ob["alive"] = false
+			ob["respawn"] = _rng.randf_range(10.0, 16.0)
+			call_deferred("_explode", ob["pos"])
+	# Le joueur trop près encaisse aussi (risque).
+	if _php_dmg_cd <= 0.0 and _player_pos.distance_to(at) < BARREL_RADIUS * 0.7:
+		_hurt_player()
+
+
 ## Bandits : rôdent, tirent parfois sur le joueur ; respawn après mort.
 func _update_bandits(delta: float) -> void:
 	var drop: Array = []
@@ -1208,8 +1265,16 @@ func _advance_town_bullets(delta: float) -> void:
 			continue
 		var hit := false
 		if b["friendly"]:
+			# Tonneau de TNT touché : il explose (dégâts de zone).
+			for bl in _barrels:
+				if bl["alive"] and (bl["pos"] as Vector2).distance_to(b["pos"]) < 20.0:
+					bl["alive"] = false
+					bl["respawn"] = _rng.randf_range(10.0, 16.0)
+					hit = true
+					_explode(bl["pos"])
+					break
 			# Mini-boss recherché : encaisse plusieurs balles, grosse prime.
-			if _boss != null and _boss["alive"] and (_boss["pos"] as Vector2).distance_to(b["pos"]) < 26.0:
+			if not hit and _boss != null and _boss["alive"] and (_boss["pos"] as Vector2).distance_to(b["pos"]) < 26.0:
 				_boss["hp"] = int(_boss["hp"]) - 1
 				hit = true
 				_bursts.append({"pos": b["pos"], "vel": Vector2.RIGHT.rotated(_rng.randf() * TAU) * 110.0,
@@ -1402,6 +1467,9 @@ func _draw() -> void:
 	for bd in _bandits:
 		if bd["alive"]:
 			items.append({"d": Iso.depth(bd["pos"]), "k": "bandit", "o": bd})
+	for bl in _barrels:
+		if bl["alive"]:
+			items.append({"d": Iso.depth(bl["pos"]), "k": "tnt", "o": bl})
 	if _boss != null and _boss["alive"]:
 		items.append({"d": Iso.depth(_boss["pos"]), "k": "boss", "o": _boss})
 	items.append({"d": Iso.depth(_player_pos), "k": "me", "o": null})
@@ -1434,6 +1502,7 @@ func _draw() -> void:
 			"law": _draw_lawman(it["o"])
 			"bankguard": _draw_bank_guard(it["o"])
 			"bandit": _draw_bandit(it["o"])
+			"tnt": _draw_tnt(it["o"]["pos"])
 			"boss": _draw_boss(it["o"])
 			"tumble": _draw_tumble(it["o"])
 			"me": _draw_me()
@@ -2483,6 +2552,22 @@ func _draw_bandit(b: Dictionary) -> void:
 		_text(Iso.project(pos) + Vector2(0, -52), "✦", 15, Color(0.7, 0.85, 1.0))
 	else:
 		_text(Iso.project(pos) + Vector2(0, -52), "$", 14, Color(0.95, 0.8, 0.3))
+
+
+## Tonneau de TNT (à faire exploser au flingue).
+func _draw_tnt(pos: Vector2) -> void:
+	var sp := Iso.project(pos)
+	draw_colored_polygon(_diamond_shadow(sp, 11.0), Color(0, 0, 0, 0.22))
+	# Fût de bois.
+	draw_rect(Rect2(sp + Vector2(-12, -30), Vector2(24, 30)), Color(0.42, 0.27, 0.14))
+	for yy in [-26.0, -16.0, -6.0]:
+		draw_line(sp + Vector2(-12, yy), sp + Vector2(12, yy), Color(0.30, 0.19, 0.10), 2.0)
+	# Bâtons de dynamite rouges sur le dessus + mèche qui scintille.
+	for dx in [-6.0, 0.0, 6.0]:
+		draw_rect(Rect2(sp + Vector2(dx - 2, -40), Vector2(4, 12)), Color(0.75, 0.16, 0.12))
+	var sparkle := 0.5 + 0.5 * sin(_hint_t * 9.0)
+	draw_circle(sp + Vector2(0, -42), 2.5, Color(1.0, 0.85, 0.3, sparkle))
+	_text(sp + Vector2(0, -50), "TNT", 11, Color(1.0, 0.5, 0.2))
 
 
 ## Mini-boss recherché : silhouette plus grande, manteau noir, barre de vie + nom.

@@ -77,6 +77,11 @@ saloon. Missions **courtes (2–5 min)**, rejouables, lisibles. Construit par
   `_reward_kill`, `_update_streak`, `_update_floaters`, `_draw_bandit`. Calque
   d'ambiance cinématographique `atmosphere.gd` (golden hour, god rays, cycle
   jour/nuit, poussières d'or) posé par-dessus le monde.
+- **FAIT (tonneaux de TNT)** : des fûts explosifs (`_barrels`) jalonnent la rue ;
+  une balle les fait **exploser** (`_explode`) — dégâts de zone (`BARREL_RADIUS`) qui
+  tuent les bandits/lois proches (+ récompense), soufflent les chasseurs, **chunkent
+  le boss** (−5 PV), avec **réaction en chaîne** entre tonneaux et **risque pour le
+  joueur** s'il est trop près. Réapparaissent après un délai. Dessinés (`_draw_tnt`).
 - **FAIT (mini-boss « RECHERCHÉ »)** : un hors-la-loi **nommé** (`BOSS_NAMES`),
   coriace (PV `11 + notoriété`, barre de vie + nom dessinés), apparaît
   périodiquement (`_boss_timer`), **fonce** sur le joueur et lâche des **rafales en
